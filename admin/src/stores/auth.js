@@ -10,8 +10,8 @@ export const useAuthStore = defineStore('auth', () => {
   async function checkSession() {
     try {
       const { data } = await api.get('/auth/me')
-      // Isolamento: só aceita sessão de restaurante/admin
-      if (data.user?.role !== 'restaurante') {
+      // Cross-login prevention: só aceita sessão de admin
+      if (data.user?.module !== 'admin') {
         user.value = null
         return
       }

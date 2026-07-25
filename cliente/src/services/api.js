@@ -20,6 +20,8 @@ api.interceptors.request.use((config) => {
       config.headers.Authorization = `Bearer ${token}`
     }
   }
+  // Cross-login prevention: identificar módulo para o backend
+  config.headers['X-Module'] = 'cliente'
   return config
 })
 

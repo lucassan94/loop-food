@@ -42,9 +42,15 @@
           :draggable="podeArrastarKanban"
           @dragstart="dragOrder = order" @dragover.prevent
           @drop="podeArrastarKanban && changeStatus(order.id, col.status)"
+          @click="abrirDetalhes(order)"
+          style="cursor:pointer;"
         >
           <strong>{{ order.pedido_id }}</strong>
           <div style="font-size:0.8rem;color:var(--text-muted);">{{ order.nome_cliente }}</div>
+          <!-- Preview dos pratos (Kanban) -->
+          <div v-if="order.itens?.length" style="font-size:0.72rem;color:var(--text-secondary);margin-top:4px;line-height:1.3;">
+            {{ order.itens.slice(0, 3).map(i => i.nome_produto).join(', ') }}<span v-if="order.itens.length > 3">...</span>
+          </div>
           <div style="font-size:0.8rem;margin-top:4px;">R$ {{ parseFloat(order.total).toFixed(2) }}</div>
           <!-- Badge de refund (Kanban) -->
           <div v-if="(order.status === 'cancelado' || order.status === 'recusado') && isOnlinePayment(order.metodo_pagamento)"
@@ -112,17 +118,15 @@
             </button>
           </template>
 
-          <!-- Pendente: Aceitar (admin/gerente/chef), Recusar (admin/gerente), Cancelar (caixa) -->
+          <!-- Pendente: Aceitar (admin/gerente/chef), Recusar (admin/gerente) -->
           <template v-if="order.status === 'pendente'">
             <button v-if="podeAceitar" class="btn btn-success btn-sm" @click="changeStatus(order.id, 'preparando')">Aceitar</button>
-            <button v-if="podeRecusar" class="btn btn-danger btn-sm" @click="recusarPedido(order)">Recusar</button>
-            <button v-if="podeCancelar && isCaixa" class="btn btn-danger btn-sm" @click="cancelarPedido(order)">Cancelar</button>
+            <button v-if="podeRecusar" class="btn btn-danger btn-sm" @click="abrirModalCancelamento(order, 'recusado')">Recusar</button>
           </template>
 
-          <!-- Preparando: Pronto (admin/gerente/chef), Cancelar (admin/gerente/caixa) -->
+          <!-- Preparando: Pronto (admin/gerente/chef) -->
           <template v-if="order.status === 'preparando'">
             <button v-if="podeMarcarPronto" class="btn btn-primary btn-sm" @click="changeStatus(order.id, 'pronto_entrega')">Pronto para Entrega</button>
-            <button v-if="podeCancelar" class="btn btn-danger btn-sm" @click="cancelarPedido(order)">Cancelar</button>
           </template>
 
           <!-- Pronto para entrega -->
@@ -150,6 +154,8 @@
 
           <button class="btn btn-secondary btn-sm" @click="abrirDetalhes(order)">Detalhes</button>
           <button v-if="podeEnviarMensagem && !['entregue','cancelado','recusado'].includes(order.status)" class="btn btn-secondary btn-sm" @click="abrirMensagem(order)">💬 Mensagem</button>
+          <!-- Cancelar disponível durante toda jornada do pedido (antes de entregue/cancelado) -->
+          <button v-if="podeCancelar && isActiveOrder(order.status) && order.status !== 'aguardando_pagamento'" class="btn btn-danger btn-sm" @click="abrirModalCancelamento(order, 'cancelado')">Cancelar</button>
         </div>
       </div>
     </div>
@@ -228,6 +234,50 @@
       </div>
     </div>
 
+    <!-- Cancel/Recuse Modal (customizado, substitui prompt()) -->
+    <div v-if="cancelModalOrder" class="modal-overlay" @click.self="fecharModalCancelamento">
+      <div class="modal-content" style="max-width:420px;">
+        <div style="text-align:center;margin-bottom:1rem;">
+          <div style="width:48px;height:48px;border-radius:50%;background:var(--error-light);display:flex;align-items:center;justify-content:center;margin:0 auto 0.75rem;">
+            <i class="fas fa-exclamation-triangle" style="color:var(--error);font-size:1.3rem;"></i>
+          </div>
+          <h3 style="font-size:1.1rem;font-weight:700;">
+            {{ cancelModalAction === 'cancelado' ? 'Cancelar Pedido' : 'Recusar Pedido' }}
+          </h3>
+          <p style="font-size:0.85rem;color:var(--text-secondary);margin-top:0.25rem;">
+            {{ cancelModalOrder?.pedido_id }} — {{ cancelModalOrder?.nome_cliente }}
+          </p>
+        </div>
+
+        <div class="form-group">
+          <label>Motivo do {{ cancelModalAction === 'cancelado' ? 'cancelamento' : 'recusa' }}:</label>
+          <textarea
+            v-model="cancelModalMotivo"
+            rows="3"
+            placeholder="Descreva o motivo..."
+            style="width:100%;padding:0.75rem;border:1.5px solid var(--border);border-radius:6px;font-family:inherit;font-size:0.9rem;outline:none;"
+            @focus="$event.target.style.borderColor = 'var(--primary)'"
+            @blur="$event.target.style.borderColor = 'var(--border)'"
+          ></textarea>
+        </div>
+
+        <div style="display:flex;gap:0.75rem;margin-top:1.25rem;">
+          <button class="btn btn-secondary" style="flex:1;justify-content:center;" @click="fecharModalCancelamento">
+            Voltar
+          </button>
+          <button
+            class="btn btn-danger"
+            style="flex:1;justify-content:center;"
+            @click="confirmarCancelamento"
+            :disabled="!cancelModalMotivo.trim()"
+          >
+            <i class="fas fa-check"></i>
+            {{ cancelModalAction === 'cancelado' ? 'Cancelar Pedido' : 'Recusar Pedido' }}
+          </button>
+        </div>
+      </div>
+    </div>
+
     <!-- Message Modal -->
     <div v-if="msgOrder" class="modal-overlay" @click.self="msgOrder = null">
       <div class="modal-content" style="max-width:400px;">
@@ -268,6 +318,9 @@ const msgOrder = ref(null)
 const mensagemTexto = ref('')
 const dragOrder = ref(null)
 const verificandoIds = ref(new Set())
+const cancelModalOrder = ref(null)     // pedido alvo do cancelamento/recusa
+const cancelModalAction = ref('cancelado') // 'cancelado' | 'recusado'
+const cancelModalMotivo = ref('')      // motivo digitado
 let pollingPaymentInterval = null
 
 // Estado dos estornos (refund) por pedido
@@ -413,36 +466,41 @@ async function changeStatus(orderId, newStatus) {
   }
 }
 
-async function recusarPedido(order) {
-  const motivo = prompt('Motivo da recusa:')
-  if (!motivo) return
-  globalLoading.value = true
-  loadingMessage.value = 'Recusando pedido...'
-  try {
-    await api.patch(`/pedidos/${order.id}/status`, { status: 'recusado', motivo })
-    await loadOrders()
-    // Aguardar o fire-and-forget do backend processar no Asaas
-    if (isOnlinePayment(order.metodo_pagamento)) {
-      setTimeout(() => checkRefundStatus(order.id), 3000)
-    }
-  } catch (err) { showFeedback(err.response?.data?.error || 'Erro ao recusar', 'erro') }
-  finally { globalLoading.value = false }
+// ── Modal customizado de cancelamento/recusa (substitui prompt()) ──
+function abrirModalCancelamento(order, action) {
+  cancelModalOrder.value = order
+  cancelModalAction.value = action
+  cancelModalMotivo.value = ''
 }
 
-async function cancelarPedido(order) {
-  const motivo = prompt('Motivo do cancelamento:')
-  if (!motivo) return
+function fecharModalCancelamento() {
+  cancelModalOrder.value = null
+  cancelModalMotivo.value = ''
+}
+
+async function confirmarCancelamento() {
+  const order = cancelModalOrder.value
+  const action = cancelModalAction.value
+  const motivo = cancelModalMotivo.value.trim()
+  if (!order || !motivo) return
+
+  fecharModalCancelamento()
+
   globalLoading.value = true
-  loadingMessage.value = 'Cancelando pedido...'
+  loadingMessage.value = action === 'cancelado' ? 'Cancelando pedido...' : 'Recusando pedido...'
   try {
-    await api.patch(`/pedidos/${order.id}/status`, { status: 'cancelado', motivo })
+    await api.patch(`/pedidos/${order.id}/status`, { status: action, motivo })
     await loadOrders()
-    // Aguardar o fire-and-forget do backend processar no Asaas
+    await loadResumo()
     if (isOnlinePayment(order.metodo_pagamento)) {
       setTimeout(() => checkRefundStatus(order.id), 3000)
     }
-  } catch (err) { showFeedback(err.response?.data?.error || 'Erro ao cancelar', 'erro') }
-  finally { globalLoading.value = false }
+    showFeedback(`✅ Pedido ${order.pedido_id} ${action === 'cancelado' ? 'cancelado' : 'recusado'} com sucesso!`, 'success')
+  } catch (err) {
+    showFeedback(err.response?.data?.error || `Erro ao ${action === 'cancelado' ? 'cancelar' : 'recusar'}`, 'erro')
+  } finally {
+    globalLoading.value = false
+  }
 }
 
 function abrirDetalhes(order) { selectedOrder.value = order }
@@ -569,17 +627,24 @@ async function verificarPagamento(order) {
 }
 
 // Confirmar pagamento manualmente (admin apenas)
+// Chama o verificar-status que consulta o Asaas e ativa o pedido se pago
 async function confirmarPagamento(order) {
-  if (!confirm(`Confirmar pagamento do ${order.pedido_id} manualmente?\nIsso ativará o pedido para a fila de preparo.`)) return
+  if (!confirm(`Confirmar pagamento do ${order.pedido_id} manualmente?\nIsso consultará o Asaas e ativará o pedido para a fila de preparo.`)) return
   globalLoading.value = true
-  loadingMessage.value = 'Confirmando pagamento...'
+  loadingMessage.value = 'Verificando pagamento...'
   try {
-    await api.post(`/pagamentos/${order.id}/simular-pagamento`)
-    showFeedback(`✅ Pagamento do ${order.pedido_id} confirmado! O pedido foi para a fila.`, 'success')
+    const { data } = await api.get(`/pagamentos/${order.id}/verificar-status`)
+    if (data.precisa_atualizar) {
+      showFeedback(`✅ Pagamento do ${order.pedido_id} confirmado! O pedido foi para a fila.`, 'success')
+    } else if (data.pagamento_status !== 'PENDING') {
+      showFeedback(`ℹ️ Status do pagamento: ${data.pagamento_status}`, 'info')
+    } else {
+      showFeedback('⚠️ Pagamento ainda não detectado no Asaas.', 'erro')
+    }
     await loadOrders()
     await loadResumo()
   } catch (err) {
-    showFeedback('Erro: ' + (err.response?.data?.erro || err.message), 'erro')
+    showFeedback('Erro: ' + (err.response?.data?.error || err.message), 'erro')
   } finally {
     globalLoading.value = false
   }
@@ -591,24 +656,17 @@ onMounted(async () => {
   onEvent('pedido:novo', () => { loadOrders(); loadResumo() })
   onEvent('pedido:atualizado', () => { loadOrders(); loadResumo() })
 
-  // Auto-polling: verificar pedidos com pagamento pendente a cada 10s
+  // Auto-polling LOCAL: recarrega lista de pedidos a cada 10s
+  // NÃO consulta Asaas — apenas o banco local
+  // O webhook do Asaas é o mecanismo principal de atualização
   pollingPaymentInterval = setInterval(async () => {
-    const pending = orders.value.filter(o => o.status === 'aguardando_pagamento' && o.metodo_pagamento?.includes('online'))
-    if (pending.length === 0) return
-    for (const order of pending) {
-      try {
-        const { data } = await api.get(`/pagamentos/${order.id}/verificar-status`)
-        if (data.precisa_atualizar) {
-          await loadOrders()
-          await loadResumo()
-          break  // recarrega a lista e sai
-        }
-      } catch { /* silent */ }
-      await new Promise(r => setTimeout(r, 500))  // delay entre chamadas
-    }
+    await loadOrders()
+    await loadResumo()
   }, 10000)
 
-  // Polling: verificar status do estorno a cada 10s (apenas para logging interno)
+  // Polling de refund LOCAL: verifica status no BD local a cada 10s
+  // O webhook PAYMENT_REFUNDED já atualiza o BD
+  // Este polling só serve como fallback para quando o status é inconclusivo
   pollingRefundInterval = setInterval(async () => {
     const recusados = orders.value.filter(o =>
       (o.status === 'cancelado' || o.status === 'recusado') &&
@@ -635,6 +693,7 @@ onMounted(async () => {
 
 // Limpar intervalos ao desmontar
 onUnmounted(() => {
+  if (pollingPaymentInterval) clearInterval(pollingPaymentInterval)
   if (pollingRefundInterval) clearInterval(pollingRefundInterval)
 })
 </script>

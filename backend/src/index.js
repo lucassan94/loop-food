@@ -9,6 +9,8 @@ import { healthCheck } from './config/database.js';
 import { buscarCEP } from './services/cep.js';
 import { errorHandler, notFound } from './middleware/errorHandler.js';
 import { pgContext } from './middleware/pgContext.js';
+import { restrictModule } from './middleware/auth.js';
+import { apiLimiter } from './middleware/rateLimiter.js';
 
 // Import routes
 import authRoutes from './modules/auth/index.js';
@@ -20,6 +22,7 @@ import restauranteRoutes from './modules/restaurante/index.js';
 import dashboardRoutes from './modules/dashboard/index.js';
 import pagamentosRoutes from './modules/pagamentos/index.js';
 import pushRoutes from './modules/push/index.js';
+import adminDataRoutes from './modules/admin-data/index.js';
 
 const app = express();
 const server = http.createServer(app);
@@ -35,17 +38,29 @@ app.set('trust proxy', 1);
 // ============================
 // SECURITY MIDDLEWARE
 // ============================
+
+// CSP dinâmica: em produção removemos unsafe-eval (Vue build não precisa)
+// Em desenvolvimento, unsafe-eval é necessário para o hot-reload do Vite
+const cspDirectives = {
+  defaultSrc: ["'self'"],
+  scriptSrc: ["'self'"],
+  styleSrc: ["'self'", "'unsafe-inline'", 'https://cdnjs.cloudflare.com', 'https://fonts.googleapis.com'],
+  fontSrc: ["'self'", 'https://cdnjs.cloudflare.com', 'https://fonts.gstatic.com'],
+  imgSrc: ["'self'", 'data:', 'blob:', 'https://images.unsplash.com', 'https://viacep.com.br', 'https://brasilapi.com.br'],
+  connectSrc: ["'self'", 'https://viacep.com.br', 'https://brasilapi.com.br'],
+};
+
+// Em dev, adicionar unsafe-eval (necessário para Vue hot-reload)
+if (config.isDev) {
+  cspDirectives.scriptSrc.push("'unsafe-eval'");
+}
+
 app.use(helmet({
   contentSecurityPolicy: {
-    directives: {
-      defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'unsafe-eval'"],
-      styleSrc: ["'self'", "'unsafe-inline'", 'https://cdnjs.cloudflare.com', 'https://fonts.googleapis.com'],
-      fontSrc: ["'self'", 'https://cdnjs.cloudflare.com', 'https://fonts.gstatic.com'],
-      imgSrc: ["'self'", 'data:', 'blob:', 'https://images.unsplash.com', 'https://viacep.com.br', 'https://brasilapi.com.br'],
-      connectSrc: ["'self'", 'https://viacep.com.br', 'https://brasilapi.com.br'],
-    },
+    directives: cspDirectives,
   },
+  // Outras proteções do helmet ativadas
+  crossOriginEmbedderPolicy: false, // Necessário para carregar recursos de terceiros
 }));
 
 app.use(cors({
@@ -61,7 +76,7 @@ app.use(cors({
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Auth-Guard'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Auth-Guard', 'X-Module'],
 }));
 
 app.use(cookieParser());
@@ -89,20 +104,27 @@ app.use('/api', pgContext);
 // ============================
 // API ROUTES
 // ============================
+// Auth routes: sem restrição de módulo (login público)
 app.use('/api/auth', authRoutes);
+
+// Rotas compartilhadas entre módulos (sem restrição de módulo no grupo,
+// cada endpoint usa authenticate internamente para verificar permissões)
 app.use('/api/produtos', produtosRoutes);
 app.use('/api/pedidos', pedidosRoutes);
 app.use('/api/clientes', clientesRoutes);
 app.use('/api/entregadores', entregadoresRoutes);
 app.use('/api/restaurante', restauranteRoutes);
-app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/pagamentos', pagamentosRoutes);
 app.use('/api/push', pushRoutes);
+
+// Rotas exclusivas do módulo Admin (com restrição de módulo)
+app.use('/api/dashboard', restrictModule(), dashboardRoutes);
+app.use('/api/admin-data', restrictModule(), adminDataRoutes);
 
 // ============================
 // CEP SEARCH
 // ============================
-app.post('/api/cep', async (req, res, next) => {
+app.post('/api/cep', apiLimiter, async (req, res, next) => {
   try {
     const { cep } = req.body;
     const result = await buscarCEP(cep);

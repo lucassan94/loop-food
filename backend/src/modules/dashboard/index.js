@@ -6,17 +6,18 @@ import { authenticate, authorize } from '../../middleware/auth.js';
 const router = Router();
 
 // Helpers para montar cláusula de data com parâmetros seguros
-function buildDateClause(params, dataInicio, dataFim) {
+// tablePrefix: prefixo opcional da tabela (ex: 'p.') para queries com JOIN
+function buildDateClause(params, dataInicio, dataFim, tablePrefix = '') {
   let clause = '';
   if (dataInicio) {
     params.push(dataInicio);
-    clause += ` AND criado_em >= $${params.length}`;
+    clause += ` AND ${tablePrefix}criado_em >= $${params.length}`;
   } else {
-    clause += ` AND criado_em >= CURRENT_DATE`;
+    clause += ` AND ${tablePrefix}criado_em >= CURRENT_DATE`;
   }
   if (dataFim) {
     params.push(dataFim + 'T23:59:59');
-    clause += ` AND criado_em <= $${params.length}`;
+    clause += ` AND ${tablePrefix}criado_em <= $${params.length}`;
   }
   return clause;
 }
@@ -24,7 +25,7 @@ function buildDateClause(params, dataInicio, dataFim) {
 // ============================
 // DASHBOARD PRINCIPAL
 // ============================
-router.get('/', authenticate, authorize('admin', 'gerente'), async (req, res, next) => {
+router.get('/', authenticate, authorize('admin', 'gerente', 'caixa'), async (req, res, next) => {
   try {
     const { data_inicio, data_fim } = req.query;
 
@@ -60,17 +61,19 @@ router.get('/', authenticate, authorize('admin', 'gerente'), async (req, res, ne
       GROUP BY metodo_pagamento
     `, params);
 
-    // Produtos mais vendidos
+    // Produtos mais vendidos (usa prefixo p. para desambiguar criado_em no JOIN)
+    const paramsTop = [config.restaurantId];
+    const dateClauseTop = buildDateClause(paramsTop, data_inicio, data_fim, 'p.');
     const topProdutos = await query(`
       SELECT pi.nome_produto, SUM(pi.quantidade) as quantidade_vendida,
              SUM(pi.subtotal) as receita_gerada
       FROM pedido_itens pi
       JOIN pedidos p ON pi.pedido_id = p.id
-      WHERE p.restaurant_id = $1${dateClause}
+      WHERE p.restaurant_id = $1${dateClauseTop}
       GROUP BY pi.nome_produto
       ORDER BY receita_gerada DESC
       LIMIT 10
-    `, params);
+    `, paramsTop);
 
     // Tempos médios por etapa (últimos 30 dias - não filtrável)
     const temposMedios = await query(`

@@ -226,6 +226,32 @@ input, textarea, select { font-family: inherit; }
   gap: 8px;
 }
 
+/* Separador entre categorias */
+.category-divider {
+  height: 2px;
+  background: linear-gradient(to right, var(--border), var(--primary-light), var(--border));
+  margin: 1.5rem 0;
+  border-radius: 1px;
+}
+
+/* Título de cada grupo de categoria */
+.category-group-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.4rem;
+  border-bottom: 2px solid var(--primary);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--primary-dark);
+}
+
+.category-group-title i {
+  font-size: 0.9rem;
+  color: var(--primary);
+}
+
 .products-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
@@ -369,6 +395,44 @@ input, textarea, select { font-family: inherit; }
   align-items: center;
   gap: 0.75rem;
   font-weight: 600;
+}
+
+.btn-cart-view {
+  padding: 0.5rem 1rem;
+  border-radius: var(--radius);
+  border: 1.5px solid rgba(255,255,255,0.3);
+  background: transparent;
+  color: white;
+  font-weight: 600;
+  font-size: 0.8rem;
+  transition: var(--transition);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.btn-cart-view:hover {
+  border-color: rgba(255,255,255,0.6);
+  background: rgba(255,255,255,0.1);
+}
+
+.btn-cart-checkout {
+  padding: 0.5rem 1.2rem;
+  border-radius: var(--radius);
+  border: none;
+  background: var(--secondary);
+  color: white;
+  font-weight: 700;
+  font-size: 0.85rem;
+  transition: var(--transition);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.btn-cart-checkout:hover {
+  background: #ea580c;
+  transform: translateY(-1px);
 }
 
 .cart-bar-right strong {
@@ -1289,6 +1353,45 @@ input, textarea, select { font-family: inherit; }
 }
 
 /* ============================
+   CEP ACTIONS (Onboarding buttons)
+   ============================ */
+.cep-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-top: 1.25rem;
+}
+
+.cep-actions .btn-link-muted {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 0.5rem;
+  cursor: pointer;
+  transition: var(--transition);
+  text-align: center;
+}
+
+.cep-actions .btn-link-muted:hover {
+  color: var(--text);
+  text-decoration: underline;
+}
+
+.btn-outline-primary {
+  background: transparent;
+  color: var(--primary);
+  border: 2px solid var(--primary);
+}
+
+.btn-outline-primary:hover {
+  background: var(--primary);
+  color: white;
+  transform: translateY(-1px);
+}
+
+/* ============================
    CEP MODAL (Onboarding)
    ============================ */
 .cep-modal-overlay {
@@ -1353,9 +1456,15 @@ input, textarea, select { font-family: inherit; }
   background: var(--surface);
   border-top: 1px solid var(--border);
   display: flex;
-  padding: 0.5rem 0;
-  padding-bottom: env(safe-area-inset-bottom, 0.5rem);
+  padding: 0.35rem 0;
+  padding-bottom: env(safe-area-inset-bottom, 0.35rem);
   box-shadow: 0 -4px 20px rgba(0,0,0,0.05);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: transform;
+}
+
+.bottom-nav.hidden {
+  transform: translateY(100%);
 }
 
 .bottom-nav-item {
@@ -1363,19 +1472,19 @@ input, textarea, select { font-family: inherit; }
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2px;
-  padding: 0.4rem;
+  gap: 1px;
+  padding: 0.3rem;
   border: none;
   background: none;
   color: var(--text-muted);
-  font-size: 0.7rem;
+  font-size: 0.65rem;
   font-weight: 600;
   transition: var(--transition);
   position: relative;
 }
 
 .bottom-nav-item i {
-  font-size: 1.3rem;
+  font-size: 1.15rem;
   transition: var(--transition);
 }
 

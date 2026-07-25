@@ -5,6 +5,7 @@ import { config } from '../../config/index.js';
 import { authenticate, authorize, optionalAuth } from '../../middleware/auth.js';
 import { AppError } from '../../middleware/errorHandler.js';
 import { emitPedidoAtualizado, emitNovoPedido, emitEntregaDisponivel } from '../../services/realtime.js';
+import { orderLimiter } from '../../middleware/rateLimiter.js';
 import { calcularFrete } from '../../services/frete.js';
 import * as asaas from '../../services/asaas.js';
 
@@ -46,9 +47,9 @@ const createOrderSchema = z.object({
 });
 
 // ============================
-// CRIAR PEDIDO (Cliente)
+// CRIAR PEDIDO (Cliente) — com rate limiting
 // ============================
-router.post('/', optionalAuth,async (req, res, next) => {
+router.post('/', orderLimiter, optionalAuth, async (req, res, next) => {
     try {
       const data = createOrderSchema.parse(req.body);
 
@@ -259,7 +260,7 @@ router.patch('/:id/status', authenticate, async (req, res, next) => {
   try {
     const { id } = req.params;
     const { status, motivo, entregador_id } = req.body;
-    const { role, id: userId } = req.user;
+    const { role, id: userId, cargo } = req.user;
 
     const statusSchema = z.object({
       status: z.enum(['aguardando_pagamento', 'pendente', 'preparando', 'pronto_entrega', 'em_transito', 'cheguei_destino', 'entregue', 'cancelado', 'recusado']),
@@ -268,6 +269,45 @@ router.patch('/:id/status', authenticate, async (req, res, next) => {
     });
 
     const data = statusSchema.parse({ status, motivo, entregador_id });
+
+    // ─── PERMISSÕES POR CARGO ───
+    // Cada cargo/role só pode fazer as transições permitidas
+    const userRole = (role || '').toLowerCase();
+    const userCargo = (cargo || '').toLowerCase();
+
+    if (userRole === 'cliente') {
+      // Cliente só pode cancelar pedidos próprios (RLS cuida do isolation)
+      if (data.status !== 'cancelado') {
+        throw new AppError('Clientes só podem cancelar pedidos.', 403);
+      }
+    } else if (userRole === 'entregador') {
+      // Entregador: só transições de entrega (em seus pedidos)
+      if (!['em_transito', 'cheguei_destino', 'entregue'].includes(data.status)) {
+        throw new AppError('Entregadores só podem gerenciar transporte/entrega.', 403);
+      }
+    } else if (userRole === 'restaurante') {
+      // Staff do restaurante: verificar cargo
+      // Fallback 'admin' para tokens antigos sem campo cargo
+      const effectiveCargo = userCargo || 'admin';
+      
+      if (['admin', 'gerente'].includes(effectiveCargo)) {
+        // Admin/gerente: qualquer transição
+      } else if (effectiveCargo === 'chef') {
+        // Chef: transições de cozinha + cancelar
+        if (!['preparando', 'pronto_entrega', 'cancelado'].includes(data.status)) {
+          throw new AppError('Chef só pode preparar, finalizar ou cancelar pedidos.', 403);
+        }
+      } else if (effectiveCargo === 'caixa') {
+        // Caixa: APENAS cancelar/recusar pedidos
+        if (!['cancelado', 'recusado'].includes(data.status)) {
+          throw new AppError('Caixa só pode cancelar ou recusar pedidos.', 403);
+        }
+      } else {
+        throw new AppError('Cargo sem permissão para alterar status.', 403);
+      }
+    } else {
+      throw new AppError('Tipo de usuário sem permissão.', 403);
+    }
 
     const result = await transaction(async (client) => {
       const pedido = await client.query(
@@ -279,22 +319,6 @@ router.patch('/:id/status', authenticate, async (req, res, next) => {
       const pedidoAtual = pedido.rows[0];
 
       // Validar transições de status
-      const transicoesValidas = {
-        'aguardando_pagamento': ['cancelado'],  // Apenas webhook pode ativar p/ 'pendente'
-        'pendente': ['preparando', 'cancelado', 'recusado'],
-        'preparando': ['pronto_entrega', 'cancelado'],
-        'pronto_entrega': ['em_transito'],
-        'em_transito': ['cheguei_destino'],
-        'cheguei_destino': ['entregue'],
-        'entregue': [],
-        'cancelado': [],
-        'recusado': [],
-      };
-
-      if (!transicoesValidas[pedidoAtual.status]?.includes(data.status)) {
-        throw new AppError(`Transição inválida de '${pedidoAtual.status}' para '${data.status}'.`, 400);
-      }
-
       // Atualizar campos de tempo
       const timeFields = {
         'preparando': 'aceito_em',
@@ -331,6 +355,9 @@ router.patch('/:id/status', authenticate, async (req, res, next) => {
       );
 
       // Registrar timeline
+      // usuarioTipo é o tipo geral (cliente/entregador/restaurante),
+      // não o cargo específico (admin/gerente/chef/caixa).
+      // O campo NOTAS da timeline pode registrar o cargo específico.
       let usuarioTipo = role;
       if (role === 'restaurante') usuarioTipo = 'restaurante';
 

@@ -46,6 +46,9 @@
           <div class="stat-card" style="text-align:center;">
             <div class="label">Hoje</div>
             <div class="value" style="font-size:1.3rem;">{{ formatPrice(financeiro.hoje) }}</div>
+            <div style="font-size:0.8rem;color:var(--text-muted);margin-top:2px;">
+              {{ financeiro.entregas_hoje ?? 0 }} {{ (financeiro.entregas_hoje ?? 0) === 1 ? 'entrega' : 'entregas' }}
+            </div>
           </div>
           <div class="stat-card" style="text-align:center;">
             <div class="label">Entregas no Mês</div>

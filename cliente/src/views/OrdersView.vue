@@ -111,9 +111,9 @@ function refundIcon(orderId) {
 
 function refundLabel(orderId) {
   const s = refundStatus.value[orderId]
-  if (s === 'DONE') return '✅ Estorno concluído'
+  if (s === 'DONE') return '✅ Estorno realizado'
   if (s === 'CANCELLED') return '❌ Estorno cancelado'
-  return '⏳ Estorno solicitado'
+  return '⏳ Aguardando estorno'
 }
 
 async function checkRefundStatus(orderId) {

@@ -7,7 +7,7 @@ import { config } from '../../config/index.js';
 import { authenticate } from '../../middleware/auth.js';
 import { AppError } from '../../middleware/errorHandler.js';
 import { validarTelefone, validarCPF } from '../../utils/validators.js';
-import { loginLimiter, signupLimiter } from '../../middleware/rateLimiter.js';
+import { loginLimiter, signupLimiter, refreshLimiter } from '../../middleware/rateLimiter.js';
 
 const router = Router();
 
@@ -28,11 +28,20 @@ const signupClienteSchema = z.object({
 
 // Gerar tokens JWT — sessão de longa duração (365 dias)
 function gerarTokens(usuario) {
+  // Determinar o módulo com base na role
+  const roleMap = {
+    'cliente': 'cliente',
+    'entregador': 'entregador',
+    'restaurante': 'admin',
+  };
+  const modulo = roleMap[usuario.role] || 'cliente';
+
   const payload = {
     id: usuario.id,
     email: usuario.email,
     nome: usuario.nome,
     role: usuario.role,
+    module: modulo,
     cargo: usuario.cargo || usuario.role,
     restaurantId: config.restaurantId,
   };
@@ -125,6 +134,7 @@ router.post('/cliente/login', loginLimiter, async (req, res, next) => {
         cep: user.cep,
         cpf_cnpj: user.cpf_cnpj,
         role: 'cliente',
+        module: 'cliente',
       },
       token: tokens.accessToken,
     });
@@ -209,6 +219,7 @@ router.post('/entregador/login', loginLimiter, async (req, res, next) => {
         entregasTotal: user.entregas_total,
         freteTotal: user.frete_total_recebido,
         role: 'entregador',
+        module: 'entregador',
       },
       token: tokens.accessToken,
     });
@@ -251,6 +262,7 @@ router.post('/restaurante/login', loginLimiter, async (req, res, next) => {
         email: user.email,
         cargo: user.cargo,
         role: 'restaurante',
+        module: 'admin',
       },
       token: tokens.accessToken,
     });
@@ -262,7 +274,7 @@ router.post('/restaurante/login', loginLimiter, async (req, res, next) => {
 // ============================
 // REFRESH TOKEN
 // ============================
-router.post('/refresh', async (req, res, next) => {
+router.post('/refresh', refreshLimiter, async (req, res, next) => {
   try {
     const refreshToken = req.cookies?.refreshToken || req.body?.refreshToken;
     if (!refreshToken) throw new AppError('Refresh token não fornecido.', 401);
@@ -315,7 +327,7 @@ router.get('/me', authenticate, async (req, res, next) => {
         [id]
       );
       if (!result.rows[0]) throw new AppError('Usuário não encontrado.', 404);
-      return res.json({ user: { ...result.rows[0], role: 'cliente' } });
+      return res.json({ user: { ...result.rows[0], role: 'cliente', module: 'cliente' } });
     }
 
     if (role === 'entregador') {
@@ -324,7 +336,7 @@ router.get('/me', authenticate, async (req, res, next) => {
         [id]
       );
       if (!result.rows[0]) throw new AppError('Usuário não encontrado.', 404);
-      return res.json({ user: { ...result.rows[0], role: 'entregador' } });
+      return res.json({ user: { ...result.rows[0], role: 'entregador', module: 'entregador' } });
     }
 
     if (role === 'restaurante') {
@@ -333,7 +345,7 @@ router.get('/me', authenticate, async (req, res, next) => {
         [id]
       );
       if (!result.rows[0]) throw new AppError('Usuário não encontrado.', 404);
-      return res.json({ user: { ...result.rows[0], role: 'restaurante' } });
+      return res.json({ user: { ...result.rows[0], role: 'restaurante', module: 'admin' } });
     }
 
     throw new AppError('Tipo de usuário inválido.', 400);

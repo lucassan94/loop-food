@@ -38,7 +38,7 @@
         </button>
       </nav>
       <div style="margin-top:auto;border-top:1px solid rgba(255,255,255,0.1);padding:1rem;">
-        <button class="sidebar-item" @click="logout">
+        <button class="sidebar-item" @click="showLogoutConfirm = true">
           <i class="fas fa-sign-out-alt"></i>
           <span>Sair</span>
         </button>
@@ -70,7 +70,20 @@
       <RelatoriosView v-if="currentView === 'relatorios'" />
       <DashboardView v-if="currentView === 'dashboard'" />
       <ConfigView v-if="currentView === 'config'" />
+      <DataManagerView v-if="currentView === 'dados'" />
     </main>
+
+    <!-- Confirm Modal -->
+    <ConfirmModal
+      :show="showLogoutConfirm"
+      title="Sair da Conta"
+      message="Tem certeza que deseja sair? Você precisará fazer login novamente para acessar o painel."
+      confirmText="Sair"
+      cancelText="Cancelar"
+      variant="danger"
+      @confirm="confirmarLogout"
+      @update:show="showLogoutConfirm = $event"
+    />
 
     <!-- Loading Overlay -->
     <div v-if="globalLoading" class="loading-overlay">
@@ -86,6 +99,7 @@ import { useAuthStore } from './stores/auth'
 import { connectRealtime, onEvent, offEvent } from './services/realtime'
 import api from './services/api'
 
+import ConfirmModal from './components/ConfirmModal.vue'
 import OrdersView from './views/OrdersView.vue'
 import ProdutosView from './views/ProdutosView.vue'
 import ClientesView from './views/ClientesView.vue'
@@ -93,6 +107,7 @@ import EntregadoresView from './views/EntregadoresView.vue'
 import RelatoriosView from './views/RelatoriosView.vue'
 import DashboardView from './views/DashboardView.vue'
 import ConfigView from './views/ConfigView.vue'
+import DataManagerView from './views/DataManagerView.vue'
 
 const authStore = useAuthStore()
 const email = ref('')
@@ -101,6 +116,7 @@ const loading = ref(false)
 const errorMsg = ref('')
 const currentView = ref('pedidos')
 const storeOpen = ref(true)
+const showLogoutConfirm = ref(false)
 
 // Global loading
 const globalLoading = ref(false)
@@ -117,6 +133,7 @@ const allMenuItems = [
   { id: 'entregadores', label: 'Entregadores', icon: 'fas fa-motorcycle', cargos: ['admin', 'gerente'] },
   { id: 'relatorios', label: 'Rel. Entregas', icon: 'fas fa-chart-bar', cargos: ['admin', 'gerente'] },
   { id: 'dashboard', label: 'Dashboard', icon: 'fas fa-chart-pie', cargos: ['admin', 'gerente', 'caixa'] },
+  { id: 'dados', label: 'Dados do Banco', icon: 'fas fa-database', cargos: ['admin'] },
   { id: 'config', label: 'Configurações', icon: 'fas fa-cog', cargos: ['admin', 'gerente'] },
 ]
 
@@ -157,10 +174,12 @@ async function login() {
   finally { loading.value = false }
 }
 
-function logout() {
-  authStore.user = null
+function confirmarLogout() {
   api.post('/auth/logout').catch(() => {})
-  window.location.href = '/'
+  authStore.user = null
+  // Navegação suave: o template reage a authStore.user = null
+  // e mostra automaticamente a tela de login (v-if="!authStore.isAuthenticated")
+  // sem necessidade de location.reload() ou router.push()
 }
 
 // Provide global loading state

@@ -201,9 +201,9 @@ const refundIcon = computed(() => {
 
 const refundLabel = computed(() => {
   const s = refundStatus.value
-  if (!s) return '⏳ Estorno solicitado'
-  if (s === 'DONE') return '✅ Estorno concluído'
-  return '⏳ Estorno solicitado'
+  if (!s) return '⏳ Aguardando estorno'
+  if (s === 'DONE') return '✅ Estorno realizado'
+  return '⏳ Aguardando estorno'
 })
 
 const timelineSteps = computed(() => [
@@ -341,8 +341,9 @@ function iniciarPollingLocal(pedidoId) {
       // Se o status mudou de 'aguardando_pagamento', o webhook chegou
       if (data.status !== 'aguardando_pagamento') {
         order.value = data
-        // Recarregar após 1s para sincronizar tudo
-        setTimeout(() => window.location.reload(), 1000)
+        // Atualização suave — não precisa de location.reload()
+        // O WebSocket já mantém os dados sincronizados em tempo real
+        clearInterval(pollingInterval)
       }
     } catch {
       // Silent — polling não deve mostrar erros

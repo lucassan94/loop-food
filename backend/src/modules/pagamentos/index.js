@@ -214,7 +214,7 @@ router.post('/criar', authenticate, async (req, res, next) => {
 
     // ─── Chamada Asaas (FORA da transação do BD) ───
 
-    // 4. Buscar ou criar customer no Asaas
+    // 4. Buscar ou criar customer no Asaas com TODOS os dados
     const customer = await asaas.findOrCreateCustomer({
       id: clienteId,
       cpfCnpj: cpfLimpo,
@@ -222,6 +222,14 @@ router.post('/criar', authenticate, async (req, res, next) => {
       email: req.user.email,
       phone: data.cliente.telefone,
       externalReference: clienteId,
+      // Endereço completo
+      address: data.pedido.endereco,
+      addressNumber: data.pedido.numero,
+      complement: data.pedido.complemento,
+      province: data.pedido.bairro,       // bairro
+      postalCode: data.pedido.cep,
+      city: data.pedido.cidade,
+      state: data.pedido.estado,
     });
 
     // Salvar asaas_customer_id no cliente (fire-and-forget)
@@ -530,12 +538,14 @@ router.get('/:pedidoId/verificar-status', authenticate, async (req, res, next) =
 });
 
 // ──────── GET /api/pagamentos/:pedidoId/refund-status ────────
-// Consulta status do estorno no Asaas (para polling no admin)
+// Consulta status do estorno — PRIORIDADE: BD local > Asaas
+// O BD é atualizado pelo webhook (PAYMENT_REFUNDED, REFUND_DENIED etc.)
+// Só consulta Asaas se o status local for inconclusivo
 router.get('/:pedidoId/refund-status', authenticate, async (req, res, next) => {
   try {
     const { pedidoId } = req.params;
 
-    // Buscar payment_id no BD
+    // Buscar pagamento no BD local
     const result = await query(
       `SELECT payment_id, status FROM pagamentos WHERE pedido_id = $1 ORDER BY criado_em DESC LIMIT 1`,
       [pedidoId]
@@ -546,20 +556,48 @@ router.get('/:pedidoId/refund-status', authenticate, async (req, res, next) => {
     }
 
     const pag = result.rows[0];
+    const localStatus = pag.status;
+
+    // Se o BD local já tem um status definitivo de refund, retorna direto
+    if (['REFUNDED', 'REFUND_DENIED', 'PARTIALLY_REFUNDED'].includes(localStatus)) {
+      return res.json({
+        tem_pagamento: true,
+        payment_id: pag.payment_id,
+        asaas_status: localStatus,
+        refund_status: localStatus === 'REFUNDED' ? 'DONE'
+          : localStatus === 'REFUND_DENIED' ? 'CANCELLED'
+          : 'DONE',
+        deleted: false,
+        fonte: 'local',
+      });
+    }
+
+    // Se ainda está como REFUND_IN_PROGRESS ou PENDING, consulta Asaas
     let refundStatus = null;
     let deleted = false;
     let asaasStatus = null;
 
     try {
-      // Consultar status REAL no Asaas
       const asaasPayment = await asaas.getPayment(pag.payment_id);
       asaasStatus = asaasPayment.status;
       deleted = asaasPayment.deleted || false;
 
-      // Extrair status do refund (último item do array, se houver)
       if (asaasPayment.refunds?.length > 0) {
         const lastRefund = asaasPayment.refunds[asaasPayment.refunds.length - 1];
-        refundStatus = lastRefund.status; // PENDING, DONE, CANCELLED, AWAITING_CRITICAL_ACTION_AUTHORIZATION
+        refundStatus = lastRefund.status;
+
+        // Se o Asaas já finalizou, atualizar nosso BD
+        if (refundStatus === 'DONE' && localStatus !== 'REFUNDED') {
+          await query(
+            `UPDATE pagamentos SET status = 'REFUNDED', atualizado_em = NOW() WHERE id = $1`,
+            [pag.id]
+          );
+        } else if (refundStatus === 'CANCELLED' && localStatus !== 'REFUND_DENIED') {
+          await query(
+            `UPDATE pagamentos SET status = 'REFUND_DENIED', atualizado_em = NOW() WHERE id = $1`,
+            [pag.id]
+          );
+        }
       }
     } catch (err) {
       console.warn(`[Asaas] Erro ao consultar status do refund ${pag.payment_id}:`, err.message);

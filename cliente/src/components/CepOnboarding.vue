@@ -31,13 +31,13 @@
       </div>
 
       <div class="cep-actions">
-        <button class="btn btn-secondary btn-block" @click="$router.push('/auth')">
-          Fazer Login
+        <button class="btn btn-primary btn-block" @click="$router.push('/auth')">
+          <i class="fas fa-sign-in-alt"></i> Fazer Login
         </button>
-        <button class="btn btn-secondary btn-block btn-outline-primary" @click="$router.push('/auth')">
-          Criar uma conta
+        <button class="btn btn-outline-primary btn-block" @click="$router.push('/auth')">
+          <i class="fas fa-user-plus"></i> Criar uma conta
         </button>
-        <button class="btn btn-link-muted" @click="$emit('close')">
+        <button class="btn-link-muted" @click="$emit('close')">
           Continuar navegando sem CEP
         </button>
       </div>

@@ -25,7 +25,7 @@
           <div class="header-status"><i class="fas fa-circle" style="font-size:6px;"></i> Em serviço</div>
         </div>
       </div>
-      <button style="background:none;border:none;color:var(--text-muted);font-size:1.2rem;" @click="logout"><i class="fas fa-sign-out-alt"></i></button>
+      <button style="background:none;border:none;color:var(--text-muted);font-size:1.2rem;" @click="showLogoutConfirm = true"><i class="fas fa-sign-out-alt"></i></button>
     </div>
 
     <!-- Stats Summary -->
@@ -119,6 +119,9 @@
           <div class="stat-card" style="text-align:center;">
             <div class="label">Hoje</div>
             <div class="value" style="font-size:1.5rem;">{{ formatPrice(financeiro.hoje) }}</div>
+            <div style="font-size:0.8rem;color:var(--text-muted);margin-top:2px;">
+              {{ financeiro.entregas_hoje ?? 0 }} {{ (financeiro.entregas_hoje ?? 0) === 1 ? 'entrega' : 'entregas' }}
+            </div>
           </div>
           <div class="stat-card" style="text-align:center;">
             <div class="label">Entregas no Mês</div>
@@ -250,6 +253,18 @@
       </div>
     </div>
 
+    <!-- Confirm Modal -->
+    <ConfirmModal
+      :show="showLogoutConfirm"
+      title="Sair da Conta"
+      message="Tem certeza que deseja sair? Você precisará fazer login novamente para continuar."
+      confirmText="Sair"
+      cancelText="Cancelar"
+      variant="danger"
+      @confirm="confirmarLogout"
+      @update:show="showLogoutConfirm = $event"
+    />
+
     <!-- Loading Overlay -->
     <div v-if="globalLoading" class="loading-overlay">
       <div class="spinner"></div>
@@ -260,6 +275,7 @@
 
 <script setup>
 import { ref, computed, reactive, onMounted, onUnmounted, provide } from 'vue'
+import ConfirmModal from './components/ConfirmModal.vue'
 import api from './services/api'
 import { connectRealtime, onEvent, offEvent } from './services/realtime'
 
@@ -269,6 +285,7 @@ const password = ref('')
 const loading = ref(false)
 const errorMsg = ref('')
 const currentTab = ref('entregas')
+const showLogoutConfirm = ref(false)
 
 // Global loading
 const globalLoading = ref(false)
@@ -312,6 +329,12 @@ async function login() {
   loading.value = true; errorMsg.value = ''
   try {
     const { data } = await api.post('/auth/entregador/login', { email: email.value, password: password.value })
+    // Cross-login prevention: verificar se o módulo confere
+    if (data.user?.module !== 'entregador') {
+      errorMsg.value = 'Acesso negado: você não tem permissão para este módulo.'
+      user.value = null
+      return
+    }
     user.value = data.user
     await loadData()
     connectSocket()
@@ -319,11 +342,12 @@ async function login() {
   finally { loading.value = false }
 }
 
-function logout() {
-  api.post('/auth/logout')
+function confirmarLogout() {
+  api.post('/auth/logout').catch(() => {})
   user.value = null
-  localStorage.removeItem('saborexpress_entregador_token')
-  location.reload()
+  // Navegação suave: o template reage a user.value = null
+  // e mostra automaticamente a tela de login (v-if="!user")
+  // sem necessidade de location.reload() — evita flash de carregamento
 }
 
 async function loadData() {
@@ -447,8 +471,8 @@ onMounted(() => {
   const token = document.cookie.match(/(^| )publicToken=([^;]+)/)?.[2]
   if (token) {
     api.get('/auth/me').then(({ data }) => {
-      // Isolamento: só aceita sessão de entregador
-      if (data.user?.role !== 'entregador') return
+      // Cross-login prevention: só aceita sessão de entregador
+      if (data.user?.module !== 'entregador') return
       user.value = data.user
       loadData()
       connectSocket()

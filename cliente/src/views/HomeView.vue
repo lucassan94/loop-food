@@ -30,13 +30,14 @@
       </button>
     </section>
 
-    <!-- Products Grid -->
+    <!-- Products Grid (agrupado por categoria com separadores) -->
     <section class="menu-section">
       <h2 class="section-title">
         <i class="fas fa-utensils"></i>
         {{ sectionTitle }}
       </h2>
 
+      <!-- Estado vazio -->
       <div v-if="filteredProducts.length === 0 && !loading" class="empty-search">
         <i class="fas fa-search"></i>
         <p v-if="searchQuery">
@@ -49,33 +50,51 @@
         </p>
       </div>
 
-      <div v-else class="products-grid">
-        <article
-          v-for="product in filteredProducts"
-          :key="product.id"
-          class="product-card"
-          @click="openProductModal(product)"
+      <!-- Produtos agrupados por categoria -->
+      <template v-else>
+        <div
+          v-for="(group, index) in filteredProductsByCategory"
+          :key="group.categoria_slug"
         >
-          <div class="product-card-image">
-            <img
-              :src="productImgSrc(product)"
-              :alt="product.nome"
-              loading="lazy"
-              @error="onImgError($event)"
-            />
+          <!-- Separador entre categorias -->
+          <div v-if="index > 0" class="category-divider"></div>
+
+          <!-- Título da categoria -->
+          <h3 class="category-group-title">
+            <i class="fas fa-tag"></i>
+            {{ group.categoria_nome }}
+          </h3>
+
+          <!-- Grid de produtos da categoria -->
+          <div class="products-grid">
+            <article
+              v-for="product in group.products"
+              :key="product.id"
+              class="product-card"
+              @click="openProductModal(product)"
+            >
+              <div class="product-card-image">
+                <img
+                  :src="productImgSrc(product)"
+                  :alt="product.nome"
+                  loading="lazy"
+                  @error="onImgError($event)"
+                />
+              </div>
+              <div class="product-card-body">
+                <h3>{{ product.nome }}</h3>
+                <p>{{ product.descricao || 'Sem descrição' }}</p>
+                <div class="product-card-footer">
+                  <span class="product-price">{{ formatPrice(product.preco) }}</span>
+                  <button class="btn-add-cart" @click.stop="quickAdd(product)">
+                    <i class="fas fa-plus"></i>
+                  </button>
+                </div>
+              </div>
+            </article>
           </div>
-          <div class="product-card-body">
-            <h3>{{ product.nome }}</h3>
-            <p>{{ product.descricao || 'Sem descrição' }}</p>
-            <div class="product-card-footer">
-              <span class="product-price">{{ formatPrice(product.preco) }}</span>
-              <button class="btn-add-cart" @click.stop="quickAdd(product)">
-                <i class="fas fa-plus"></i>
-              </button>
-            </div>
-          </div>
-        </article>
-      </div>
+        </div>
+      </template>
 
       <div v-if="loading" class="loading-wrapper">
         <div class="spinner spinner-center"></div>
@@ -178,6 +197,7 @@ const chosenExtraSet = ref(new Set()) // Set of extra IDs (simple checkbox mode)
 const cartItems = inject('cartItems')
 const updateCart = inject('updateCart')
 
+// Filtragem normal (plana)
 const filteredProducts = computed(() => {
   let result = products.value
 
@@ -195,6 +215,23 @@ const filteredProducts = computed(() => {
   }
 
   return result
+})
+
+// Produtos agrupados por categoria (com separação visual)
+const filteredProductsByCategory = computed(() => {
+  const groups = {}
+  for (const product of filteredProducts.value) {
+    const key = product.categoria_slug || 'outros'
+    if (!groups[key]) {
+      groups[key] = {
+        categoria_slug: key,
+        categoria_nome: product.categoria_nome || 'Outros',
+        products: [],
+      }
+    }
+    groups[key].products.push(product)
+  }
+  return Object.values(groups)
 })
 
 const sectionTitle = computed(() => {

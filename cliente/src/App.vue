@@ -6,8 +6,6 @@
       Loja Fechada no momento — novos pedidos não podem ser realizados
     </div>
 
-
-
     <!-- Main Content -->
     <main :class="{ 'main-cart-open': showCart }">
       <router-view
@@ -16,8 +14,8 @@
       />
     </main>
 
-    <!-- Bottom Navigation -->
-    <nav class="bottom-nav">
+    <!-- Bottom Navigation (esconde ao rolar para baixo) -->
+    <nav class="bottom-nav" :class="{ hidden: navHidden }">
       <button
         class="bottom-nav-item"
         :class="{ active: $route.name === 'Home' }"
@@ -46,14 +44,18 @@
     </nav>
 
     <!-- Cart Bar -->
-    <div v-if="showCart" class="cart-bar" @click="openCart">
-      <div class="cart-bar-left">
+    <div v-if="showCart" class="cart-bar">
+      <div class="cart-bar-left" @click="openCart">
         <i class="fas fa-shopping-bag"></i>
         <span>{{ cartTotalItens }} {{ cartTotalItens === 1 ? 'item' : 'itens' }}</span>
       </div>
       <div class="cart-bar-right">
-        <span>Ver Sacola</span>
-        <strong>{{ formatPrice(cartTotal) }}</strong>
+        <button class="btn-cart-view" @click="openCart">
+          <i class="fas fa-eye"></i> Ver
+        </button>
+        <button class="btn-cart-checkout" @click="checkoutCart">
+          <i class="fas fa-arrow-right"></i> Checkout
+        </button>
       </div>
     </div>
 
@@ -94,7 +96,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, provide } from 'vue'
+import { ref, computed, onMounted, onUnmounted, provide } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from './stores/auth'
 import { connectRealtime, onEvent, offEvent } from './services/realtime'
@@ -111,6 +113,26 @@ const cartItems = ref([])
 const showCartDrawer = ref(false)
 const showCepModal = ref(false)
 const unreadMessages = ref(0)
+
+// Navbar scroll hide
+const navHidden = ref(false)
+let lastScrollY = 0
+let scrollTick = false
+
+function handleScroll() {
+  if (scrollTick) return
+  scrollTick = true
+  requestAnimationFrame(() => {
+    const currentScrollY = window.scrollY
+    if (currentScrollY > lastScrollY && currentScrollY > 60) {
+      navHidden.value = true
+    } else {
+      navHidden.value = false
+    }
+    lastScrollY = currentScrollY
+    scrollTick = false
+  })
+}
 
 // Global loading
 const globalLoading = ref(false)
@@ -200,8 +222,13 @@ function restoreCart() {
   }
 }
 
-// Abrir carrinho: se não estiver logado, redirecionar para login
+// Abrir carrinho: mostra os itens mesmo sem login
 function openCart() {
+  showCartDrawer.value = true
+}
+
+// Checkout: força login se não estiver autenticado
+function checkoutCart() {
   if (!authStore.isAuthenticated) {
     addToast('Faça login para finalizar seu pedido.', 'info')
     $router.push('/auth')
@@ -221,6 +248,7 @@ provide('showCepModal', showCepModal)
 provide('storeOpen', storeOpen)
 
 onMounted(async () => {
+  window.addEventListener('scroll', handleScroll, { passive: true })
   await authStore.checkSession()
   restoreCart()
 
@@ -305,4 +333,8 @@ function statusLabel(status) {
   }
   return labels[status] || status
 }
+
+onUnmounted(() => {
+  window.removeEventListener('scroll', handleScroll)
+})
 </script>

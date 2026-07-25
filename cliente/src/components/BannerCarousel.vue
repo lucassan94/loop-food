@@ -110,7 +110,7 @@ onUnmounted(() => pauseAutoPlay())
 <style scoped>
 .carousel {
   position: relative;
-  height: 260px;
+  height: 180px;
   margin: 0;
   border-radius: 0;
   overflow: hidden;
@@ -251,10 +251,10 @@ onUnmounted(() => pauseAutoPlay())
 
 @media (min-width: 768px) {
   .carousel {
-    height: 320px;
+    height: 220px;
   }
   .carousel-overlay h2 {
-    font-size: 2rem;
+    font-size: 1.5rem;
   }
 }
 </style>

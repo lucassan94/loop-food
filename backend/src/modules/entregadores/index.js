@@ -12,8 +12,8 @@ const router = Router();
 const entregadorSchema = z.object({
   nome: z.string().min(2, 'Nome deve ter no mínimo 2 caracteres.'),
   email: z.string().email('E-mail inválido.'),
-  telefone: z.string().refine((v) => !v || validarTelefone(v).valido, 'Telefone inválido. Use (XX) XXXXX-XXXX.'),
-  cpf: z.string().refine((v) => !v || validarCPF(v).valido, 'CPF inválido. Use XXX.XXX.XXX-XX.'),
+  telefone: z.string().optional().default('').refine((v) => !v || validarTelefone(v).valido, 'Telefone inválido. Use (XX) XXXXX-XXXX.'),
+  cpf: z.string().optional().default('').refine((v) => !v || validarCPF(v).valido, 'CPF inválido. Use XXX.XXX.XXX-XX.'),
   rg: z.string().optional().default(''),
   data_nascimento: z.string().optional().default(''),
   endereco: z.string().optional().default(''),
@@ -143,7 +143,8 @@ router.get('/relatorio/financeiro', authenticate, authorize('admin', 'gerente'),
   try {
     // Total de hoje
     const hoje = await query(
-      `SELECT COALESCE(SUM(p.valor_frete), 0) as total
+      `SELECT COALESCE(SUM(p.valor_frete), 0) as total,
+              COUNT(*) as entregas
        FROM pedidos p
        WHERE p.restaurant_id = $1 AND p.status = 'entregue' AND p.entregue_em >= CURRENT_DATE`,
       [config.restaurantId]
@@ -177,6 +178,7 @@ router.get('/relatorio/financeiro', authenticate, authorize('admin', 'gerente'),
 
     res.json({
       hoje: hoje.rows[0].total,
+      entregas_hoje: parseInt(hoje.rows[0].entregas || 0),
       mes: consolidado.rows[0].mes,
       entregas_mes: parseInt(consolidado.rows[0].entregas_mes || 0),
       dias: dias.rows,
@@ -258,7 +260,8 @@ router.get('/me/financeiro', authenticate, async (req, res, next) => {
 
     // Total de hoje
     const hoje = await query(
-      `SELECT COALESCE(SUM(valor_frete), 0) as total
+      `SELECT COALESCE(SUM(valor_frete), 0) as total,
+              COUNT(*) as entregas
        FROM pedidos
        WHERE entregador_id = $1 AND status = 'entregue' AND entregue_em >= CURRENT_DATE`,
       [id]
@@ -292,6 +295,7 @@ router.get('/me/financeiro', authenticate, async (req, res, next) => {
 
     res.json({
       hoje: hoje.rows[0].total,
+      entregas_hoje: parseInt(hoje.rows[0].entregas || 0),
       semana: consolidado.rows[0].semana,
       mes: consolidado.rows[0].mes,
       entregas_mes: parseInt(consolidado.rows[0].entregas_mes || 0),

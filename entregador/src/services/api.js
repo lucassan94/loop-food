@@ -9,6 +9,8 @@ const api = axios.create({
 api.interceptors.request.use((config) => {
   const token = document.cookie.match(/(^| )publicToken=([^;]+)/)?.[2]
   if (token) config.headers.Authorization = `Bearer ${token}`
+  // Cross-login prevention: identificar módulo para o backend
+  config.headers['X-Module'] = 'entregador'
   return config
 })
 
@@ -26,11 +28,11 @@ api.interceptors.response.use(
         await axios.post('/api/auth/refresh', {}, { withCredentials: true })
         return api(error.config)
       } catch {
-        // Refresh falhou — limpa cookies e recarrega
+        // Refresh falhou — limpa cookies e redireciona sem reload completo
         document.cookie.split(';').forEach(c => {
           document.cookie = c.replace(/^ +/, '').replace(/=.*/, '=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/')
         })
-        window.location.reload()
+        window.location.href = '/'
       }
     }
     return Promise.reject(error)

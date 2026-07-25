@@ -1,0 +1,898 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SaborExpress — Seu delivery sem depender de terceiros</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --brand: #dc2626;
+      --brand-dark: #b91c1c;
+      --brand-light: #fee2e2;
+      --accent: #f97316;
+      --dark: #0f172a;
+      --dark-2: #1e293b;
+      --gray: #64748b;
+      --gray-light: #e2e8f0;
+      --gray-bg: #f8fafc;
+      --white: #ffffff;
+      --radius: 16px;
+      --radius-sm: 8px;
+    }
+    html { scroll-behavior: smooth; scroll-padding-top: 80px; }
+    body {
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      background: var(--white);
+      color: var(--dark);
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+      overflow-x: hidden;
+    }
+
+    /* ── Navigation ── */
+    nav {
+      position: fixed; top: 0; left: 0; right: 0;
+      z-index: 100;
+      padding: 1rem 5%;
+      display: flex; align-items: center; justify-content: space-between;
+      transition: all 0.3s ease;
+      background: transparent;
+      transform: translateY(0);
+    }
+    nav.hidden { transform: translateY(-100%); }
+    nav.scrolled {
+      background: rgba(255,255,255,0.92);
+      backdrop-filter: blur(12px);
+      box-shadow: 0 1px 8px rgba(0,0,0,0.06);
+    }
+    .nav-logo {
+      font-weight: 800; font-size: 1.25rem; color: var(--white);
+      display: flex; align-items: center; gap: 8px;
+      transition: color 0.3s;
+    }
+    nav.scrolled .nav-logo { color: var(--dark); }
+    .nav-logo svg { width: 28px; height: 28px; }
+    .nav-cta a {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 0.6rem 1.5rem;
+      background: var(--white); color: var(--brand);
+      border-radius: 999px; font-weight: 700; font-size: 0.85rem;
+      text-decoration: none; transition: all 0.2s;
+    }
+    nav.scrolled .nav-cta a {
+      background: var(--brand); color: var(--white);
+    }
+    .nav-cta a:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(220,38,38,0.3); }
+
+    /* ── Hero ── */
+    .hero {
+      min-height: 100vh;
+      background: linear-gradient(135deg, var(--dark) 0%, var(--dark-2) 50%, #1a0a0a 100%);
+      display: flex; align-items: center; justify-content: center;
+      padding: 6rem 5% 4rem;
+      position: relative; overflow: hidden;
+    }
+    .hero::before {
+      content: ''; position: absolute;
+      width: 800px; height: 800px;
+      background: radial-gradient(circle, rgba(220,38,38,0.12) 0%, transparent 70%);
+      top: -200px; right: -200px;
+    }
+    .hero::after {
+      content: ''; position: absolute;
+      width: 600px; height: 600px;
+      background: radial-gradient(circle, rgba(249,115,22,0.08) 0%, transparent 70%);
+      bottom: -200px; left: -200px;
+    }
+    .hero-content {
+      max-width: 1100px; width: 100%;
+      display: grid; grid-template-columns: 1fr 1fr; gap: 4rem;
+      align-items: center; position: relative; z-index: 1;
+    }
+    .hero-text h1 {
+      font-size: clamp(2.5rem, 5vw, 4rem);
+      font-weight: 900; line-height: 1.1;
+      color: var(--white); margin-bottom: 1.25rem;
+    }
+    .hero-text h1 span { background: linear-gradient(135deg, #f97316, #dc2626); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .hero-text p {
+      font-size: 1.1rem; color: rgba(255,255,255,0.7); margin-bottom: 2rem;
+      max-width: 480px; line-height: 1.7;
+    }
+    .hero-stats {
+      display: flex; gap: 2rem; margin-top: 2rem;
+    }
+    .hero-stat { text-align: left; }
+    .hero-stat-value {
+      font-size: 1.8rem; font-weight: 800; color: var(--white);
+    }
+    .hero-stat-label { font-size: 0.85rem; color: rgba(255,255,255,0.5); }
+    .hero-visual {
+      position: relative;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .hero-card {
+      background: rgba(255,255,255,0.05);
+      backdrop-filter: blur(20px);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: var(--radius);
+      padding: 2rem;
+      width: 100%; max-width: 420px;
+      animation: float 6s ease-in-out infinite;
+    }
+    @keyframes float {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-12px); }
+    }
+    .hero-card h3 { color: var(--white); font-size: 1rem; font-weight: 700; margin-bottom: 1rem; opacity: 0.8; }
+    .hero-card .comparison-item {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 0.75rem 0; border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
+    .hero-card .comparison-item:last-child { border-bottom: none; }
+    .hero-card .ci-label { font-size: 0.85rem; color: rgba(255,255,255,0.6); }
+    .hero-card .ci-ifood { font-size: 0.9rem; font-weight: 700; color: #ef4444; }
+    .hero-card .ci-ours { font-size: 0.9rem; font-weight: 700; color: #22c55e; }
+
+    /* ── Sections ── */
+    section { padding: 5rem 5%; }
+    .section-title {
+      text-align: center; margin-bottom: 3rem;
+    }
+    .section-title h2 {
+      font-size: clamp(2rem, 4vw, 2.8rem); font-weight: 800;
+      margin-bottom: 0.75rem;
+    }
+    .section-title p {
+      color: var(--gray); font-size: 1.05rem; max-width: 600px; margin: 0 auto;
+    }
+    .section-tag {
+      display: inline-block;
+      padding: 0.3rem 1rem; border-radius: 999px;
+      background: var(--brand-light); color: var(--brand);
+      font-size: 0.8rem; font-weight: 700; margin-bottom: 1rem;
+    }
+
+    /* ── Problem / Why ── */
+    .problem {
+      background: var(--gray-bg);
+    }
+    .problem-grid {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem;
+      max-width: 1100px; margin: 0 auto;
+    }
+    .problem-card {
+      background: var(--white); border-radius: var(--radius);
+      padding: 2rem; border: 1px solid var(--gray-light);
+      transition: all 0.3s ease;
+    }
+    .problem-card:hover { transform: translateY(-4px); box-shadow: 0 12px 24px rgba(0,0,0,0.06); }
+    .problem-card .pc-icon {
+      width: 44px; height: 44px; border-radius: 12px;
+      display: flex; align-items: center; justify-content: center;
+      margin-bottom: 1rem;
+    }
+    .problem-card h3 { font-size: 1.05rem; font-weight: 700; margin-bottom: 0.5rem; }
+    .problem-card p { font-size: 0.9rem; color: var(--gray); line-height: 1.6; }
+
+    /* ── Comparison Table ── */
+    .comparison {
+      background: var(--white);
+    }
+    .comparison-table-wrap {
+      max-width: 900px; margin: 0 auto;
+      overflow-x: auto;
+    }
+    .comparison-table {
+      width: 100%; border-collapse: collapse;
+      font-size: 0.95rem;
+    }
+    .comparison-table th {
+      text-align: left; padding: 1rem 1.25rem;
+      font-weight: 700; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.5px;
+      border-bottom: 2px solid var(--gray-light);
+    }
+    .comparison-table th:first-child { width: 35%; }
+    .comparison-table td {
+      padding: 1rem 1.25rem; border-bottom: 1px solid var(--gray-light);
+    }
+    .comparison-table tr:last-child td { border-bottom: none; }
+    .comparison-table .highlight-row {
+      background: linear-gradient(90deg, var(--brand-light) 0%, transparent 100%);
+    }
+    .comparison-table .tag-ifood {
+      display: inline-block; padding: 2px 8px; border-radius: 4px;
+      background: #fef2f2; color: #dc2626; font-size: 0.75rem; font-weight: 700;
+    }
+    .comparison-table .tag-ours {
+      display: inline-block; padding: 2px 8px; border-radius: 4px;
+      background: #f0fdf4; color: #16a34a; font-size: 0.75rem; font-weight: 700;
+    }
+
+    /* ── Bar Chart ── */
+    .chart-section { background: var(--gray-bg); }
+    .chart-wrap { max-width: 900px; margin: 0 auto; }
+    .chart-group { margin-bottom: 2rem; }
+    .chart-group:last-child { margin-bottom: 0; }
+    .chart-label {
+      display: flex; justify-content: space-between; margin-bottom: 0.5rem;
+      font-size: 0.9rem; font-weight: 600;
+    }
+    .chart-label .cl-value { font-weight: 700; }
+    .chart-bar {
+      height: 36px; border-radius: var(--radius-sm);
+      background: var(--gray-light); position: relative; overflow: hidden;
+    }
+    .chart-bar-fill {
+      height: 100%; border-radius: var(--radius-sm);
+      display: flex; align-items: center; justify-content: flex-end;
+      padding-right: 12px; font-size: 0.75rem; font-weight: 700; color: var(--white);
+      transition: width 1s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .chart-bar-fill.ifood { background: linear-gradient(90deg, #f87171, #dc2626); }
+    .chart-bar-fill.ours { background: linear-gradient(90deg, #4ade80, #16a34a); }
+    .chart-bar-fill.ours-accent { background: linear-gradient(90deg, #fb923c, #ea580c); }
+    .chart-note {
+      text-align: center; margin-top: 2rem;
+      font-size: 0.9rem; color: var(--gray);
+      max-width: 600px; margin-left: auto; margin-right: auto;
+    }
+
+    /* ── Savings Highlight ── */
+    .savings {
+      background: linear-gradient(135deg, var(--dark), var(--dark-2));
+      text-align: center;
+    }
+    .savings h2 { color: var(--white); }
+    .savings .section-title p { color: rgba(255,255,255,0.6); }
+    .savings-grid {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem;
+      max-width: 900px; margin: 0 auto;
+    }
+    .savings-card {
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: var(--radius); padding: 2rem;
+      transition: all 0.3s;
+    }
+    .savings-card:hover { transform: translateY(-4px); background: rgba(255,255,255,0.08); }
+    .savings-card .sc-value {
+      font-size: 2.2rem; font-weight: 900;
+      background: linear-gradient(135deg, #4ade80, #22c55e);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      margin-bottom: 0.5rem;
+    }
+    .savings-card .sc-label { color: rgba(255,255,255,0.7); font-size: 0.9rem; }
+    .savings-card .sc-sub { color: rgba(255,255,255,0.4); font-size: 0.8rem; margin-top: 0.5rem; }
+
+    /* ── Pricing ── */
+    .pricing { background: var(--white); }
+    .pricing-card-wrap {
+      max-width: 500px; margin: 0 auto;
+    }
+    .pricing-card {
+      background: var(--white);
+      border: 2px solid var(--gray-light);
+      border-radius: var(--radius);
+      padding: 2.5rem;
+      position: relative;
+      transition: all 0.3s;
+    }
+    .pricing-card:hover {
+      border-color: var(--brand);
+      box-shadow: 0 20px 40px rgba(220,38,38,0.1);
+      transform: translateY(-4px);
+    }
+    .pricing-card .pc-badge {
+      position: absolute; top: -12px; left: 50%; transform: translateX(-50%);
+      background: var(--brand); color: var(--white);
+      padding: 0.3rem 1.2rem; border-radius: 999px;
+      font-size: 0.75rem; font-weight: 700; letter-spacing: 0.3px;
+    }
+    .pricing-card .pc-header { text-align: center; margin-bottom: 2rem; }
+    .pricing-card .pc-name { font-size: 1rem; font-weight: 700; color: var(--gray); margin-bottom: 0.5rem; }
+    .pricing-card .pc-price {
+      font-size: 3rem; font-weight: 900; color: var(--dark);
+    }
+    .pricing-card .pc-price span { font-size: 1rem; font-weight: 600; color: var(--gray); }
+    .pricing-card .pc-desc { color: var(--gray); font-size: 0.9rem; margin-top: 0.5rem; }
+    .pricing-card .pc-features { list-style: none; margin: 1.5rem 0; }
+    .pricing-card .pc-features li {
+      padding: 0.6rem 0; border-bottom: 1px solid var(--gray-light);
+      font-size: 0.9rem; display: flex; align-items: center; gap: 10px;
+    }
+    .pricing-card .pc-features li:last-child { border-bottom: none; }
+    .pricing-card .pc-features li::before {
+      content: ''; width: 18px; height: 18px; flex-shrink: 0;
+      background: var(--brand-light); border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='%23dc2626'%3E%3Cpath d='M13.78 4.22a.75.75 0 010 1.06l-7.25 7.25a.75.75 0 01-1.06 0L2.22 9.28a.75.75 0 011.06-1.06L6 10.94l6.72-6.72a.75.75 0 011.06 0z'/%3E%3C/svg%3E");
+      background-size: 12px; background-position: center; background-repeat: no-repeat;
+    }
+    .pricing-card .pc-price-structure {
+      background: var(--gray-bg); border-radius: var(--radius-sm);
+      padding: 1.25rem; margin: 1.5rem 0; text-align: center;
+    }
+    .pricing-card .pc-price-structure .ps-row {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 0.4rem 0; font-size: 0.9rem;
+    }
+    .pricing-card .pc-price-structure .ps-row .ps-label { color: var(--gray); }
+    .pricing-card .pc-price-structure .ps-row .ps-value { font-weight: 700; }
+    .pricing-card .pc-price-structure .ps-divider {
+      border-top: 1px dashed var(--gray-light); margin: 0.5rem 0;
+    }
+    .pricing-card .pc-cta {
+      display: block; text-align: center;
+      padding: 1rem; border-radius: var(--radius-sm);
+      background: var(--brand); color: var(--white);
+      font-weight: 700; font-size: 1rem; text-decoration: none;
+      transition: all 0.2s;
+    }
+    .pricing-card .pc-cta:hover { background: var(--brand-dark); transform: translateY(-1px); }
+
+    /* ── Features Grid ── */
+    .features { background: var(--gray-bg); }
+    .features-grid {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem;
+      max-width: 1100px; margin: 0 auto;
+    }
+    .feature-card {
+      background: var(--white); border-radius: var(--radius);
+      padding: 2rem; border: 1px solid var(--gray-light);
+      transition: all 0.3s;
+    }
+    .feature-card:hover { transform: translateY(-4px); box-shadow: 0 12px 24px rgba(0,0,0,0.06); }
+    .feature-card .fc-icon {
+      width: 44px; height: 44px; border-radius: 12px;
+      display: flex; align-items: center; justify-content: center;
+      margin-bottom: 1rem;
+    }
+    .feature-card h3 { font-size: 1.05rem; font-weight: 700; margin-bottom: 0.5rem; }
+    .feature-card p { font-size: 0.9rem; color: var(--gray); line-height: 1.6; }
+
+    /* ── CTA ── */
+    .cta-section {
+      background: linear-gradient(135deg, var(--brand), var(--accent));
+      text-align: center;
+    }
+    .cta-section h2 { color: var(--white); font-size: clamp(2rem, 4vw, 2.8rem); font-weight: 800; margin-bottom: 1rem; }
+    .cta-section p { color: rgba(255,255,255,0.8); font-size: 1.1rem; margin-bottom: 2rem; max-width: 500px; margin-left: auto; margin-right: auto; }
+    .cta-section .cta-btn {
+      display: inline-block;
+      padding: 1rem 2.5rem; border-radius: 999px;
+      background: var(--white); color: var(--brand);
+      font-weight: 700; font-size: 1.05rem; text-decoration: none;
+      transition: all 0.2s;
+    }
+    .cta-section .cta-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.2); }
+
+    /* ── Footer ── */
+    footer {
+      background: var(--dark); padding: 2rem 5%;
+      text-align: center; color: rgba(255,255,255,0.4); font-size: 0.85rem;
+    }
+
+    /* ── Animations ── */
+    .reveal {
+      opacity: 0; transform: translateY(24px);
+      transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .reveal.visible { opacity: 1; transform: translateY(0); }
+    .reveal-delay-1 { transition-delay: 0.1s; }
+    .reveal-delay-2 { transition-delay: 0.2s; }
+    .reveal-delay-3 { transition-delay: 0.3s; }
+
+    /* ── Responsive ── */
+    @media (max-width: 768px) {
+      .hero-content { grid-template-columns: 1fr; gap: 2rem; text-align: center; }
+      .hero-text p { margin-left: auto; margin-right: auto; }
+      .hero-stats { justify-content: center; }
+      .problem-grid { grid-template-columns: 1fr; }
+      .features-grid { grid-template-columns: 1fr; }
+      .savings-grid { grid-template-columns: 1fr; }
+      .pricing-card-wrap { max-width: 100%; }
+      .comparison-table { font-size: 0.8rem; }
+      .comparison-table th, .comparison-table td { padding: 0.75rem; }
+    }
+    @media (max-width: 480px) {
+      section { padding: 3rem 5%; }
+      .hero-stats { flex-direction: column; gap: 1rem; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Navigation -->
+<nav id="navbar">
+  <div class="nav-logo">
+    <svg viewBox="0 0 28 28" fill="none" aria-hidden="true">
+      <rect width="28" height="28" rx="8" fill="currentColor"/>
+      <path d="M8 13h12l-2-5H10l-2 5zm2 2v4a1 1 0 001 1h6a1 1 0 001-1v-4H10z" fill="white"/>
+    </svg>
+    SaborExpress
+  </div>
+  <div class="nav-cta">
+    <a href="#pricing">Ver Plano</a>
+  </div>
+</nav>
+
+<!-- Hero -->
+<section class="hero" id="hero">
+  <div class="hero-content">
+    <div class="hero-text">
+      <div style="margin-bottom:1rem;">
+        <span style="display:inline-block;padding:0.3rem 1rem;border-radius:999px;background:rgba(220,38,38,0.15);color:#fca5a5;font-size:0.8rem;font-weight:700;">
+          Alternativa inteligente ao iFood
+        </span>
+      </div>
+      <h1>Seu delivery sem <span>pagar 15%</span> de comissão</h1>
+      <p>
+        O Palazzo pode economizar mais de <strong style="color:#22c55e;">R$ 78 mil por ano</strong>
+        com sua própria plataforma de pedidos. Sem depender de terceiros, sem taxas abusivas.
+      </p>
+      <a href="#pricing" style="display:inline-flex;align-items:center;gap:8px;padding:0.85rem 2rem;border-radius:999px;background:linear-gradient(135deg,#dc2626,#f97316);color:white;font-weight:700;font-size:1rem;text-decoration:none;transition:all 0.2s;">
+        Ver plano e simulação
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+          <path d="M3 8h10M9 4l4 4-4 4" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </a>
+      <div class="hero-stats">
+        <div class="hero-stat">
+          <div class="hero-stat-value">78<small style="font-size:0.9rem;color:var(--gray);">mil</small></div>
+          <div class="hero-stat-label">Economia anual</div>
+        </div>
+        <div class="hero-stat">
+          <div class="hero-stat-value">94<small style="font-size:0.9rem;color:var(--gray);">%</small></div>
+          <div class="hero-stat-label">Menos taxas</div>
+        </div>
+        <div class="hero-stat">
+          <div class="hero-stat-value">100<small style="font-size:0.9rem;color:var(--gray);">%</small></div>
+          <div class="hero-stat-label">Seus dados</div>
+        </div>
+      </div>
+    </div>
+    <div class="hero-visual">
+      <div class="hero-card">
+        <h3>Custo mensal com R$ 50 mil em vendas</h3>
+        <div class="comparison-item">
+          <span class="ci-label">iFood Básico</span>
+          <span class="ci-ifood">R$ 7.710/mês</span>
+        </div>
+        <div class="comparison-item">
+          <span class="ci-label">iFood Entrega</span>
+          <span class="ci-ifood">R$ 13.400/mês</span>
+        </div>
+        <div class="comparison-item">
+          <span class="ci-label">SaborExpress</span>
+          <span class="ci-ours">R$ 497/mês*</span>
+        </div>
+        <div style="margin-top:1rem;font-size:0.75rem;color:rgba(255,255,255,0.3);text-align:center;">
+          *primeiros 6 meses
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Problem -->
+<section class="problem" id="problem">
+  <div class="section-title reveal">
+    <span class="section-tag">O problema</span>
+    <h2>Cada pedido no iFood custa caro</h2>
+    <p>Comissões que chegam a 26,5% por pedido consomem sua margem. E você ainda não tem acesso aos dados dos seus clientes.</p>
+  </div>
+  <div class="problem-grid">
+    <div class="problem-card reveal reveal-delay-1">
+      <div class="pc-icon" style="background:#fef2f2;">
+        <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+          <path d="M11 1L21 7v8l-10 6L1 15V7l10-6z" stroke="#dc2626" stroke-width="1.5" fill="none"/>
+          <path d="M7 11l3 3 5-5" stroke="#dc2626" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <h3>Comissão de até 26,5%</h3>
+      <p>No plano com logística do iFood, você paga mais de um quarto do pedido em taxas. Num pedido de R$ 50, o iFood leva R$ 13,25.</p>
+    </div>
+    <div class="problem-card reveal reveal-delay-2">
+      <div class="pc-icon" style="background:#fef2f2;">
+        <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+          <circle cx="11" cy="11" r="8" stroke="#dc2626" stroke-width="1.5" fill="none"/>
+          <path d="M11 7v4l3 2" stroke="#dc2626" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <h3>Sem vínculo com o cliente</h3>
+      <p>O cliente é do iFood, não seu. Você não tem e-mails, telefones ou histórico para fidelizar e se comunicar diretamente.</p>
+    </div>
+    <div class="problem-card reveal reveal-delay-3">
+      <div class="pc-icon" style="background:#fef2f2;">
+        <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+          <rect x="3" y="6" width="16" height="12" rx="2" stroke="#dc2626" stroke-width="1.5" fill="none"/>
+          <path d="M7 6V4a2 2 0 012-2h4a2 2 0 012 2v2" stroke="#dc2626" stroke-width="1.5"/>
+        </svg>
+      </div>
+      <h3>Dependência total</h3>
+      <p>Se o iFood mudar as regras ou aumentar taxas, sua operação é impactada. Você não tem controle sobre sua própria plataforma.</p>
+    </div>
+  </div>
+</section>
+
+<!-- Comparison Table -->
+<section class="comparison" id="comparison">
+  <div class="section-title reveal">
+    <span class="section-tag">Comparativo</span>
+    <h2>iFood vs SaborExpress</h2>
+    <p>Veja a diferença de custos e benefícios entre as plataformas.</p>
+  </div>
+  <div class="comparison-table-wrap reveal">
+    <table class="comparison-table">
+      <thead>
+        <tr>
+          <th>Item</th>
+          <th><span class="tag-ifood">iFood Básico</span></th>
+          <th><span class="tag-ifood">iFood Entrega</span></th>
+          <th><span class="tag-ours">SaborExpress</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Comissão por pedido</strong></td>
+          <td>12%</td>
+          <td>23%</td>
+          <td><strong style="color:#16a34a;">0%</strong></td>
+        </tr>
+        <tr>
+          <td><strong>Taxa de pagamento</strong></td>
+          <td>3,2%</td>
+          <td>3,5%</td>
+          <td><strong style="color:#16a34a;">R$ 0</strong> (apenas gateway ~2%)</td>
+        </tr>
+        <tr>
+          <td><strong>Mensalidade</strong></td>
+          <td>R$ 110*</td>
+          <td>R$ 150*</td>
+          <td><strong style="color:#16a34a;">R$ 497</strong> (6 meses)</td>
+        </tr>
+        <tr>
+          <td><strong>Taxa de serviço ao cliente</strong></td>
+          <td>R$ 0,99 ~ R$ 2,49</td>
+          <td>R$ 0,99 ~ R$ 2,49</td>
+          <td><strong style="color:#16a34a;">R$ 0</strong></td>
+        </tr>
+        <tr>
+          <td><strong>Dados dos clientes</strong></td>
+          <td style="color:#dc2626;">✕ Não</td>
+          <td style="color:#dc2626;">✕ Não</td>
+          <td style="color:#16a34a;">✅ Sim</td>
+        </tr>
+        <tr>
+          <td><strong>Cardápio digital</strong></td>
+          <td style="color:#16a34a;">✅ Sim</td>
+          <td style="color:#16a34a;">✅ Sim</td>
+          <td style="color:#16a34a;">✅ Sim</td>
+        </tr>
+        <tr>
+          <td><strong>Gestão de entregadores</strong></td>
+          <td style="color:#16a34a;">✅ Sim</td>
+          <td style="color:#dc2626;">✕ (iFood entrega)</td>
+          <td style="color:#16a34a;">✅ Sim</td>
+        </tr>
+        <tr>
+          <td><strong>Tracking em tempo real</strong></td>
+          <td style="color:#dc2626;">✕ Limitado</td>
+          <td style="color:#16a34a;">✅ Sim</td>
+          <td style="color:#16a34a;">✅ Sim</td>
+        </tr>
+        <tr>
+          <td><strong>Programa de fidelidade</strong></td>
+          <td style="color:#dc2626;">✕ Não</td>
+          <td style="color:#dc2626;">✕ Não</td>
+          <td style="color:#16a34a;">✅ Sim</td>
+        </tr>
+        <tr>
+          <td><strong>Mensagens com cliente</strong></td>
+          <td style="color:#dc2626;">✕ Não</td>
+          <td style="color:#dc2626;">✕ Não</td>
+          <td style="color:#16a34a;">✅ Sim</td>
+        </tr>
+        <tr>
+          <td><strong>Relatórios financeiros</strong></td>
+          <td style="color:#f59e0b;">⚠️ Básico</td>
+          <td style="color:#f59e0b;">⚠️ Básico</td>
+          <td style="color:#16a34a;">✅ Completos</td>
+        </tr>
+        <tr>
+          <td><strong>Impressão térmica</strong></td>
+          <td style="color:#dc2626;">✕ Não</td>
+          <td style="color:#dc2626;">✕ Não</td>
+          <td style="color:#16a34a;">✅ Sim</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- Chart -->
+<section class="chart-section" id="simulation">
+  <div class="section-title reveal">
+    <span class="section-tag">Simulação</span>
+    <h2>Quanto você paga por mês com R$ 50 mil em vendas</h2>
+    <p>Simulação realista baseada no faturamento médio de R$ 50.000/mês do Palazzo.</p>
+  </div>
+  <div class="chart-wrap">
+    <div class="chart-group reveal">
+      <div class="chart-label">
+        <span>iFood Plano Básico (entrega própria)</span>
+        <span class="cl-value" style="color:#dc2626;">R$ 7.710/mês</span>
+      </div>
+      <div class="chart-bar">
+        <div class="chart-bar-fill ifood" style="width: 0%;" data-width="58">R$ 7.710</div>
+      </div>
+    </div>
+    <div class="chart-group reveal">
+      <div class="chart-label">
+        <span>iFood Plano Entrega (logística iFood)</span>
+        <span class="cl-value" style="color:#dc2626;">R$ 13.400/mês</span>
+      </div>
+      <div class="chart-bar">
+        <div class="chart-bar-fill ifood" style="width: 0%;" data-width="100">R$ 13.400</div>
+      </div>
+    </div>
+    <div class="chart-group reveal">
+      <div class="chart-label">
+        <span>SaborExpress (primeiros 6 meses)</span>
+        <span class="cl-value" style="color:#16a34a;">R$ 497/mês</span>
+      </div>
+      <div class="chart-bar">
+        <div class="chart-bar-fill ours" style="width: 0%;" data-width="4">R$ 497</div>
+      </div>
+    </div>
+    <div class="chart-group reveal">
+      <div class="chart-label">
+        <span>SaborExpress (após 6 meses)</span>
+        <span class="cl-value" style="color:#16a34a;">R$ 997/mês</span>
+      </div>
+      <div class="chart-bar">
+        <div class="chart-bar-fill ours-accent" style="width: 0%;" data-width="8">R$ 997</div>
+      </div>
+    </div>
+    <div class="chart-note reveal">
+      * Considerando 12% comissão + 3,2% taxa de pagamento + R$ 110 mensalidade para iFood Básico.
+      <br/>23% comissão + 3,5% taxa de pagamento + R$ 150 mensalidade para iFood Entrega.
+      <br/>SaborExpress: taxa fixa mensal, sem comissão sobre vendas.
+    </div>
+  </div>
+</section>
+
+<!-- Savings -->
+<section class="savings" id="savings">
+  <div class="section-title reveal">
+    <span class="section-tag" style="background:rgba(220,38,38,0.15);color:#fca5a5;">Economia real</span>
+    <h2>Quanto o Palazzo economiza no 1º ano</h2>
+    <p>Substituindo o iFood pela sua própria plataforma SaborExpress.</p>
+  </div>
+  <div class="savings-grid">
+    <div class="savings-card reveal reveal-delay-1">
+      <div class="sc-value">R$ 78.656</div>
+      <div class="sc-label">Economia vs iFood Básico</div>
+      <div class="sc-sub">Considerando implantação + 12 meses de plataforma</div>
+    </div>
+    <div class="savings-card reveal reveal-delay-2">
+      <div class="sc-value">R$ 146.936</div>
+      <div class="sc-label">Economia vs iFood Entrega</div>
+      <div class="sc-sub">Se você usa a logística do iFood hoje</div>
+    </div>
+    <div class="savings-card reveal reveal-delay-3">
+      <div class="sc-value">+ 15%</div>
+      <div class="sc-label">Aumento na margem de lucro</div>
+      <div class="sc-sub">O que sobra direto no seu caixa sem comissões</div>
+    </div>
+  </div>
+</section>
+
+<!-- Pricing -->
+<section class="pricing" id="pricing">
+  <div class="section-title reveal">
+    <span class="section-tag">Nosso plano</span>
+    <h2>Único plano. Simples e direto.</h2>
+    <p>Sem porcentagens, sem surpresas. Uma única opção com valor promocional nos primeiros 6 meses.</p>
+  </div>
+  <div class="pricing-card-wrap reveal">
+    <div class="pricing-card">
+      <div class="pc-badge">Mais popular</div>
+      <div class="pc-header">
+        <div class="pc-name">Plano Completo</div>
+        <div class="pc-price">R$ 497 <span>/mês</span></div>
+        <div class="pc-desc">primeiros 6 meses, depois R$ 997/mês</div>
+      </div>
+      <div class="pc-price-structure">
+        <div class="ps-row">
+          <span class="ps-label">Implantação inicial</span>
+          <span class="ps-value">R$ 4.900 (uma vez)</span>
+        </div>
+        <div class="ps-divider"></div>
+        <div class="ps-row">
+          <span class="ps-label">Mensalidade (1º ao 6º mês)</span>
+          <span class="ps-value" style="color:#16a34a;">R$ 497</span>
+        </div>
+        <div class="ps-row">
+          <span class="ps-label">Mensalidade (7º mês em diante)</span>
+          <span class="ps-value">R$ 997</span>
+        </div>
+        <div class="ps-divider"></div>
+        <div class="ps-row" style="font-weight:700;">
+          <span class="ps-label">Total 1º ano</span>
+          <span class="ps-value" style="color:var(--brand);">R$ 13.864</span>
+        </div>
+      </div>
+      <ul class="pc-features">
+        <li>Cardápio digital completo com fotos e extras</li>
+        <li>App do cliente (cardápio, carrinho, checkout, tracking)</li>
+        <li>Painel administrativo (pedidos, kanban, produtos)</li>
+        <li>App do entregador (rotas, financeiro, perfil)</li>
+        <li>Pagamento online via PIX e cartão de crédito</li>
+        <li>Gestão de entregadores próprios</li>
+        <li>Relatórios financeiros e dashboard de vendas</li>
+        <li>Notificações push em tempo real</li>
+        <li>Mensagens diretas com o cliente</li>
+        <li>Impressão térmica automática</li>
+        <li>Dados completos dos seus clientes</li>
+        <li>Suporte prioritário via WhatsApp</li>
+        <li>Hospedagem e manutenção inclusas</li>
+      </ul>
+      <a href="#contact" class="pc-cta">Quero economizar R$ 78 mil/ano</a>
+    </div>
+  </div>
+</section>
+
+<!-- Features -->
+<section class="features" id="features">
+  <div class="section-title reveal">
+    <span class="section-tag">Funcionalidades</span>
+    <h2>Tudo que você precisa em um só lugar</h2>
+    <p>Três aplicativos integrados em tempo real. Do cardápio à entrega.</p>
+  </div>
+  <div class="features-grid">
+    <div class="feature-card reveal reveal-delay-1">
+      <div class="fc-icon" style="background:#dcfce7;">
+        <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+          <path d="M3 3h16v16H3V3z" stroke="#16a34a" stroke-width="1.5"/>
+          <path d="M8 8h6M8 11h6M8 14h4" stroke="#16a34a" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <h3>Cardápio Digital</h3>
+      <p>Produtos com fotos, categorias, descrições e opcionais. Busca inteligente e filtros por categoria.</p>
+    </div>
+    <div class="feature-card reveal reveal-delay-2">
+      <div class="fc-icon" style="background:#dbeafe;">
+        <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+          <rect x="3" y="5" width="16" height="12" rx="2" stroke="#2563eb" stroke-width="1.5" fill="none"/>
+          <path d="M7 9l4 4 4-4" stroke="#2563eb" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <h3>Carrinho e Checkout</h3>
+      <p>Checkout em 4 etapas com cálculo de frete por CEP, busca automática de endereço e múltiplas formas de pagamento.</p>
+    </div>
+    <div class="feature-card reveal reveal-delay-3">
+      <div class="fc-icon" style="background:#fef3c7;">
+        <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+          <circle cx="11" cy="11" r="8" stroke="#d97706" stroke-width="1.5" fill="none"/>
+          <path d="M11 7v4l3 2" stroke="#d97706" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <h3>Fila de Pedidos</h3>
+      <p>Visualização em cards, kanban ou lista. Timers de preparo, status em tempo real e prioridade automática.</p>
+    </div>
+    <div class="feature-card reveal reveal-delay-1">
+      <div class="fc-icon" style="background:#ede9fe;">
+        <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+          <path d="M5 14l4-4 3 3 5-5" stroke="#7c3aed" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          <circle cx="11" cy="11" r="8" stroke="#7c3aed" stroke-width="1.5" fill="none"/>
+        </svg>
+      </div>
+      <h3>Dashboard Financeiro</h3>
+      <p>Faturamento, ticket médio, produtos mais vendidos, distribuição por status e meios de pagamento em gráficos.</p>
+    </div>
+    <div class="feature-card reveal reveal-delay-2">
+      <div class="fc-icon" style="background:#fce7f3;">
+        <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+          <path d="M3 9h16v8a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" stroke="#db2777" stroke-width="1.5" fill="none"/>
+          <path d="M7 5l4 4 4-4" stroke="#db2777" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <h3>App do Entregador</h3>
+      <p>Entregas disponíveis, rota em tempo real, timer de tolerância, extrato financeiro e perfil completo.</p>
+    </div>
+    <div class="feature-card reveal reveal-delay-3">
+      <div class="fc-icon" style="background:#e0f2fe;">
+        <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+          <path d="M2 8l8-6 8 6v8a2 2 0 01-2 2H4a2 2 0 01-2-2V8z" stroke="#0284c7" stroke-width="1.5" fill="none"/>
+        </svg>
+      </div>
+      <h3>Tracking em Tempo Real</h3>
+      <p>Cliente acompanha cada etapa: pedido recebido, preparando, saiu para entrega, entregador a caminho, entregue!</p>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="cta-section" id="contact">
+  <div class="section-title reveal" style="margin-bottom:0;">
+    <h2>Pronto para dar o próximo passo?</h2>
+    <p>Agende uma demonstração gratuita e veja como o SaborExpress pode transformar a operação do Palazzo.</p>
+    <a href="mailto:contato@saborexpress.com.br" class="cta-btn">
+      Agendar demonstração
+    </a>
+  </div>
+</section>
+
+<!-- Footer -->
+<footer>      <p>&copy; 2026 SaborExpress. Feito para restaurantes que querem crescer sem depender de terceiros.</p>
+      <p style="margin-top:0.5rem;font-size:0.8rem;">contato@saborexpress.com.br</p>
+</footer>
+
+<script>
+// ── Navbar scroll ──
+const navbar = document.getElementById('navbar');
+let lastScrollY = 0;
+let scrollTick = false;
+window.addEventListener('scroll', () => {
+  if (scrollTick) return;
+  scrollTick = true;
+  requestAnimationFrame(() => {
+    const y = window.scrollY;
+    if (y > 60) {
+      navbar.classList.add('scrolled');
+      navbar.classList.toggle('hidden', y > lastScrollY);
+    } else {
+      navbar.classList.remove('scrolled', 'hidden');
+    }
+    lastScrollY = y;
+    scrollTick = false;
+  });
+}, { passive: true });
+
+// ── Navbar aparece ao passar o mouse em mobile ──
+navbar.addEventListener('mouseenter', () => navbar.classList.remove('hidden'));
+
+// ── Scroll Reveal (Intersection Observer) ──
+const revealElements = document.querySelectorAll('.reveal');
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) {
+      entry.target.classList.add('visible');
+      // Trigger bar chart animation when chart section becomes visible
+      if (entry.target.closest('.chart-section')) {
+        setTimeout(animateBars, 200);
+      }
+    }
+  });
+}, { threshold: 0.15, rootMargin: '0px 0px -40px 0px' });
+
+revealElements.forEach(el => observer.observe(el));
+
+// ── Bar Chart Animation ──
+function animateBars() {
+  document.querySelectorAll('.chart-bar-fill').forEach(bar => {
+    const width = bar.getAttribute('data-width');
+    if (width) bar.style.width = width + '%';
+  });
+}
+
+// ── Smooth anchor scroll ──
+document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+  anchor.addEventListener('click', function(e) {
+    e.preventDefault();
+    const target = document.querySelector(this.getAttribute('href'));
+    if (target) {
+      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  });
+});
+</script>
+
+</body>
+</html>

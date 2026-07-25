@@ -85,29 +85,67 @@ export async function findCustomer(cpfCnpj, externalRef) {
   return call('GET', `/v3/customers?cpfCnpj=${cpfCnpj}&externalReference=${externalRef}`);
 }
 
-// Cria novo cliente no Asaas
+// Cria novo cliente no Asaas com TODOS os dados disponíveis
 // Nota: mobilePhone só é enviado em produção, pois o sandbox rejeita
 // qualquer valor neste campo (bug conhecido do sandbox Asaas)
-export async function createCustomer({ name, cpfCnpj, email, phone, externalReference }) {
+export async function createCustomer({ name, cpfCnpj, email, phone, externalReference, address, addressNumber, complement, province, postalCode, city, state }) {
   const body = {
     name,
     cpfCnpj,
     email,
     externalReference: String(externalReference),
-    notificationDisabled: true,
+    notificationDisabled: false, // permite que Asaas envie notificações ao cliente
   };
   // Apenas em produção: enviar telefone
-  // Sandbox rejeita qualquer valor em mobilePhone
   if (config.asaas.environment === 'production' && phone) {
     body.mobilePhone = phone;
   }
+  // Endereço (enviar sempre que disponível)
+  if (address) body.address = address;
+  if (addressNumber) body.addressNumber = addressNumber;
+  if (complement) body.complement = complement;
+  if (province) body.province = province; // bairro
+  if (postalCode) body.postalCode = postalCode.replace(/\D/g, '');
+  if (city) body.city = city;
+  if (state) body.state = state;
   return call('POST', '/v3/customers', body);
 }
 
-// Busca por CPF/externalRef; se não existir, cria
+// Atualiza dados do cliente no Asaas (usado no checkout para manter dados frescos)
+export async function updateCustomer(asaasCustomerId, { name, email, phone, address, addressNumber, complement, province, postalCode, city, state }) {
+  const body = {};
+  if (name) body.name = name;
+  if (email) body.email = email;
+  if (config.asaas.environment === 'production' && phone) {
+    body.mobilePhone = phone;
+  }
+  if (address) body.address = address;
+  if (addressNumber) body.addressNumber = addressNumber;
+  if (complement) body.complement = complement;
+  if (province) body.province = province;
+  if (postalCode) body.postalCode = postalCode.replace(/\D/g, '');
+  if (city) body.city = city;
+  if (state) body.state = state;
+  return call('PUT', `/v3/customers/${asaasCustomerId}`, body);
+}
+
+// Busca por CPF/externalRef; se não existir, cria.
+// Se existir, ATUALIZA os dados para manter o Asaas sincronizado.
 export async function findOrCreateCustomer(clienteData) {
   const { data } = await findCustomer(clienteData.cpfCnpj, String(clienteData.id));
-  if (data?.length > 0) return data[0];
+  
+  if (data?.length > 0) {
+    const existing = data[0];
+    // Atualizar dados do cliente no Asaas (sincronização)
+    // Isso garante que endereço, telefone etc. estejam sempre atualizados
+    try {
+      await updateCustomer(existing.id, clienteData);
+    } catch (err) {
+      console.warn(`[Asaas] Erro ao atualizar customer ${existing.id}: ${err.message}`);
+    }
+    return existing;
+  }
+  
   return createCustomer(clienteData);
 }
 

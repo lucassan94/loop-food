@@ -89,3 +89,35 @@ export function guardCheck(req, res, next) {
   // Normal auth flow
   next();
 }
+
+// Middleware: restringir acesso por módulo (cross-login prevention)
+// Cada frontend envia X-Module header. O middleware verifica se o
+// módulo do usuário (armazenado no JWT) corresponde ao esperado.
+// Ex: admin não consegue acessar APIs do cliente, vice-versa.
+//
+// IMPORTANTE: DEVE ser executado APÓS o authenticate, pois precisa
+// de req.user preenchido. Não verifica autenticação — apenas módulo.
+export function restrictModule() {
+  return (req, res, next) => {
+    const requestModule = req.headers['x-module'] || '';
+    const userModule = req.user?.module || '';
+
+    // Se nenhum módulo foi especificado, permitir (compatibilidade/reverso)
+    if (!requestModule) return next();
+
+    // Se o usuário não está autenticado, não há módulo para verificar
+    if (!req.user) return next();
+
+    // Verificar se o módulo do JWT corresponde ao header
+    if (userModule !== requestModule) {
+      return res.status(403).json({
+        error: 'Acesso negado: módulo incorreto.',
+        code: 'WRONG_MODULE',
+        expected: userModule,
+        received: requestModule,
+      });
+    }
+
+    next();
+  };
+}
