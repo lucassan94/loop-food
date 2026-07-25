@@ -6,9 +6,6 @@ services:
     restart: unless-stopped
     ports:
       - "8090:3001"
-    env_file:
-      - stack.env
-      - .env
     environment:
       - NODE_ENV=production
       - DB_HOST=${DB_HOST:-86.48.18.22}
@@ -16,9 +13,14 @@ services:
       - DB_NAME=${DB_NAME:-delivery}
       - DB_USER=${DB_USER:-default}
       - DB_PASS=${DB_PASS:-default}
+      - JWT_SECRET=${JWT_SECRET:-dev-secret-change-in-production}
       - RESTAURANT_ID=${RESTAURANT_ID:-1}
       - CORS_ORIGIN=${CORS_ORIGIN:-http://86.48.18.22:8091,http://86.48.18.22:8092,http://86.48.18.22:8093}
+      # Asaas (preencha via Portainer em Stacks > palazzo > Environment variables)
+      - ASAAS_API_KEY=${ASAAS_API_KEY}
       - ASAAS_ENV=${ASAAS_ENV:-sandbox}
+      - ASAAS_WEBHOOK_TOKEN=${ASAAS_WEBHOOK_TOKEN}
+      - ASAAS_WEBHOOK_SECRET=${ASAAS_WEBHOOK_SECRET}
       - ASAAS_PIX_EXPIRY=${ASAAS_PIX_EXPIRY:-30}
     volumes:
       - backend_uploads:/app/uploads
