@@ -22,11 +22,18 @@ export const config = {
   jwt: {
     secret: (() => {
       const s = process.env.JWT_SECRET;
-      if (process.env.NODE_ENV === 'production' && !s) {
-        console.error('[FATAL] JWT_SECRET não configurado em produção!');
-        process.exit(1);
+      if (process.env.NODE_ENV === 'production') {
+        if (s === 'dev-secret-change-in-production' || !s) {
+          console.warn('╔══════════════════════════════════════════════════════════╗');
+          console.warn('║  ⚠️  AVISO: JWT_SECRET está usando o valor PADRÃO!     ║');
+          console.warn('║  Crie um arquivo .env com um secret seguro:            ║');
+          console.warn('║  JWT_SECRET=suachaveaqui                               ║');
+          console.warn('║  Gere com: node -e "console.log(require(\'crypto\')    ║');
+          console.warn('║    .randomBytes(32).toString(\'hex\'))"               ║');
+          console.warn('╚══════════════════════════════════════════════════════════╝');
+        }
       }
-      return s || 'dev-secret-key-change-in-production';
+      return s || 'dev-secret-change-in-production';
     })(),
     expiresIn: process.env.JWT_EXPIRES_IN || '365d',
     refreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '365d',
