@@ -1,7 +1,7 @@
 <template>
   <div>
     <div style="display:grid;gap:1.5rem;max-width:800px;">
-      <!-- Store Status -->
+      <!-- Store Status & Delivery Mode -->
       <div class="card">
         <div class="card-header">Status da Loja</div>
         <div class="card-body" style="display:flex;align-items:center;justify-content:space-between;">
@@ -14,6 +14,21 @@
           <button class="btn" :class="storeOpen ? 'btn-danger' : 'btn-success'" @click="toggleLoja">
             {{ storeOpen ? 'Fechar Loja' : 'Abrir Loja' }}
           </button>
+        </div>
+        <div class="card-body" style="border-top:1px solid var(--border);padding-top:1rem;display:flex;align-items:center;justify-content:space-between;">
+          <div>
+            <strong>{{ modoSemEntregador ? '🚫 Modo Sem Entregador' : '🛵 Modo com Entregador' }}</strong>
+            <p style="font-size:0.85rem;color:var(--text-muted);">
+              {{ modoSemEntregador
+                ? 'O restaurante gerencia todos os status manualmente. Os status de entrega (em_trânsito, cheguei_destino) são pulados.'
+                : 'Entregadores podem assumir entregas e gerenciar o status de entrega.'
+              }}
+            </p>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" :checked="modoSemEntregador" @change="toggleModoSemEntregador" />
+            <span class="slider"></span>
+          </label>
         </div>
       </div>
 
@@ -208,6 +223,7 @@ import { ref, onMounted, reactive } from 'vue'
 import api from '../services/api'
 
 const storeOpen = ref(true)
+const modoSemEntregador = ref(false)
 const restaurante = reactive({ nome: '', endereco: '', cep: '', cidade: '', estado: '', latitude: null, longitude: null, tempo_preparo_min: 20 })
 const raios = ref([])
 const equipe = ref([])
@@ -239,8 +255,18 @@ async function load() {
     tempo_preparo_min: r.data.tempo_preparo_min,
   })
   storeOpen.value = r.data.status_loja
+  modoSemEntregador.value = r.data.modo_sem_entregador || false
   raios.value = rios.data
   equipe.value = eq.data
+}
+
+async function toggleModoSemEntregador() {
+  try {
+    const { data } = await api.put('/restaurante', { modo_sem_entregador: !modoSemEntregador.value })
+    modoSemEntregador.value = data.modo_sem_entregador
+  } catch (err) {
+    alert(err.response?.data?.error || 'Erro ao alterar modo de entrega')
+  }
 }
 
 function formatCEP() {

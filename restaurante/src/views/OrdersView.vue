@@ -14,9 +14,24 @@
         <option value="cancelados">Cancelados</option>
         <option value="">Todos</option>
       </select>
-      <input type="date" v-model="filtroDataInicio" />
-      <input type="date" v-model="filtroDataFim" />
-      <button class="btn btn-primary btn-sm" @click="loadOrders">Filtrar</button>
+      <div class="date-radio-group">
+        <label class="date-radio" :class="{ active: filtroDataPeriodo === 'hoje' }">
+          <input type="radio" name="dataFiltro" value="hoje" v-model="filtroDataPeriodo" @change="aplicarFiltroData()" />
+          <span>Hoje</span>
+        </label>
+        <label class="date-radio" :class="{ active: filtroDataPeriodo === 'ontem' }">
+          <input type="radio" name="dataFiltro" value="ontem" v-model="filtroDataPeriodo" @change="aplicarFiltroData()" />
+          <span>Ontem</span>
+        </label>
+        <label class="date-radio" :class="{ active: filtroDataPeriodo === '7dias' }">
+          <input type="radio" name="dataFiltro" value="7dias" v-model="filtroDataPeriodo" @change="aplicarFiltroData()" />
+          <span>7 dias</span>
+        </label>
+        <label class="date-radio" :class="{ active: filtroDataPeriodo === '' }">
+          <input type="radio" name="dataFiltro" value="" v-model="filtroDataPeriodo" @change="aplicarFiltroData()" />
+          <span>Todos</span>
+        </label>
+      </div>
       <button class="btn btn-secondary btn-sm" @click="limparFiltros">Limpar</button>
     </div>
 
@@ -131,7 +146,12 @@
 
           <!-- Pronto para entrega -->
           <template v-if="order.status === 'pronto_entrega'">
-            <span style="font-size:0.85rem;color:var(--text-muted);">Aguardando Entregador...</span>
+            <template v-if="modoSemEntregador">
+              <button v-if="podeMarcarPronto" class="btn btn-success btn-sm" @click="changeStatus(order.id, 'entregue')">✅ Confirmar Entrega</button>
+            </template>
+            <template v-else>
+              <span style="font-size:0.85rem;color:var(--text-muted);">Aguardando Entregador...</span>
+            </template>
           </template>
 
           <!-- Em trânsito / Chegou destino -->
@@ -370,18 +390,51 @@ async function checkRefundStatus(orderId) {
 
 const hoje = new Date().toISOString().split('T')[0]
 const filtroStatus = ref('')
+const filtroDataPeriodo = ref('hoje')
 const filtroDataInicio = ref(hoje)
 const filtroDataFim = ref('')
+const modoSemEntregador = ref(false)
 
-const kanbanColumns = [
-  { status: 'aguardando_pagamento', label: '⏳ Pagamento' },
-  { status: 'pendente', label: 'Aguardando' },
-  { status: 'preparando', label: 'Preparando' },
-  { status: 'pronto_entrega', label: 'Pronto' },
-  { status: 'em_transito', label: 'Em Rota' },
-  { status: 'cheguei_destino', label: 'No Local' },
-  { status: 'entregue', label: 'Entregue' },
-]
+function aplicarFiltroData() {
+  const hojeStr = new Date().toISOString().split('T')[0]
+  if (filtroDataPeriodo.value === 'hoje') {
+    filtroDataInicio.value = hojeStr
+    filtroDataFim.value = ''
+  } else if (filtroDataPeriodo.value === 'ontem') {
+    const ontem = new Date(); ontem.setDate(ontem.getDate() - 1)
+    filtroDataInicio.value = ontem.toISOString().split('T')[0]
+    filtroDataFim.value = ''
+  } else if (filtroDataPeriodo.value === '7dias') {
+    const seteDias = new Date(); seteDias.setDate(seteDias.getDate() - 7)
+    filtroDataInicio.value = seteDias.toISOString().split('T')[0]
+    filtroDataFim.value = ''
+  } else {
+    filtroDataInicio.value = ''
+    filtroDataFim.value = ''
+  }
+  loadOrders()
+}
+
+const kanbanColumns = computed(() => {
+  const cols = [
+    { status: 'aguardando_pagamento', label: '⏳ Pagamento' },
+    { status: 'pendente', label: 'Aguardando' },
+    { status: 'preparando', label: 'Preparando' },
+    { status: 'pronto_entrega', label: 'Pronto' },
+  ]
+  // Se modo sem entregador, esconder colunas de entrega (a menos que existam pedidos lá)
+  if (modoSemEntregador.value) {
+    const hasTransito = orders.value.some(o => o.status === 'em_transito')
+    const hasDestino = orders.value.some(o => o.status === 'cheguei_destino')
+    if (hasTransito) cols.push({ status: 'em_transito', label: '📦 Em Rota' })
+    if (hasDestino) cols.push({ status: 'cheguei_destino', label: '📍 No Local' })
+  } else {
+    cols.push({ status: 'em_transito', label: 'Em Rota' })
+    cols.push({ status: 'cheguei_destino', label: 'No Local' })
+  }
+  cols.push({ status: 'entregue', label: 'Entregue' })
+  return cols
+})
 
 function formatPrice(v) { return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v) }
 
@@ -590,8 +643,16 @@ async function enviarMensagem() {
   finally { globalLoading.value = false }
 }
 
+async function loadConfig() {
+  try {
+    const { data } = await api.get('/restaurante')
+    modoSemEntregador.value = data.modo_sem_entregador || false
+  } catch { /* ignore */ }
+}
+
 function limparFiltros() {
   filtroStatus.value = ''
+  filtroDataPeriodo.value = 'hoje'
   filtroDataInicio.value = hoje
   filtroDataFim.value = ''
   loadOrders()
@@ -653,6 +714,7 @@ async function confirmarPagamento(order) {
 onMounted(async () => {
   await loadOrders()
   await loadResumo()
+  await loadConfig()
   onEvent('pedido:novo', () => { loadOrders(); loadResumo() })
   onEvent('pedido:atualizado', () => { loadOrders(); loadResumo() })
 
@@ -740,6 +802,39 @@ onUnmounted(() => {
   color: #166534;
   border: 1px solid #bbf7d0;
 }
+.date-radio-group {
+  display: flex;
+  gap: 4px;
+  background: var(--background);
+  padding: 3px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
+.date-radio {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 12px;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition);
+  color: var(--text-muted);
+  user-select: none;
+}
+.date-radio:hover {
+  color: var(--text);
+}
+.date-radio.active {
+  background: var(--surface);
+  color: var(--primary);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+}
+.date-radio input[type="radio"] {
+  display: none;
+}
+
 .feedback-toast.erro {
   background: #fee2e2;
   color: #991b1b;

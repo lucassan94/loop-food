@@ -283,6 +283,15 @@ router.patch('/:id/status', authenticate, async (req, res, next) => {
         throw new AppError('Clientes só podem cancelar pedidos.', 403);
       }
     } else if (userRole === 'entregador') {
+      // Verificar se o restaurante permite entregadores
+      const restResult = await query(
+        'SELECT modo_sem_entregador FROM restaurantes WHERE id = $1',
+        [req.restaurantId || config.restaurantId]
+      );
+      const modoSemEntregador = restResult.rows[0]?.modo_sem_entregador || false;
+      if (modoSemEntregador) {
+        throw new AppError('Restaurante está em modo sem entregador. Gerencie a entrega pelo painel.', 403);
+      }
       // Entregador: só transições de entrega (em seus pedidos)
       if (!['em_transito', 'cheguei_destino', 'entregue'].includes(data.status)) {
         throw new AppError('Entregadores só podem gerenciar transporte/entrega.', 403);
@@ -291,12 +300,23 @@ router.patch('/:id/status', authenticate, async (req, res, next) => {
       // Staff do restaurante: verificar cargo
       // Fallback 'admin' para tokens antigos sem campo cargo
       const effectiveCargo = userCargo || 'admin';
+
+      // Verificar se o restaurante está em modo sem entregador
+      // Nesse modo, o restaurante pode mover de pronto_entrega → entregue
+      const restResult = await query(
+        'SELECT modo_sem_entregador FROM restaurantes WHERE id = $1',
+        [req.restaurantId || config.restaurantId]
+      );
+      const modoSemEntregador = restResult.rows[0]?.modo_sem_entregador || false;
       
       if (['admin', 'gerente'].includes(effectiveCargo)) {
         // Admin/gerente: qualquer transição
+        // Se modo_sem_entregador, permitir pronto_entrega → entregue
       } else if (effectiveCargo === 'chef') {
         // Chef: transições de cozinha + cancelar
-        if (!['preparando', 'pronto_entrega', 'cancelado'].includes(data.status)) {
+        const allowedChef = ['preparando', 'pronto_entrega', 'cancelado'];
+        if (modoSemEntregador) allowedChef.push('entregue');
+        if (!allowedChef.includes(data.status)) {
           throw new AppError('Chef só pode preparar, finalizar ou cancelar pedidos.', 403);
         }
       } else if (effectiveCargo === 'caixa') {

@@ -1,10 +1,24 @@
 <template>
   <div>
     <div class="filter-bar">
-      <input type="date" v-model="dataInicio" />
-      <input type="date" v-model="dataFim" />
-      <button class="btn btn-primary btn-sm" @click="load">Filtrar</button>
-      <button class="btn btn-secondary btn-sm" @click="dataInicio=hoje;dataFim='';load()">Limpar</button>
+      <div class="date-radio-group">
+        <label class="date-radio" :class="{ active: dataPeriodo === 'hoje' }">
+          <input type="radio" name="dataDashboard" value="hoje" v-model="dataPeriodo" @change="aplicarData()" />
+          <span>Hoje</span>
+        </label>
+        <label class="date-radio" :class="{ active: dataPeriodo === 'ontem' }">
+          <input type="radio" name="dataDashboard" value="ontem" v-model="dataPeriodo" @change="aplicarData()" />
+          <span>Ontem</span>
+        </label>
+        <label class="date-radio" :class="{ active: dataPeriodo === '7dias' }">
+          <input type="radio" name="dataDashboard" value="7dias" v-model="dataPeriodo" @change="aplicarData()" />
+          <span>7 dias</span>
+        </label>
+        <label class="date-radio" :class="{ active: dataPeriodo === '30dias' }">
+          <input type="radio" name="dataDashboard" value="30dias" v-model="dataPeriodo" @change="aplicarData()" />
+          <span>30 dias</span>
+        </label>
+      </div>
     </div>
 
     <div v-if="loading" style="text-align:center;padding:3rem;">
@@ -99,8 +113,26 @@ const dados = ref(null)
 const loading = ref(true)
 const erroCarregamento = ref('')
 const hoje = new Date().toISOString().split('T')[0]
+const dataPeriodo = ref('hoje')
 const dataInicio = ref(hoje)
 const dataFim = ref('')
+
+function aplicarData() {
+  const hojeStr = new Date().toISOString().split('T')[0]
+  if (dataPeriodo.value === 'hoje') {
+    dataInicio.value = hojeStr; dataFim.value = ''
+  } else if (dataPeriodo.value === 'ontem') {
+    const d = new Date(); d.setDate(d.getDate() - 1)
+    dataInicio.value = d.toISOString().split('T')[0]; dataFim.value = ''
+  } else if (dataPeriodo.value === '7dias') {
+    const d = new Date(); d.setDate(d.getDate() - 7)
+    dataInicio.value = d.toISOString().split('T')[0]; dataFim.value = ''
+  } else if (dataPeriodo.value === '30dias') {
+    const d = new Date(); d.setDate(d.getDate() - 30)
+    dataInicio.value = d.toISOString().split('T')[0]; dataFim.value = ''
+  }
+  load()
+}
 
 function formatPrice(v) { return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v) }
 
@@ -142,5 +174,34 @@ onMounted(load)
 </script>
 <style scoped>
 .spinner { border: 4px solid #e2e8f0; border-top-color: #dc2626; border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto; }
+.date-radio-group {
+  display: flex;
+  gap: 4px;
+  background: var(--background);
+  padding: 3px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
+.date-radio {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 12px;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition);
+  color: var(--text-muted);
+  user-select: none;
+}
+.date-radio:hover { color: var(--text); }
+.date-radio.active {
+  background: var(--surface);
+  color: var(--primary);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+}
+.date-radio input[type="radio"] { display: none; }
+
 @keyframes spin { to { transform: rotate(360deg); } }
 </style>

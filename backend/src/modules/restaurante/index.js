@@ -16,7 +16,7 @@ router.get('/', async (req, res, next) => {
   try {
     const restaurantId = req.restaurantId || config.restaurantId;
     const result = await query(
-      'SELECT id, nome, endereco, cep, cidade, estado, latitude, longitude, status_loja, tempo_preparo_min FROM restaurantes WHERE id = $1',
+      'SELECT id, nome, endereco, cep, cidade, estado, latitude, longitude, status_loja, tempo_preparo_min, modo_sem_entregador FROM restaurantes WHERE id = $1',
       [restaurantId]
     );
 
@@ -63,7 +63,7 @@ router.get('/', async (req, res, next) => {
 router.put('/', authenticate, authorize('admin', 'gerente'), async (req, res, next) => {
   try {
     const restaurantId = req.restaurantId || config.restaurantId;
-    const { nome, endereco, cep, cidade, estado, latitude, longitude, tempo_preparo_min } = req.body;
+    const { nome, endereco, cep, cidade, estado, latitude, longitude, tempo_preparo_min, modo_sem_entregador } = req.body;
 
     const result = await query(
       `UPDATE restaurantes SET
@@ -74,10 +74,11 @@ router.put('/', authenticate, authorize('admin', 'gerente'), async (req, res, ne
         estado = COALESCE($5, estado),
         latitude = COALESCE($6, latitude),
         longitude = COALESCE($7, longitude),
-        tempo_preparo_min = COALESCE($8, tempo_preparo_min)
-       WHERE id = $9
+        tempo_preparo_min = COALESCE($8, tempo_preparo_min),
+        modo_sem_entregador = COALESCE($9, modo_sem_entregador)
+       WHERE id = $10
        RETURNING *`,
-      [nome, endereco, cep, cidade, estado, latitude, longitude, tempo_preparo_min, restaurantId]
+      [nome, endereco, cep, cidade, estado, latitude, longitude, tempo_preparo_min, modo_sem_entregador, restaurantId]
     );
 
     emitToRestaurant('restaurante:atualizado', result.rows[0], restaurantId);
