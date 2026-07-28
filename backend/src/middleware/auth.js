@@ -1,6 +1,95 @@
 import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
 import { config } from '../config/index.js';
 import { setUserContext } from '../config/database.js';
+
+// ============================================================================
+// CACHE DE JWT SECRET POR TENANT
+// ============================================================================
+// Cada tenant pode ter seu próprio JWT secret armazenado no banco
+// (restaurantes.jwt_secret). Isso garante isolamento: tokens do Tenant A
+// não funcionam no Tenant B.
+//
+// O secret é auto-gerado no primeiro login de cada tenant.
+// Fallback: usa o JWT_SECRET global do .env quando jwt_secret é NULL.
+// ============================================================================
+
+const jwtSecretCache = new Map();
+const JWT_SECRET_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutos
+
+/**
+ * Busca o JWT secret de um tenant específico.
+ * Usa cache em memória para evitar consultas repetidas ao banco.
+ * Retorna null se o tenant não tiver secret próprio (usa fallback global).
+ */
+async function getTenantJwtSecret(restaurantId) {
+  if (!restaurantId) return null;
+
+  const cached = jwtSecretCache.get(restaurantId);
+  if (cached && (Date.now() - cached.cachedAt) < JWT_SECRET_CACHE_TTL_MS) {
+    return cached.secret;
+  }
+
+  try {
+    const { query } = await import('../config/database.js');
+    const result = await query(
+      'SELECT jwt_secret FROM restaurantes WHERE id = $1',
+      [restaurantId]
+    );
+    if (result.rows.length > 0 && result.rows[0].jwt_secret) {
+      const secret = result.rows[0].jwt_secret;
+      jwtSecretCache.set(restaurantId, { secret, cachedAt: Date.now() });
+      return secret;
+    }
+  } catch (err) {
+    console.warn(`[Auth] Erro ao buscar jwt_secret do tenant ${restaurantId}:`, err.message);
+  }
+  return null;
+}
+
+/**
+ * Gera um JWT secret para o tenant (se não existir) e retorna o secret ativo.
+ * Usa crypto.randomBytes para gerar um secret de 256 bits (32 bytes hex).
+ */
+export async function ensureTenantJwtSecret(restaurantId) {
+  if (!restaurantId) return config.jwt.secret;
+
+  // Tentar cache primeiro
+  let secret = await getTenantJwtSecret(restaurantId);
+  if (secret) return secret;
+
+  // Gerar novo secret
+  secret = crypto.randomBytes(32).toString('hex');
+
+  try {
+    const { query } = await import('../config/database.js');
+    await query(
+      'UPDATE restaurantes SET jwt_secret = $1 WHERE id = $2 AND jwt_secret IS NULL',
+      [secret, restaurantId]
+    );
+    // Atualizar cache
+    jwtSecretCache.set(restaurantId, { secret, cachedAt: Date.now() });
+    return secret;
+  } catch (err) {
+    console.warn(`[Auth] Erro ao gerar jwt_secret para tenant ${restaurantId}:`, err.message);
+    return config.jwt.secret;
+  }
+}
+
+// ============================================================================
+// UTILITÁRIOS
+// ============================================================================
+
+/**
+ * Limpa o cache de JWT secrets. Útil após alterar o secret de um tenant.
+ */
+export function clearJwtSecretCache(restaurantId) {
+  if (restaurantId) {
+    jwtSecretCache.delete(restaurantId);
+  } else {
+    jwtSecretCache.clear();
+  }
+}
 
 // Extrair token do cookie ou header Authorization
 function extractToken(req) {
@@ -16,8 +105,8 @@ function extractToken(req) {
   return null;
 }
 
-// Middleware: autenticação obrigatória
-export function authenticate(req, res, next) {
+// Middleware: autenticação obrigatória (suporta JWT per-tenant)
+export async function authenticate(req, res, next) {
   const token = extractToken(req);
 
   if (!token) {
@@ -25,14 +114,32 @@ export function authenticate(req, res, next) {
   }
 
   try {
-    const decoded = jwt.verify(token, config.jwt.secret);
+    // 1. Decodificar sem verificar para extrair o restaurantId do payload
+    const payload = jwt.decode(token);
+    if (!payload) throw new Error('Token inválido');
+
+    // 2. Resolver o rid e tentar verificar com per-tenant ou global
+    const rid = payload.restaurantId || req.restaurantId || config.restaurantId;
+    const tenantSecret = await getTenantJwtSecret(rid);
+
+    // 3. Verificar o token: tenta per-tenant primeiro, fallback global
+    //    (o fallback permite transição suave de tokens antigos)
+    let decoded;
+    if (tenantSecret) {
+      try {
+        decoded = jwt.verify(token, tenantSecret);
+      } catch {
+        // Fallback: token pode ter sido assinado com o secret global (migração)
+        decoded = jwt.verify(token, config.jwt.secret);
+      }
+    } else {
+      decoded = jwt.verify(token, config.jwt.secret);
+    }
     req.user = decoded;
 
     // Atualizar o contexto RLS com os dados do usuário logado
-    // Isso garante que app.user_role e app.user_id estejam definidos
-    // para as queries executadas pelo route handler
     setUserContext({
-      restaurantId: req.restaurantId || decoded.restaurantId || config.restaurantId,
+      restaurantId: rid,
       id: decoded.id,
       role: decoded.role,
       cargo: decoded.cargo,
@@ -51,21 +158,36 @@ export function authenticate(req, res, next) {
 }
 
 // Middleware: autenticação opcional (não bloqueia)
-export function optionalAuth(req, res, next) {
+export async function optionalAuth(req, res, next) {
   const token = extractToken(req);
 
   if (token) {
     try {
-      const decoded = jwt.verify(token, config.jwt.secret);
-      req.user = decoded;
+      // Decodificar sem verificar para extrair o restaurantId
+      const payload = jwt.decode(token);
+      if (payload) {
+        const rid = payload.restaurantId || req.restaurantId || config.restaurantId;
+        const tenantSecret = await getTenantJwtSecret(rid);
+        let decoded;
+        if (tenantSecret) {
+          try {
+            decoded = jwt.verify(token, tenantSecret);
+          } catch {
+            decoded = jwt.verify(token, config.jwt.secret);
+          }
+        } else {
+          decoded = jwt.verify(token, config.jwt.secret);
+        }
+        req.user = decoded;
 
-      // Atualizar contexto RLS se usuário foi autenticado opcionalmente
-      setUserContext({
-        restaurantId: req.restaurantId || decoded.restaurantId || config.restaurantId,
-        id: decoded.id,
-        role: decoded.role,
-        cargo: decoded.cargo,
-      });
+        // Atualizar contexto RLS
+        setUserContext({
+          restaurantId: rid,
+          id: decoded.id,
+          role: decoded.role,
+          cargo: decoded.cargo,
+        });
+      }
     } catch {
       // Token inválido ou expirado, ignora
     }
@@ -75,20 +197,16 @@ export function optionalAuth(req, res, next) {
 }
 
 // Middleware: verificar role/cargo específica
-// Aceita tanto role (cliente/entregador/restaurante) quanto cargo (admin/gerente/chef/caixa)
-// NOTA: Não usa mais o bypass 'role === restaurante' — agora cada cargo é verificado explicitamente.
 export function authorize(...allowedRolesOrCargos) {
   return (req, res, next) => {
     if (!req.user) {
       return res.status(401).json({ error: 'Não autenticado.' });
     }
 
-    // Normalizar para lowercase
     const allowed = allowedRolesOrCargos.map(r => r.toLowerCase());
     const userRole = (req.user.role || '').toLowerCase();
     const userCargo = (req.user.cargo || '').toLowerCase();
 
-    // Verifica se o role OU o cargo do usuário está na lista de permitidos
     if (allowed.includes(userRole) || allowed.includes(userCargo)) {
       return next();
     }
@@ -101,37 +219,21 @@ export function authorize(...allowedRolesOrCargos) {
   };
 }
 
-// Guard: proteção contra bypass via DevTools no frontend
 export function guardCheck(req, res, next) {
-  // SPA guard: se a request não tiver referer ou for via API, pode prosseguir
-  // Isso evita que alguém desative o JS e tente acessar dados
   if (req.headers['x-auth-guard'] === 'saborexpress-secure') {
     return next();
   }
-
-  // Normal auth flow
   next();
 }
 
-// Middleware: restringir acesso por módulo (cross-login prevention)
-// Cada frontend envia X-Module header. O middleware verifica se o
-// módulo do usuário (armazenado no JWT) corresponde ao esperado.
-// Ex: admin não consegue acessar APIs do cliente, vice-versa.
-//
-// IMPORTANTE: DEVE ser executado APÓS o authenticate, pois precisa
-// de req.user preenchido. Não verifica autenticação — apenas módulo.
 export function restrictModule() {
   return (req, res, next) => {
     const requestModule = req.headers['x-module'] || '';
     const userModule = req.user?.module || '';
 
-    // Se nenhum módulo foi especificado, permitir (compatibilidade/reverso)
     if (!requestModule) return next();
-
-    // Se o usuário não está autenticado, não há módulo para verificar
     if (!req.user) return next();
 
-    // Verificar se o módulo do JWT corresponde ao header
     if (userModule !== requestModule) {
       return res.status(403).json({
         error: 'Acesso negado: módulo incorreto.',

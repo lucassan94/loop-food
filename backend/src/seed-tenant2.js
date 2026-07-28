@@ -9,6 +9,7 @@
 // Uso: DB_HOST=86.48.18.22 node src/seed-tenant2.js
 // ============================================================================
 
+import crypto from 'crypto';
 import bcrypt from 'bcrypt';
 import pg from 'pg';
 import 'dotenv/config';
@@ -32,22 +33,25 @@ async function seedTenant2() {
     // ─── 1. ATUALIZAR TENANT 1 (Palazzo) ───
     console.log('📌 Atualizando Tenant 1 (Palazzo)...');
     
-    // Verificar se o slug já foi atualizado
-    const existing = await client.query('SELECT id, slug, dominio FROM restaurantes WHERE id = 1');
-    if (existing.rows[0]?.slug === 'palazzomooca') {
-      console.log('   ⏩ Tenant 1 já configurado, pulando...');
+    // Gerar JWT secret para tenant 1 se não existir
+    const jwt1 = crypto.randomBytes(32).toString('hex');
+    const up1 = await client.query(
+      `UPDATE restaurantes SET
+         slug = COALESCE(NULLIF(slug, ''), 'palazzomooca'),
+         dominio = COALESCE(NULLIF(dominio, ''), 'palazzomooca'),
+         nome = COALESCE(NULLIF(nome, ''), 'Palazzo'),
+         asaas_env = COALESCE(asaas_env, 'sandbox'),
+         jwt_secret = COALESCE(jwt_secret, $1),
+         config = '{}'::jsonb,
+         atualizado_em = NOW()
+       WHERE id = 1
+       RETURNING id, slug, jwt_secret IS NOT NULL as tem_jwt`,
+      [jwt1]
+    );
+    if (up1.rows[0]?.tem_jwt) {
+      console.log('   ✅ Tenant 1 atualizado: palazzomooca (JWT secret gerado)');
     } else {
-      await client.query(
-        `UPDATE restaurantes SET
-           slug = 'palazzomooca',
-           dominio = 'palazzomooca',
-           nome = COALESCE(NULLIF(nome, ''), 'Palazzo'),
-           asaas_env = COALESCE(asaas_env, 'sandbox'),
-           config = '{}'::jsonb,
-           atualizado_em = NOW()
-         WHERE id = 1`
-      );
-      console.log('   ✅ Tenant 1 atualizado: palazzomooca');
+      console.log('   ⏩ Tenant 1 já configurado');
     }
 
     // ─── 2. CRIAR TENANT 2 (SaborExpress) ───
@@ -58,24 +62,28 @@ async function seedTenant2() {
     let tenant2Id;
     if (tenantExists.rows.length > 0) {
       tenant2Id = tenantExists.rows[0].id;
-      // Garantir que o tenant existente tenha coordenadas
+      // Garantir que o tenant existente tenha coordenadas + JWT secret
+      const jwt2 = crypto.randomBytes(32).toString('hex');
       await client.query(
         `UPDATE restaurantes SET
            latitude = COALESCE(latitude, -23.5505),
            longitude = COALESCE(longitude, -46.6333),
+           jwt_secret = COALESCE(jwt_secret, $1),
            atualizado_em = NOW()
-         WHERE id = $1 AND (latitude IS NULL OR longitude IS NULL)`,
-        [tenant2Id]
+         WHERE id = $2 AND (latitude IS NULL OR longitude IS NULL OR jwt_secret IS NULL)`,
+        [jwt2, tenant2Id]
       );
-      console.log(`   ⏩ Tenant 2 já existe (id=${tenant2Id}), coordenadas verificadas`);
+      console.log(`   ⏩ Tenant 2 já existe (id=${tenant2Id}), coordenadas + JWT verificados`);
     } else {
+      const jwt2 = crypto.randomBytes(32).toString('hex');
       const result = await client.query(
-        `INSERT INTO restaurantes (nome, slug, dominio, asaas_env, status_loja, tempo_preparo_min, latitude, longitude, config)
-         VALUES ('SaborExpress', 'saborexpress', 'saborexpress', 'sandbox', true, 20, -23.5505, -46.6333, '{}'::jsonb)
-         RETURNING id`
+        `INSERT INTO restaurantes (nome, slug, dominio, asaas_env, status_loja, tempo_preparo_min, latitude, longitude, jwt_secret, config)
+         VALUES ('SaborExpress', 'saborexpress', 'saborexpress', 'sandbox', true, 20, -23.5505, -46.6333, $1, '{}'::jsonb)
+         RETURNING id`,
+        [jwt2]
       );
       tenant2Id = result.rows[0].id;
-      console.log(`   ✅ Tenant 2 criado (id=${tenant2Id})`);
+      console.log(`   ✅ Tenant 2 criado (id=${tenant2Id}) com JWT secret`);
     }
 
     // ─── 3. CATEGORIAS para Tenant 2 ───

@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import bcrypt from 'bcrypt';
 import { query } from './config/database.js';
 import { config } from './config/index.js';
@@ -7,6 +8,14 @@ async function seed() {
   console.log('\n🌱 Seeding database...\n');
 
   try {
+    // Gerar JWT secret para o tenant se não existir
+    const jwtSecret = crypto.randomBytes(32).toString('hex');
+    await query(
+      'UPDATE restaurantes SET jwt_secret = COALESCE(jwt_secret, $1) WHERE id = $2',
+      [jwtSecret, config.restaurantId]
+    );
+    console.log('✅ JWT secret gerado/verificado para o tenant');
+
     // Admin user
     const adminHash = await bcrypt.hash('admin123', 12);
     await query(

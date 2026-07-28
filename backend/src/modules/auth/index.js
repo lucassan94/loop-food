@@ -4,7 +4,7 @@ import jwt from 'jsonwebtoken';
 import { z } from 'zod';
 import { query, transaction } from '../../config/database.js';
 import { config } from '../../config/index.js';
-import { authenticate } from '../../middleware/auth.js';
+import { authenticate, ensureTenantJwtSecret } from '../../middleware/auth.js';
 import { AppError } from '../../middleware/errorHandler.js';
 import { validarTelefone, validarCPF } from '../../utils/validators.js';
 import { loginLimiter, signupLimiter, refreshLimiter } from '../../middleware/rateLimiter.js';
@@ -27,7 +27,8 @@ const signupClienteSchema = z.object({
 });
 
 // Gerar tokens JWT — sessão de longa duração (365 dias)
-function gerarTokens(usuario, restaurantId) {
+// Usa JWT secret per-tenant (ou global como fallback)
+async function gerarTokens(usuario, restaurantId) {
   // Determinar o módulo com base na role
   const roleMap = {
     'cliente': 'cliente',
@@ -46,13 +47,16 @@ function gerarTokens(usuario, restaurantId) {
     restaurantId: restaurantId || config.restaurantId,
   };
 
-  const accessToken = jwt.sign(payload, config.jwt.secret, {
+  // Garantir que o tenant tenha um JWT secret (auto-gera se não existir)
+  const secret = await ensureTenantJwtSecret(restaurantId);
+
+  const accessToken = jwt.sign(payload, secret, {
     expiresIn: config.jwt.expiresIn,
   });
 
   const refreshToken = jwt.sign(
     { ...payload, type: 'refresh' },
-    config.jwt.secret,
+    secret,
     { expiresIn: config.jwt.refreshExpiresIn }
   );
 
@@ -115,7 +119,7 @@ router.post('/cliente/login', loginLimiter, async (req, res, next) => {
     const senhaValida = await bcrypt.compare(password, user.senha_hash);
     if (!senhaValida) throw new AppError('E-mail ou senha inválidos.', 401);
 
-    const tokens = gerarTokens({ ...user, role: 'cliente' }, restaurantId);
+    const tokens = await gerarTokens({ ...user, role: 'cliente' }, restaurantId);
     setTokenCookies(req, res, tokens);
 
     res.json({
@@ -170,7 +174,7 @@ router.post('/cliente/signup', signupLimiter, async (req, res, next) => {
       return r.rows[0];
     });
 
-    const tokens = gerarTokens({ ...result, role: 'cliente' }, restaurantId);
+    const tokens = await gerarTokens({ ...result, role: 'cliente' }, restaurantId);
     setTokenCookies(req, res, tokens);
 
     res.status(201).json({
@@ -208,7 +212,7 @@ router.post('/entregador/login', loginLimiter, async (req, res, next) => {
     const senhaValida = await bcrypt.compare(password, user.senha_hash);
     if (!senhaValida) throw new AppError('E-mail ou senha inválidos.', 401);
 
-    const tokens = gerarTokens({ ...user, role: 'entregador' }, restaurantId);
+    const tokens = await gerarTokens({ ...user, role: 'entregador' }, restaurantId);
     setTokenCookies(req, res, tokens);
 
     res.json({
@@ -255,7 +259,7 @@ router.post('/restaurante/login', loginLimiter, async (req, res, next) => {
     // Atualizar último acesso
     await query('UPDATE restaurante_users SET ultimo_acesso = NOW() WHERE id = $1', [user.id]);
 
-    const tokens = gerarTokens({ ...user, role: 'restaurante' }, restaurantId);
+    const tokens = await gerarTokens({ ...user, role: 'restaurante' }, restaurantId);
     setTokenCookies(req, res, tokens);
 
     res.json({
@@ -293,7 +297,7 @@ router.post('/refresh', refreshLimiter, async (req, res, next) => {
       role: decoded.role,
     };
 
-    const tokens = gerarTokens(user);
+    const tokens = await gerarTokens(user);
     setTokenCookies(req, res, tokens);
 
     res.json({
