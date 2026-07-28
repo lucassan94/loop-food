@@ -9,7 +9,14 @@ const api = axios.create({
   withCredentials: true,
 })
 
-// Interceptor para adicionar token público lido dos cookies
+// Lê slug da URL (ex: ?slug=saborexpress) uma vez e armazena
+let _urlSlug = null
+try {
+  const params = new URLSearchParams(window.location.search)
+  _urlSlug = params.get('slug')
+} catch { /* ignora */ }
+
+// Interceptor para adicionar token público lido dos cookies + slug
 api.interceptors.request.use((config) => {
   // Pular endpoints que não precisam de autenticação
   const publicEndpoints = ['/auth/cliente/login', '/auth/cliente/signup', '/auth/refresh']
@@ -22,6 +29,10 @@ api.interceptors.request.use((config) => {
   }
   // Cross-login prevention: identificar módulo para o backend
   config.headers['X-Module'] = 'cliente'
+  // Se houver slug na URL, passar para o tenantResolver
+  if (_urlSlug) {
+    config.headers['X-Tenant-Slug'] = _urlSlug
+  }
   return config
 })
 
