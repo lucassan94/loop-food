@@ -45,7 +45,7 @@ api.interceptors.response.use(
         document.cookie.split(';').forEach(c => {
           document.cookie = c.replace(/^ +/, '').replace(/=.*/, '=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/')
         })
-        window.location.href = '/'
+        window.location.href = window.location.pathname.startsWith('/admin') ? '/admin' : '/'
       }
     }
     return Promise.reject(error)

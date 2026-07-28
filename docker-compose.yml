@@ -19,7 +19,8 @@ services:
       # Para subdomínios wildcard, use prefixo *. (ex: *.loopautomacoes.com.br)
       # O backend aceita wildcard: qualquer subdomínio que termine em .loopautomacoes.com.br
       # Ex: https://palazzomooca.cliente.loopautomacoes.com.br será aceito
-      - CORS_ORIGIN=${CORS_ORIGIN:-http://86.48.18.22:8091,http://86.48.18.22:8092,http://86.48.18.22:8093,*.loopautomacoes.com.br}
+      # Com o novo router (path-based), acessamos direto: {slug}.loopautomacoes.com.br
+      - CORS_ORIGIN=${CORS_ORIGIN:-http://86.48.18.22:8091,http://86.48.18.22:8092,http://86.48.18.22:8093,http://86.48.18.22:8094,*.loopautomacoes.com.br}
       # Asaas (preencha via Portainer em Stacks > loop-food > Environment variables)
       - ASAAS_API_KEY=${ASAAS_API_KEY}
       - ASAAS_ENV=${ASAAS_ENV:-sandbox}
@@ -39,6 +40,7 @@ services:
       retries: 5
       start_period: 30s
 
+  # Serviços individuais (mantidos para compatibilidade com acesso direto por IP)
   cliente:
     build:
       context: ./cliente
@@ -78,6 +80,27 @@ services:
     restart: unless-stopped
     ports:
       - "8093:80"
+    depends_on:
+      - backend
+    healthcheck:
+      test: ["CMD", "pidof", "nginx"]
+      interval: 30s
+      timeout: 3s
+      retries: 2
+      start_period: 5s
+
+  # ─── ROUTER: entry point unificado para subdomínios ──────────────
+  # Acesse via {slug}.loopautomacoes.com.br:
+  #   /           → Cliente (cardápio)
+  #   /admin      → Restaurante (painel admin)
+  #   /entregador → Entregador (app delivery)
+  router:
+    build:
+      context: .
+      dockerfile: router/Dockerfile
+    restart: unless-stopped
+    ports:
+      - "8094:80"
     depends_on:
       - backend
     healthcheck:
