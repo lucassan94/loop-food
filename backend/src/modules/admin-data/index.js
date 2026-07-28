@@ -14,6 +14,7 @@ const TABELAS_PERMITIDAS = {
   entregadores: { label: 'Entregadores', colunaChave: 'id' },
   restaurante_users: { label: 'Usuários Admin', colunaChave: 'id' },
   raios_entrega: { label: 'Raios de Entrega', colunaChave: 'id' },
+  restaurantes: { label: 'Restaurantes (Tenants)', colunaChave: 'id' },
 };
 
 // 🔒 Colunas atualizáveis por tabela (WHITELIST)
@@ -24,6 +25,7 @@ const COLUNAS_ATUALIZAVEIS = {
   entregadores: ['nome', 'email', 'telefone', 'status', 'endereco'],
   restaurante_users: ['nome', 'email', 'cargo', 'ativo'],
   raios_entrega: ['raio_km', 'tempo_min', 'tempo_max', 'custo'],
+  restaurantes: ['nome', 'endereco', 'cep', 'cidade', 'estado', 'latitude', 'longitude', 'status_loja', 'tempo_preparo_min', 'slug', 'dominio', 'asaas_api_key', 'asaas_env', 'asaas_webhook_token', 'asaas_webhook_secret'],
 };
 
 // ============================
