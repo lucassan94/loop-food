@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { query } from '../../config/database.js';
+import { config } from '../../config/index.js';
 import { authenticate, authorize } from '../../middleware/auth.js';
 import { AppError } from '../../middleware/errorHandler.js';
 
@@ -39,27 +40,28 @@ router.get('/tables', authenticate, authorize('admin'), async (req, res) => {
 });
 
 // ============================
-// LER REGISTROS DE UMA TABELA
+// LER REGISTROS DE UMA TABELA (tenant-scoped por RLS + filtro explícito)
 // ============================
 router.get('/:table', authenticate, authorize('admin'), async (req, res, next) => {
   try {
     const { table } = req.params;
     const { limit = 100, offset = 0 } = req.query;
+    const restaurantId = req.restaurantId || config.restaurantId;
 
     if (!TABELAS_PERMITIDAS[table]) {
       throw new AppError(`Tabela '${table}' não disponível para consulta.`, 403);
     }
 
-    // Buscar registros com parameterized query
+    // Buscar registros com tenant scoping explícito (+ RLS dupla proteção)
     const result = await query(
-      `SELECT * FROM ${table} ORDER BY id DESC LIMIT $1 OFFSET $2`,
-      [parseInt(limit), parseInt(offset)]
+      `SELECT * FROM ${table} WHERE restaurant_id = $1 ORDER BY id DESC LIMIT $2 OFFSET $3`,
+      [restaurantId, parseInt(limit), parseInt(offset)]
     );
 
-    // Contar total (para paginação)
+    // Contar total (apenas do tenant)
     const countResult = await query(
-      `SELECT COUNT(*) as total FROM ${table}`,
-      []
+      `SELECT COUNT(*) as total FROM ${table} WHERE restaurant_id = $1`,
+      [restaurantId]
     );
 
     res.json({
@@ -73,12 +75,13 @@ router.get('/:table', authenticate, authorize('admin'), async (req, res, next) =
 });
 
 // ============================
-// ATUALIZAR UM REGISTRO
+// ATUALIZAR UM REGISTRO (tenant-scoped)
 // ============================
 router.put('/:table/:id', authenticate, authorize('admin'), async (req, res, next) => {
   try {
     const { table, id } = req.params;
     const data = req.body;
+    const restaurantId = req.restaurantId || config.restaurantId;
 
     if (!TABELAS_PERMITIDAS[table]) {
       throw new AppError(`Tabela '${table}' não disponível para atualização.`, 403);
@@ -104,11 +107,12 @@ router.put('/:table/:id', authenticate, authorize('admin'), async (req, res, nex
       throw new AppError('Nenhuma coluna válida para atualizar.', 400);
     }
 
-    // Adicionar ID como último parâmetro
+    // Adicionar restaurant_id e ID como parâmetros
+    params.push(restaurantId);
     params.push(id);
 
     const result = await query(
-      `UPDATE ${table} SET ${updates.join(', ')} WHERE ${colunaChave} = $${paramIdx} RETURNING *`,
+      `UPDATE ${table} SET ${updates.join(', ')} WHERE restaurant_id = $${paramIdx} AND ${colunaChave} = $${paramIdx + 1} RETURNING *`,
       params
     );
 

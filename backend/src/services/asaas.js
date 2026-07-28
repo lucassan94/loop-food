@@ -1,19 +1,99 @@
 // Serviço de integração com a API Asaas (v3)
+// Suporte multi-tenant: cada restaurante pode ter sua própria chave Asaas
 import crypto from 'crypto';
 import { config } from '../config/index.js';
 import { AppError } from '../middleware/errorHandler.js';
 
-const BASE_URL = config.asaas.baseUrl;
+// ──────── CACHE DE CREDENCIAIS POR TENANT ────────
+const tenantCredentialCache = new Map();
+const CREDENTIAL_CACHE_TTL = 5 * 60 * 1000; // 5 minutos
+
+/**
+ * Busca as credenciais Asaas de um tenant específico.
+ * Usa cache em memória para evitar consultas repetidas ao banco.
+ * Retorna null se o tenant não tiver credenciais próprias.
+ */
+async function getTenantCredentials(tenantId) {
+  if (!tenantId) return null;
+
+  const cached = tenantCredentialCache.get(tenantId);
+  if (cached && (Date.now() - cached.cachedAt) < CREDENTIAL_CACHE_TTL) {
+    return cached;
+  }
+
+  try {
+    const { query } = await import('../config/database.js');
+    const result = await query(
+      'SELECT asaas_api_key, asaas_env, asaas_webhook_token, asaas_webhook_secret FROM restaurantes WHERE id = $1',
+      [tenantId]
+    );
+
+    if (result.rows.length > 0 && result.rows[0].asaas_api_key) {
+      const creds = { ...result.rows[0], cachedAt: Date.now() };
+      tenantCredentialCache.set(tenantId, creds);
+      return creds;
+    }
+  } catch (err) {
+    console.warn(`[Asaas] Erro ao buscar credenciais do tenant ${tenantId}:`, err.message);
+  }
+  return null;
+}
+
+/**
+ * Limpa o cache de credenciais de um tenant específico ou de todos.
+ */
+export function clearAsaasTenantCache(tenantId) {
+  if (tenantId) {
+    tenantCredentialCache.delete(tenantId);
+  } else {
+    tenantCredentialCache.clear();
+  }
+}
 
 // ──────── HEADERS ────────
-function getHeaders() {
-  if (!config.asaas.apiKey) {
-    throw new AppError('ASAAS_API_KEY não configurada.', 500, 'ASAAS_MISCONFIG');
+async function getHeaders(tenantId) {
+  let apiKey = config.asaas.apiKey;
+  let environment = config.asaas.environment;
+
+  // Se tenantId foi fornecido, tentar usar credenciais do tenant
+  if (tenantId) {
+    const creds = await getTenantCredentials(tenantId);
+    if (creds?.asaas_api_key) {
+      apiKey = creds.asaas_api_key;
+      if (creds.asaas_env) {
+        environment = creds.asaas_env;
+      }
+    }
   }
+
+  if (!apiKey) {
+    throw new AppError(
+      tenantId
+        ? `ASAAS_API_KEY não configurada para o tenant ${tenantId}.`
+        : 'ASAAS_API_KEY não configurada.',
+      500,
+      'ASAAS_MISCONFIG'
+    );
+  }
+
   return {
     'Content-Type': 'application/json',
-    'access_token': config.asaas.apiKey,
+    'access_token': apiKey,
   };
+}
+
+// ──────── ENVIRONMENT HELPER ────────
+function getBaseUrl(tenantId) {
+  // O cache DEVE estar populado por getHeaders() ou getTenantCredentials()
+  // ANTES de chamar esta função.
+  // Chame getHeaders(tenantId) ou await getTenantCredentials(tenantId) primeiro.
+  const env = tenantId
+    ? (tenantCredentialCache.get(tenantId)?.asaas_env || config.asaas.environment)
+    : config.asaas.environment;
+
+  return env === 'production'
+    ? 'https://api.asaas.com'
+    : 'https://api-sandbox.asaas.com';
 }
 
 // ──────── LOGGING ────────
@@ -40,7 +120,7 @@ async function withRetry(fn, retries = 3, baseDelay = 500) {
         || err.code === 'ABORT_ERR'
         || err.message?.includes('ECONNRESET');
       if (!isRetryable || attempt === retries) break;
-      const delay = baseDelay * Math.pow(2, attempt - 1); // exponential backoff
+      const delay = baseDelay * Math.pow(2, attempt - 1);
       console.warn(`[Asaas] Tentativa ${attempt}/${retries} falhou, retry em ${delay}ms: ${err.message}`);
       await new Promise(r => setTimeout(r, delay));
     }
@@ -48,15 +128,19 @@ async function withRetry(fn, retries = 3, baseDelay = 500) {
   throw lastError;
 }
 
-// Helper genérico para chamadas à API Asaas
-async function call(method, path, body = null, idempotencyKey = null) {
+// ──────── API CALL ────────
+// tenantId: opcional, usado para usar credenciais específicas do tenant
+async function call(method, path, body = null, idempotencyKey = null, tenantId = null) {
   return withRetry(async () => {
-    const headers = getHeaders();
+    // getHeaders() DEVE vir antes de getBaseUrl() para garantir
+    // que o cache de credenciais do tenant seja populado primeiro
+    const headers = await getHeaders(tenantId);
+    const baseUrl = getBaseUrl(tenantId);
     if (idempotencyKey) headers['idempotency_key'] = idempotencyKey;
 
     const start = Date.now();
 
-    const response = await fetch(`${BASE_URL}${path}`, {
+    const response = await fetch(`${baseUrl}${path}`, {
       method,
       headers,
       body: body ? JSON.stringify(body) : null,
@@ -80,43 +164,28 @@ async function call(method, path, body = null, idempotencyKey = null) {
 
 // ──────── CUSTOMER ────────
 
-// Busca cliente existente por CPF e/ou externalReference
-export async function findCustomer(cpfCnpj, externalRef) {
-  return call('GET', `/v3/customers?cpfCnpj=${cpfCnpj}&externalReference=${externalRef}`);
+export async function findCustomer(cpfCnpj, externalRef, tenantId = null) {
+  return call('GET', `/v3/customers?cpfCnpj=${cpfCnpj}&externalReference=${externalRef}`, null, null, tenantId);
 }
 
-// Cria novo cliente no Asaas com TODOS os dados disponíveis
-// Nota: mobilePhone só é enviado em produção, pois o sandbox rejeita
-// qualquer valor neste campo (bug conhecido do sandbox Asaas)
-export async function createCustomer({ name, cpfCnpj, email, phone, externalReference, address, addressNumber, complement, province, postalCode, city, state }) {
+export async function createCustomer({
+  name, cpfCnpj, email, phone, externalReference,
+  address, addressNumber, complement, province, postalCode, city, state
+}, tenantId = null) {
+  // Garantir que o cache de credenciais seja populado antes de resolver a base URL
+  const creds = tenantId ? await getTenantCredentials(tenantId) : null;
+  const env = creds?.asaas_env || config.asaas.environment;
+  const baseUrl = env === 'production' ? 'https://api.asaas.com' : 'https://api-sandbox.asaas.com';
+
   const body = {
     name,
     cpfCnpj,
     email,
     externalReference: String(externalReference),
-    notificationDisabled: false, // permite que Asaas envie notificações ao cliente
+    notificationDisabled: false,
   };
-  // Apenas em produção: enviar telefone
-  if (config.asaas.environment === 'production' && phone) {
-    body.mobilePhone = phone;
-  }
-  // Endereço (enviar sempre que disponível)
-  if (address) body.address = address;
-  if (addressNumber) body.addressNumber = addressNumber;
-  if (complement) body.complement = complement;
-  if (province) body.province = province; // bairro
-  if (postalCode) body.postalCode = postalCode.replace(/\D/g, '');
-  if (city) body.city = city;
-  if (state) body.state = state;
-  return call('POST', '/v3/customers', body);
-}
 
-// Atualiza dados do cliente no Asaas (usado no checkout para manter dados frescos)
-export async function updateCustomer(asaasCustomerId, { name, email, phone, address, addressNumber, complement, province, postalCode, city, state }) {
-  const body = {};
-  if (name) body.name = name;
-  if (email) body.email = email;
-  if (config.asaas.environment === 'production' && phone) {
+  if (env === 'production' && phone) {
     body.mobilePhone = phone;
   }
   if (address) body.address = address;
@@ -126,37 +195,60 @@ export async function updateCustomer(asaasCustomerId, { name, email, phone, addr
   if (postalCode) body.postalCode = postalCode.replace(/\D/g, '');
   if (city) body.city = city;
   if (state) body.state = state;
-  return call('PUT', `/v3/customers/${asaasCustomerId}`, body);
+
+  return call('POST', '/v3/customers', body, null, tenantId);
 }
 
-// Busca por CPF/externalRef; se não existir, cria.
-// Se existir, ATUALIZA os dados para manter o Asaas sincronizado.
-export async function findOrCreateCustomer(clienteData) {
-  const { data } = await findCustomer(clienteData.cpfCnpj, String(clienteData.id));
-  
+export async function updateCustomer(
+  asaasCustomerId,
+  { name, email, phone, address, addressNumber, complement, province, postalCode, city, state },
+  tenantId = null
+) {
+  // Garantir que o cache de credenciais seja populado
+  const creds = tenantId ? await getTenantCredentials(tenantId) : null;
+  const env = creds?.asaas_env || config.asaas.environment;
+
+  const body = {};
+  if (name) body.name = name;
+  if (email) body.email = email;
+
+  if (env === 'production' && phone) {
+    body.mobilePhone = phone;
+  }
+  if (address) body.address = address;
+  if (addressNumber) body.addressNumber = addressNumber;
+  if (complement) body.complement = complement;
+  if (province) body.province = province;
+  if (postalCode) body.postalCode = postalCode.replace(/\D/g, '');
+  if (city) body.city = city;
+  if (state) body.state = state;
+
+  return call('PUT', `/v3/customers/${asaasCustomerId}`, body, null, tenantId);
+}
+
+export async function findOrCreateCustomer(clienteData, tenantId = null) {
+  const { data } = await findCustomer(clienteData.cpfCnpj, String(clienteData.id), tenantId);
+
   if (data?.length > 0) {
     const existing = data[0];
-    // Atualizar dados do cliente no Asaas (sincronização)
-    // Isso garante que endereço, telefone etc. estejam sempre atualizados
     try {
-      await updateCustomer(existing.id, clienteData);
+      await updateCustomer(existing.id, clienteData, tenantId);
     } catch (err) {
       console.warn(`[Asaas] Erro ao atualizar customer ${existing.id}: ${err.message}`);
     }
     return existing;
   }
-  
-  return createCustomer(clienteData);
+
+  return createCustomer(clienteData, tenantId);
 }
 
 // ──────── PAYMENT ────────
 
-// Cria cobrança (PIX ou Cartão de Crédito)
 export async function createPayment({
   customer, billingType, value, dueDate,
   description, externalReference,
   creditCard, creditCardHolderInfo, remoteIp,
-}, idempotencyKey) {
+}, idempotencyKey = null, tenantId = null) {
   const body = {
     customer,
     billingType,
@@ -166,7 +258,6 @@ export async function createPayment({
     externalReference: String(externalReference),
   };
 
-  // Se for cartão de crédito, enviar dados do cartão + titular
   if (billingType === 'CREDIT_CARD' && creditCard) {
     body.creditCard = {
       holderName: creditCard.holderName,
@@ -186,49 +277,33 @@ export async function createPayment({
     body.remoteIp = remoteIp;
   }
 
-  return call('POST', '/v3/payments', body, idempotencyKey);
+  return call('POST', '/v3/payments', body, idempotencyKey, tenantId);
 }
 
-// Consulta detalhes de uma cobrança
-export async function getPayment(paymentId) {
-  return call('GET', `/v3/payments/${paymentId}`);
+export async function getPayment(paymentId, tenantId = null) {
+  return call('GET', `/v3/payments/${paymentId}`, null, null, tenantId);
 }
 
-// Obtém QR Code PIX (encodedImage, payload, expirationDate)
-export async function getPixQrCode(paymentId) {
-  return call('GET', `/v3/payments/${paymentId}/pixQrCode`);
+export async function getPixQrCode(paymentId, tenantId = null) {
+  return call('GET', `/v3/payments/${paymentId}/pixQrCode`, null, null, tenantId);
 }
 
-// Deleta cobrança (para cancelar PENDING)
-export async function deletePayment(paymentId) {
-  return call('DELETE', `/v3/payments/${paymentId}`);
+export async function deletePayment(paymentId, tenantId = null) {
+  return call('DELETE', `/v3/payments/${paymentId}`, null, null, tenantId);
 }
 
-// Reembolso (total ou parcial)
-export async function refundPayment(paymentId, value = null) {
+export async function refundPayment(paymentId, value = null, tenantId = null) {
   const body = {};
   if (value !== null) body.value = value;
-  return call('POST', `/v3/payments/${paymentId}/refund`, body);
+  return call('POST', `/v3/payments/${paymentId}/refund`, body, null, tenantId);
 }
 
-// Tokeniza cartão (Checkout Transparente — dados NUNCA são armazenados)
-export async function tokenizeCard(cardData) {
-  // ATENÇÃO: cardData contém dados sensíveis. Esta função tokeniza
-  // o cartão com o Asaas e retorna APENAS o token. O frontend deve
-  // usar este token no lugar dos dados brutos do cartão.
-  //
-  // Idealmente, a tokenização deve ocorrer no frontend via Asaas JS SDK
-  // para que dados de cartão NUNCA trafeguem pelo seu servidor.
-  //
-  // Por enquanto, este endpoint atua como proxy para minimizar a
-  // superfície PCI, mas o ideal é tokenizar no frontend.
-  return call('POST', '/v3/creditCard/tokenize', cardData);
+export async function tokenizeCard(cardData, tenantId = null) {
+  return call('POST', '/v3/creditCard/tokenize', cardData, null, tenantId);
 }
 
 // ──────── WEBHOOK HMAC ────────
 
-// Gera HMAC-SHA256 do payload do webhook para verificação
-// O Asaas envia o header 'asaas-signature' com este HMAC
 export function gerarHmacPayLoad(body, secret) {
   if (!secret) return null;
   return crypto
@@ -237,15 +312,57 @@ export function gerarHmacPayLoad(body, secret) {
     .digest('hex');
 }
 
-// Verifica se a assinatura HMAC recebida é válida
 export function verificarAssinaturaWebhook(body, signature, secret) {
   if (!signature || !secret) return false;
   const expected = gerarHmacPayLoad(body, secret);
-  // Comparação segura contra timing attack
   if (!expected) return false;
   try {
     return crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected));
   } catch {
     return false;
   }
+}
+
+// ──────── WEBHOOK TOKEN VALIDATION (multi-tenant) ────────
+
+/**
+ * Valida o token do webhook Asaas.
+ * Suporta multi-tenant: aceita tanto o token global quanto tokens específicos de tenant.
+ *
+ * 1. Tenta matching com o token global (config.asaas.webhookToken) — backward compatible
+ * 2. Se não match, busca no cache de credenciais se algum tenant tem este token
+ * 3. Se encontrar, retorna o tenantId correspondente
+ *
+ * Retorna: { valido: boolean, tenantId: number|null }
+ */
+export async function validarTokenWebhook(token) {
+  if (!token) return { valido: false, tenantId: null };
+
+  // 1. Verificar token global
+  if (token === config.asaas.webhookToken) {
+    return { valido: true, tenantId: null };
+  }
+
+  // 2. Verificar tokens de tenants cacheados
+  for (const [tenantId, creds] of tenantCredentialCache.entries()) {
+    if (creds.asaas_webhook_token === token) {
+      return { valido: true, tenantId };
+    }
+  }
+
+  // 3. Se não achou no cache, buscar no banco (todos os tenants)
+  try {
+    const { query } = await import('../config/database.js');
+    const result = await query(
+      'SELECT id FROM restaurantes WHERE asaas_webhook_token = $1 AND asaas_webhook_token IS NOT NULL',
+      [token]
+    );
+    if (result.rows.length > 0) {
+      return { valido: true, tenantId: result.rows[0].id };
+    }
+  } catch (err) {
+    console.warn('[Asaas] Erro ao buscar tenant por webhook token:', err.message);
+  }
+
+  return { valido: false, tenantId: null };
 }

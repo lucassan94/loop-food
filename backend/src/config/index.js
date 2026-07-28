@@ -39,7 +39,10 @@ export const config = {
     refreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '365d',
   },
 
-  // Multi-tenant: Restaurant ID (hardcoded for this instance)
+  // Multi-tenant: Restaurant ID (fallback para desenvolvimento local)
+  // Em produção, o tenantResolver extrai o restaurant_id do subdomínio.
+  // Este valor é usado apenas quando o tenantResolver não consegue resolver
+  // (ex: localhost, chamadas diretas por IP, scripts de migração/seed).
   restaurantId: parseInt(process.env.RESTAURANT_ID || '1', 10),
 
   // CORS

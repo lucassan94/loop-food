@@ -9,6 +9,7 @@ import { healthCheck } from './config/database.js';
 import { buscarCEP } from './services/cep.js';
 import { errorHandler, notFound } from './middleware/errorHandler.js';
 import { pgContext } from './middleware/pgContext.js';
+import { tenantResolver } from './middleware/tenantResolver.js';
 import { restrictModule } from './middleware/auth.js';
 import { apiLimiter } from './middleware/rateLimiter.js';
 
@@ -94,11 +95,29 @@ app.use(express.urlencoded({ extended: true }));
 // ============================
 // STATIC FILES (Uploads)
 // ============================
+// A estrutura de diretórios segue o padrão multi-tenant:
+//   ./uploads/{tenantId}/cardapio/
+//   ./uploads/{tenantId}/banners/
+//   ./uploads/{tenantId}/entregadores/
+//   ./uploads/{tenantId}/categorias/
+//
+// O express.static serve a partir do diretório base,
+// e o tenant é resolvido pelo path da URL (/uploads/{tenantId}/...).
 app.use('/uploads', express.static(config.upload.dir));
+
+// ============================
+// TENANT RESOLVER (identifica o restaurante pelo subdomínio)
+// ============================
+// Extrai o subdomínio do header Host e busca o tenant no banco.
+// Define req.restaurantId para uso nas queries com RLS.
+// Deve executar ANTES do pgContext para que req.restaurantId esteja disponível.
+app.use('/api', tenantResolver);
 
 // ============================
 // PG CONTEXT (define variáveis de sessão para RLS)
 // ============================
+// Define as variáveis de sessão PostgreSQL (app.restaurant_id, app.user_role, etc.)
+// na conexão que executará a query, garantindo isolamento por tenant via RLS.
 app.use('/api', pgContext);
 
 // ============================
@@ -143,7 +162,8 @@ app.get('/api/health', async (req, res) => {
     status: db.alive ? 'healthy' : 'degraded',
     timestamp: new Date().toISOString(),
     database: db,
-    restaurantId: config.restaurantId,
+    restaurantId: req.restaurantId || config.restaurantId,
+    tenant: req.tenant ? { id: req.tenant.id, slug: req.tenant.slug } : null,
   });
 });
 

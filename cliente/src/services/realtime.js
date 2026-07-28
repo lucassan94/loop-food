@@ -6,9 +6,10 @@ export function connectRealtime() {
   if (socket?.connected) return socket
 
   const token = getCookie('publicToken')
+  const restaurantId = getCookie('tenantId')
 
   socket = io(window.location.origin, {
-    auth: { token },
+    auth: { token, restaurantId },
     transports: ['websocket', 'polling'],
     reconnection: true,
     reconnectionAttempts: Infinity,

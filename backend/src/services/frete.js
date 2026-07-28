@@ -19,23 +19,24 @@ function toRad(deg) {
 }
 
 // Buscar dados do restaurante para cálculo de distância
-export async function getRestaurantCoords() {
+export async function getRestaurantCoords(restaurantId) {
   const result = await query(
     'SELECT latitude, longitude, tempo_preparo_min FROM restaurantes WHERE id = $1',
-    [config.restaurantId]
+    [restaurantId || config.restaurantId]
   );
   return result.rows[0] || null;
 }
 
 // Calcular frete baseado na distância e matriz de raios
-export async function calcularFrete(latitudeCliente, longitudeCliente) {
-  const restaurante = await getRestaurantCoords();
+export async function calcularFrete(latitudeCliente, longitudeCliente, restaurantId) {
+  const restaurante = await getRestaurantCoords(restaurantId);
+  const rid = restaurantId || config.restaurantId;
 
   if (!restaurante || !restaurante.latitude || !restaurante.longitude) {
     // Fallback: frete fixo se não houver coordenadas
     const result = await query(
       'SELECT raio_km, tempo_min, tempo_max, custo FROM raios_entrega WHERE restaurant_id = $1 ORDER BY raio_km ASC LIMIT 1',
-      [config.restaurantId]
+      [rid]
     );
     const faixa = result.rows[0] || { raio_km: 1, tempo_min: 15, tempo_max: 25, custo: 5.00 };
     return {
@@ -62,7 +63,7 @@ export async function calcularFrete(latitudeCliente, longitudeCliente) {
      WHERE restaurant_id = $1 AND raio_km >= $2
      ORDER BY raio_km ASC
      LIMIT 1`,
-    [config.restaurantId, Math.ceil(distancia)]
+    [rid, Math.ceil(distancia)]
   );
 
   const faixa = result.rows[0];

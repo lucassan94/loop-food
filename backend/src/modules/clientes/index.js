@@ -11,6 +11,7 @@ const router = Router();
 // ============================
 router.get('/', authenticate, authorize('admin', 'gerente', 'caixa'), async (req, res, next) => {
   try {
+    const restaurantId = req.restaurantId || config.restaurantId;
     const { busca, ordenar_por, ordem } = req.query;
     let sql = `
       SELECT id, nome, sobrenome, email, telefone, endereco, cep, bairro,
@@ -18,7 +19,7 @@ router.get('/', authenticate, authorize('admin', 'gerente', 'caixa'), async (req
       FROM clientes
       WHERE restaurant_id = $1
     `;
-    const params = [config.restaurantId];
+    const params = [restaurantId];
 
     if (busca) {
       sql += ' AND (LOWER(nome) LIKE $' + (params.length + 1) + ' OR LOWER(email) LIKE $' + (params.length + 1) + ' OR LOWER(telefone) LIKE $' + (params.length + 1) + ')';
@@ -43,13 +44,14 @@ router.get('/', authenticate, authorize('admin', 'gerente', 'caixa'), async (req
 // ============================
 router.get('/:id', authenticate, authorize('admin', 'gerente', 'caixa'), async (req, res, next) => {
   try {
+    const restaurantId = req.restaurantId || config.restaurantId;
     const { id } = req.params;
     const result = await query(
       `SELECT id, nome, sobrenome, email, telefone, endereco, cep, numero, bairro,
               complemento, cidade, estado, latitude, longitude,
               total_gasto, pedidos_total, criado_em
        FROM clientes WHERE id = $1 AND restaurant_id = $2`,
-      [id, config.restaurantId]
+      [id, restaurantId]
     );
 
     if (result.rows.length === 0) {
@@ -61,7 +63,7 @@ router.get('/:id', authenticate, authorize('admin', 'gerente', 'caixa'), async (
       `SELECT id, pedido_id, total, status, criado_em
        FROM pedidos WHERE cliente_id = $1 AND restaurant_id = $2
        ORDER BY criado_em DESC LIMIT 10`,
-      [id, config.restaurantId]
+      [id, restaurantId]
     );
 
     // Produto mais comprado
@@ -72,7 +74,7 @@ router.get('/:id', authenticate, authorize('admin', 'gerente', 'caixa'), async (
        WHERE p.cliente_id = $1 AND p.restaurant_id = $2
        GROUP BY pi.nome_produto
        ORDER BY total_vendido DESC LIMIT 1`,
-      [id, config.restaurantId]
+      [id, restaurantId]
     );
 
     res.json({
@@ -90,6 +92,7 @@ router.get('/:id', authenticate, authorize('admin', 'gerente', 'caixa'), async (
 // ============================
 router.put('/perfil', authenticate, async (req, res, next) => {
   try {
+    const restaurantId = req.restaurantId || config.restaurantId;
     const { id } = req.user;
     const { nome, sobrenome, telefone, endereco, cep, numero, bairro, complemento, cidade, estado, cpf_cnpj } = req.body;
 
@@ -108,7 +111,7 @@ router.put('/perfil', authenticate, async (req, res, next) => {
         cpf_cnpj = COALESCE($11, cpf_cnpj)
        WHERE id = $12 AND restaurant_id = $13
        RETURNING id, nome, sobrenome, email, telefone, endereco, cep, numero, bairro, complemento, cidade, estado, cpf_cnpj`,
-      [nome, sobrenome, telefone, endereco, cep, numero, bairro, complemento, cidade, estado, cpf_cnpj, id, config.restaurantId]
+      [nome, sobrenome, telefone, endereco, cep, numero, bairro, complemento, cidade, estado, cpf_cnpj, id, restaurantId]
     );
 
     if (result.rows.length === 0) {

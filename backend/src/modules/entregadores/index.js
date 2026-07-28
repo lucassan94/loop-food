@@ -26,13 +26,14 @@ const entregadorSchema = z.object({
 // ============================
 router.get('/', authenticate, authorize('admin', 'gerente'), async (req, res, next) => {
   try {
+    const restaurantId = req.restaurantId || config.restaurantId;
     const result = await query(
       `SELECT id, nome, email, telefone, cpf, status, entregas_total,
               frete_total_recebido, ultima_entrega_em, criado_em
        FROM entregadores
        WHERE restaurant_id = $1
        ORDER BY nome ASC`,
-      [config.restaurantId]
+      [restaurantId]
     );
     res.json(result.rows);
   } catch (err) {
@@ -45,6 +46,7 @@ router.get('/', authenticate, authorize('admin', 'gerente'), async (req, res, ne
 // ============================
 router.post('/', authenticate, authorize('admin', 'gerente'), async (req, res, next) => {
   try {
+    const restaurantId = req.restaurantId || config.restaurantId;
     const data = entregadorSchema.parse(req.body);
     if (!data.password) throw new AppError('Senha é obrigatória.', 400);
 
@@ -59,7 +61,7 @@ router.post('/', authenticate, authorize('admin', 'gerente'), async (req, res, n
       `INSERT INTO entregadores (restaurant_id, nome, email, telefone, cpf, rg, data_nascimento, endereco, senha_hash, status)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
        RETURNING id, nome, email, telefone, status`,
-      [config.restaurantId, data.nome, data.email, data.telefone, data.cpf,
+      [restaurantId, data.nome, data.email, data.telefone, data.cpf,
        data.rg, data.data_nascimento || null, data.endereco, senhaHash, data.status]
     );
 
@@ -74,11 +76,12 @@ router.post('/', authenticate, authorize('admin', 'gerente'), async (req, res, n
 // ============================
 router.put('/:id', authenticate, authorize('admin', 'gerente'), async (req, res, next) => {
   try {
+    const restaurantId = req.restaurantId || config.restaurantId;
     const { id } = req.params;
     const data = entregadorSchema.partial().parse(req.body);
 
     const fields = [];
-    const params = [id, config.restaurantId];
+    const params = [id, restaurantId];
     let paramIdx = 3;
 
     for (const [key, value] of Object.entries(data)) {
@@ -120,6 +123,7 @@ router.put('/:id', authenticate, authorize('admin', 'gerente'), async (req, res,
 // ============================
 router.get('/relatorio', authenticate, authorize('admin', 'gerente'), async (req, res, next) => {
   try {
+    const restaurantId = req.restaurantId || config.restaurantId;
     const result = await query(
       `SELECT e.id, e.nome, e.email, e.telefone, e.entregas_total, e.frete_total_recebido, e.ultima_entrega_em,
               COUNT(p.id) FILTER (WHERE p.status = 'entregue' AND p.criado_em >= CURRENT_DATE) as entregas_hoje
@@ -128,7 +132,7 @@ router.get('/relatorio', authenticate, authorize('admin', 'gerente'), async (req
        WHERE e.restaurant_id = $1 AND e.status != 'inativo'
        GROUP BY e.id
        ORDER BY e.entregas_total DESC`,
-      [config.restaurantId]
+      [restaurantId]
     );
     res.json(result.rows);
   } catch (err) {
@@ -141,13 +145,14 @@ router.get('/relatorio', authenticate, authorize('admin', 'gerente'), async (req
 // ============================
 router.get('/relatorio/financeiro', authenticate, authorize('admin', 'gerente'), async (req, res, next) => {
   try {
+    const restaurantId = req.restaurantId || config.restaurantId;
     // Total de hoje
     const hoje = await query(
       `SELECT COALESCE(SUM(p.valor_frete), 0) as total,
               COUNT(*) as entregas
        FROM pedidos p
        WHERE p.restaurant_id = $1 AND p.status = 'entregue' AND p.entregue_em >= CURRENT_DATE`,
-      [config.restaurantId]
+      [restaurantId]
     );
 
     // Dias do mês
@@ -163,7 +168,7 @@ router.get('/relatorio/financeiro', authenticate, authorize('admin', 'gerente'),
          AND p.entregue_em >= DATE_TRUNC('month', CURRENT_DATE)
        GROUP BY DATE(p.entregue_em)
        ORDER BY data DESC`,
-      [config.restaurantId]
+      [restaurantId]
     );
 
     // Consolidado do mês
@@ -173,7 +178,7 @@ router.get('/relatorio/financeiro', authenticate, authorize('admin', 'gerente'),
         COUNT(*) as entregas_mes
        FROM pedidos
        WHERE restaurant_id = $1 AND status = 'entregue' AND entregue_em >= DATE_TRUNC('month', CURRENT_DATE)`,
-      [config.restaurantId]
+      [restaurantId]
     );
 
     res.json({
@@ -193,6 +198,7 @@ router.get('/relatorio/financeiro', authenticate, authorize('admin', 'gerente'),
 // ============================
 router.get('/relatorio/financeiro/dia/:data', authenticate, authorize('admin', 'gerente'), async (req, res, next) => {
   try {
+    const restaurantId = req.restaurantId || config.restaurantId;
     const { data } = req.params;
 
     const result = await query(
@@ -205,7 +211,7 @@ router.get('/relatorio/financeiro/dia/:data', authenticate, authorize('admin', '
          AND p.status = 'entregue'
          AND DATE(p.entregue_em) = $2
        ORDER BY p.entregue_em DESC`,
-      [config.restaurantId, data]
+      [restaurantId, data]
     );
 
     res.json({

@@ -27,7 +27,7 @@ const signupClienteSchema = z.object({
 });
 
 // Gerar tokens JWT — sessão de longa duração (365 dias)
-function gerarTokens(usuario) {
+function gerarTokens(usuario, restaurantId) {
   // Determinar o módulo com base na role
   const roleMap = {
     'cliente': 'cliente',
@@ -43,7 +43,7 @@ function gerarTokens(usuario) {
     role: usuario.role,
     module: modulo,
     cargo: usuario.cargo || usuario.role,
-    restaurantId: config.restaurantId,
+    restaurantId: restaurantId || config.restaurantId,
   };
 
   const accessToken = jwt.sign(payload, config.jwt.secret, {
@@ -99,6 +99,7 @@ function setTokenCookies(req, res, tokens) {
 // ============================
 router.post('/cliente/login', loginLimiter, async (req, res, next) => {
   try {
+    const restaurantId = req.restaurantId || config.restaurantId;
     const { email, password } = loginSchema.parse(req.body);
 
     const result = await query(
@@ -114,7 +115,7 @@ router.post('/cliente/login', loginLimiter, async (req, res, next) => {
     const senhaValida = await bcrypt.compare(password, user.senha_hash);
     if (!senhaValida) throw new AppError('E-mail ou senha inválidos.', 401);
 
-    const tokens = gerarTokens({ ...user, role: 'cliente' });
+    const tokens = gerarTokens({ ...user, role: 'cliente' }, restaurantId);
     setTokenCookies(req, res, tokens);
 
     res.json({
@@ -148,6 +149,7 @@ router.post('/cliente/login', loginLimiter, async (req, res, next) => {
 // ============================
 router.post('/cliente/signup', signupLimiter, async (req, res, next) => {
   try {
+    const restaurantId = req.restaurantId || config.restaurantId;
     const data = signupClienteSchema.parse(req.body);
 
     // Verificar se email já existe
@@ -163,12 +165,12 @@ router.post('/cliente/signup', signupLimiter, async (req, res, next) => {
         `INSERT INTO clientes (restaurant_id, nome, sobrenome, email, telefone, cpf_cnpj, senha_hash)
          VALUES ($1, $2, $3, $4, $5, $6, $7)
          RETURNING id, nome, sobrenome, email, telefone, cpf_cnpj`,
-        [config.restaurantId, data.nome, data.sobrenome || '', data.email, data.telefone || '', data.cpf?.replace(/\D/g, '') || '', senhaHash]
+        [restaurantId, data.nome, data.sobrenome || '', data.email, data.telefone || '', data.cpf?.replace(/\D/g, '') || '', senhaHash]
       );
       return r.rows[0];
     });
 
-    const tokens = gerarTokens({ ...result, role: 'cliente' });
+    const tokens = gerarTokens({ ...result, role: 'cliente' }, restaurantId);
     setTokenCookies(req, res, tokens);
 
     res.status(201).json({
@@ -186,13 +188,14 @@ router.post('/cliente/signup', signupLimiter, async (req, res, next) => {
 // ============================
 router.post('/entregador/login', loginLimiter, async (req, res, next) => {
   try {
+    const restaurantId = req.restaurantId || config.restaurantId;
     const { email, password } = loginSchema.parse(req.body);
 
     const result = await query(
       `SELECT id, nome, email, telefone, senha_hash, status, entregas_total, frete_total_recebido
        FROM entregadores
        WHERE email = $1 AND restaurant_id = $2`,
-      [email, config.restaurantId]
+      [email, restaurantId]
     );
 
     const user = result.rows[0];
@@ -205,7 +208,7 @@ router.post('/entregador/login', loginLimiter, async (req, res, next) => {
     const senhaValida = await bcrypt.compare(password, user.senha_hash);
     if (!senhaValida) throw new AppError('E-mail ou senha inválidos.', 401);
 
-    const tokens = gerarTokens({ ...user, role: 'entregador' });
+    const tokens = gerarTokens({ ...user, role: 'entregador' }, restaurantId);
     setTokenCookies(req, res, tokens);
 
     res.json({
@@ -233,13 +236,14 @@ router.post('/entregador/login', loginLimiter, async (req, res, next) => {
 // ============================
 router.post('/restaurante/login', loginLimiter, async (req, res, next) => {
   try {
+    const restaurantId = req.restaurantId || config.restaurantId;
     const { email, password } = loginSchema.parse(req.body);
 
     const result = await query(
       `SELECT id, nome, email, senha_hash, cargo, ativo
        FROM restaurante_users
        WHERE email = $1 AND restaurant_id = $2 AND ativo = true`,
-      [email, config.restaurantId]
+      [email, restaurantId]
     );
 
     const user = result.rows[0];
@@ -251,7 +255,7 @@ router.post('/restaurante/login', loginLimiter, async (req, res, next) => {
     // Atualizar último acesso
     await query('UPDATE restaurante_users SET ultimo_acesso = NOW() WHERE id = $1', [user.id]);
 
-    const tokens = gerarTokens({ ...user, role: 'restaurante' });
+    const tokens = gerarTokens({ ...user, role: 'restaurante' }, restaurantId);
     setTokenCookies(req, res, tokens);
 
     res.json({

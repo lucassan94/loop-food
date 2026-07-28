@@ -20,6 +20,12 @@ export function initRealtime(httpServer) {
   // Middleware de autenticação
   io.use((socket, next) => {
     const token = socket.handshake.auth?.token || socket.handshake.query?.token;
+    const restaurantId = socket.handshake.auth?.restaurantId || socket.handshake.query?.restaurantId;
+
+    // Guardar restaurantId do handshake para usuários anônimos
+    if (restaurantId) {
+      socket.handshakeRestaurantId = parseInt(restaurantId, 10);
+    }
 
     if (!token) {
       // Conexão anônima (cliente não logado) - permite apenas eventos públicos
@@ -39,20 +45,30 @@ export function initRealtime(httpServer) {
 
   io.on('connection', (socket) => {
     const user = socket.user;
-    console.log(`[WS] Cliente conectado: ${user ? `${user.role} ${user.id}` : 'anônimo'}`);
+
+    // Determinar restaurantId: JWT > handshake > fallback config
+    const userRestaurantId = user?.restaurantId || socket.handshakeRestaurantId || config.restaurantId;
+
+    console.log(`[WS] Cliente conectado: ${user ? `${user.role} ${user.id}` : 'anônimo'} | restaurantId=${userRestaurantId}`);
 
     // Unir a salas baseadas no role
     if (user) {
       socket.join(`user:${user.role}:${user.id}`);
-      socket.join(`role:${user.role}`);
+
+      if (user.role === 'entregador') {
+        // Entregadores entram em sala scoped por tenant
+        socket.join(`role:entregador:restaurant:${userRestaurantId}`);
+      } else {
+        socket.join(`role:${user.role}`);
+      }
 
       if (user.restaurantId) {
         socket.join(`restaurant:${user.restaurantId}`);
       }
     }
 
-    // Salas públicas do restaurante
-    socket.join(`restaurant:${config.restaurantId}`);
+    // Sala pública do restaurante (sempre determinada pelo tenant)
+    socket.join(`restaurant:${userRestaurantId}`);
 
     socket.on('disconnect', () => {
       console.log(`[WS] Cliente desconectado: ${user ? user.role : 'anônimo'}`);
@@ -69,8 +85,12 @@ export function emitToRoom(room, event, data) {
   io.to(room).emit(event, data);
 }
 
-// Emitir para todos em um restaurante
-export function emitToRestaurant(event, data, restaurantId = config.restaurantId) {
+// Emitir para todos em um restaurante (restaurantId é OBRIGATÓRIO)
+export function emitToRestaurant(event, data, restaurantId) {
+  if (!restaurantId) {
+    console.warn('[WS] emitToRestaurant chamado sem restaurantId');
+    return;
+  }
   emitToRoom(`restaurant:${restaurantId}`, event, data);
 }
 
@@ -86,7 +106,10 @@ export function emitToUser(role, userId, event, data) {
 
 // Eventos de pedido
 export function emitPedidoAtualizado(pedido) {
-  emitToRestaurant('pedido:atualizado', pedido);
+  const restaurantId = pedido.restaurant_id;
+  if (restaurantId) {
+    emitToRestaurant('pedido:atualizado', pedido, restaurantId);
+  }
 
   if (pedido.cliente_id) {
     emitToUser('cliente', pedido.cliente_id, 'pedido:atualizado', pedido);
@@ -100,15 +123,25 @@ export function emitPedidoAtualizado(pedido) {
 }
 
 export function emitNovoPedido(pedido) {
-  emitToRestaurant('pedido:novo', pedido);
+  const restaurantId = pedido.restaurant_id;
+  if (restaurantId) {
+    emitToRestaurant('pedido:novo', pedido, restaurantId);
+  }
 }
 
-export function emitEntregaDisponivel(entrega) {
-  emitToRole('entregador', 'entrega:disponivel', entrega);
+// Entregas disponíveis são emitidas APENAS para entregadores do tenant correto
+export function emitEntregaDisponivel(entrega, restaurantId) {
+  if (!restaurantId) {
+    console.warn('[WS] emitEntregaDisponivel chamado sem restaurantId');
+    return;
+  }
+  emitToRoom(`role:entregador:restaurant:${restaurantId}`, 'entrega:disponivel', entrega);
 }
 
-export function emitNovaMensagem(mensagem, clienteId) {
-  emitToRestaurant('mensagem:novo', mensagem);
+export function emitNovaMensagem(mensagem, clienteId, restaurantId) {
+  if (restaurantId) {
+    emitToRestaurant('mensagem:novo', mensagem, restaurantId);
+  }
   if (clienteId) {
     emitToUser('cliente', clienteId, 'mensagem:novo', mensagem);
   }

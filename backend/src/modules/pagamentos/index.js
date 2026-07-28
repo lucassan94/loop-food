@@ -24,35 +24,62 @@ const ASAAS_IPS = [
   '177.71.245.127',
 ];
 
-function validateWebhookSignature(req, res, next) {
-  // 1. Verificar IP (produção)
-  const clientIp = req.ip || req.connection?.remoteAddress;
-  if (config.asaas.environment === 'production' && clientIp) {
-    const ipLimpo = clientIp.replace(/^::ffff:/, '');
-    if (!ASAAS_IPS.includes(ipLimpo)) {
-      console.warn(`[Asaas] Webhook rejeitado: IP ${ipLimpo} não autorizado`);
-      return res.status(200).json({ received: true }); // 200 para não gerar retentativas
+async function validateWebhookSignature(req, res, next) {
+  try {
+    // 1. Verificar IP (produção)
+    const clientIp = req.ip || req.connection?.remoteAddress;
+    if (config.asaas.environment === 'production' && clientIp) {
+      const ipLimpo = clientIp.replace(/^::ffff:/, '');
+      if (!ASAAS_IPS.includes(ipLimpo)) {
+        console.warn(`[Asaas] Webhook rejeitado: IP ${ipLimpo} não autorizado`);
+        return res.status(200).json({ received: true });
+      }
     }
-  }
 
-  // 2. Verificar token (obrigatório em todos os ambientes)
-  const token = req.headers['asaas-access-token'];
-  if (!token || token !== config.asaas.webhookToken) {
-    console.warn('[Asaas] Webhook rejeitado: token inválido');
-    return res.status(200).json({ received: true });
-  }
-
-  // 3. Verificar HMAC-SHA256 (se webhookSecret estiver configurado)
-  if (config.asaas.webhookSecret) {
-    const signature = req.headers['asaas-signature'];
-    const rawBody = req.rawBody || JSON.stringify(req.body);
-    if (!asaas.verificarAssinaturaWebhook(rawBody, signature, config.asaas.webhookSecret)) {
-      console.warn('[Asaas] Webhook rejeitado: assinatura HMAC inválida');
+    // 2. Verificar token (multi-tenant)
+    const token = req.headers['asaas-access-token'];
+    const { valido: tokenValido, tenantId } = await asaas.validarTokenWebhook(token);
+    if (!tokenValido) {
+      console.warn('[Asaas] Webhook rejeitado: token inválido');
       return res.status(200).json({ received: true });
     }
-  }
 
-  next();
+    // 3. Se o token pertence a um tenant específico, resolver o restaurant_id
+    if (tenantId) {
+      req.restaurantId = tenantId;
+
+      // Verificar HMAC com o secret do tenant (se configurado)
+      const { query } = await import('../../config/database.js');
+      const tenantResult = await query(
+        'SELECT asaas_webhook_secret FROM restaurantes WHERE id = $1',
+        [tenantId]
+      );
+      const tenantSecret = tenantResult.rows[0]?.asaas_webhook_secret;
+      if (tenantSecret) {
+        const signature = req.headers['asaas-signature'];
+        const rawBody = req.rawBody || JSON.stringify(req.body);
+        if (!asaas.verificarAssinaturaWebhook(rawBody, signature, tenantSecret)) {
+          console.warn('[Asaas] Webhook rejeitado: assinatura HMAC inválida para tenant');
+          return res.status(200).json({ received: true });
+        }
+      }
+    } else {
+      // Token global: usar webhookSecret global (se configurado)
+      if (config.asaas.webhookSecret) {
+        const signature = req.headers['asaas-signature'];
+        const rawBody = req.rawBody || JSON.stringify(req.body);
+        if (!asaas.verificarAssinaturaWebhook(rawBody, signature, config.asaas.webhookSecret)) {
+          console.warn('[Asaas] Webhook rejeitado: assinatura HMAC inválida (global)');
+          return res.status(200).json({ received: true });
+        }
+      }
+    }
+
+    next();
+  } catch (err) {
+    console.error('[Asaas] Erro na validação do webhook:', err.message);
+    return res.status(200).json({ received: true });
+  }
 }
 
 // ──────── POST /api/pagamentos/tokenizar-cartao ────────
@@ -70,8 +97,9 @@ router.post('/tokenizar-cartao', authenticate, async (req, res, next) => {
 
     const cardData = schema.parse(req.body);
 
+    const restaurantId = req.restaurantId || config.restaurantId;
     // Tokenizar com Asaas (dados NUNCA são armazenados no nosso BD)
-    const result = await asaas.tokenizeCard(cardData);
+    const result = await asaas.tokenizeCard(cardData, restaurantId);
 
     // Retorna APENAS o token — dados do cartão são descartados
     res.json({
@@ -158,12 +186,13 @@ router.post('/criar', authenticate, async (req, res, next) => {
       throw new AppError('CPF é obrigatório para pagamento online.', 400);
     }
 
+    const restaurantId = req.restaurantId || config.restaurantId;
     // Executar em transação
     const result = await transaction(async (conn) => {
       // 1. Verificar se loja está aberta
       const loja = await conn.query(
         'SELECT status_loja FROM restaurantes WHERE id = $1',
-        [config.restaurantId]
+        [restaurantId]
       );
       if (!loja.rows[0]?.status_loja) {
         throw new AppError('A loja está fechada no momento.', 400);
@@ -181,7 +210,7 @@ router.post('/criar', authenticate, async (req, res, next) => {
         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, '', '', $15, $16, 'aguardando_pagamento')
         RETURNING *`,
         [
-          config.restaurantId, clienteId, data.cliente.nome, data.cliente.telefone,
+          restaurantId, clienteId, data.cliente.nome, data.cliente.telefone,
           data.pedido.endereco, data.pedido.numero, data.pedido.bairro, data.pedido.cep,
           data.pedido.cidade, data.pedido.estado,
           data.subtotal, data.valor_frete, data.total,
@@ -230,7 +259,7 @@ router.post('/criar', authenticate, async (req, res, next) => {
       postalCode: data.pedido.cep,
       city: data.pedido.cidade,
       state: data.pedido.estado,
-    });
+    }, restaurantId);
 
     // Salvar asaas_customer_id no cliente (fire-and-forget)
     query(
@@ -255,18 +284,18 @@ router.post('/criar', authenticate, async (req, res, next) => {
         dueDate: dueDateStr,
         description: `Pedido #${result.pedido_id || result.id} - SaborExpress`,
         externalReference: result.id,  // pedido_id
-      }, idempotencyKey);
+      }, idempotencyKey, restaurantId);
 
       // Buscar QR Code PIX
-      const pixData = await asaas.getPixQrCode(payment.id);
+      const pixData = await asaas.getPixQrCode(payment.id, restaurantId);
 
-      // Salvar dados do pagamento no BD
+      // Salvar dados do pagamento no BD (com restaurant_id para rastreio multi-tenant)
       await query(
         `INSERT INTO pagamentos (pedido_id, customer_id, payment_id, billing_type, status,
-          valor_bruto, encoded_image, payload, data_vencimento)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+          valor_bruto, encoded_image, payload, data_vencimento, restaurant_id)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
         [result.id, customer.id, payment.id, 'PIX', payment.status,
-         data.total, pixData.encodedImage, pixData.payload, dueDateStr]
+         data.total, pixData.encodedImage, pixData.payload, dueDateStr, restaurantId]
       );
 
       // Calcular expiração (configurada em pixExpiryMinutes)
@@ -317,16 +346,16 @@ router.post('/criar', authenticate, async (req, res, next) => {
         paymentBody.creditCardHolderInfo = data.creditCardHolderInfo;
       }
 
-      const payment = await asaas.createPayment(paymentBody, idempotencyKey);
+      const payment = await asaas.createPayment(paymentBody, idempotencyKey, restaurantId);
 
-      // Salvar dados do pagamento no BD
+      // Salvar dados do pagamento no BD (com restaurant_id para rastreio multi-tenant)
       await query(
         `INSERT INTO pagamentos (pedido_id, customer_id, payment_id, billing_type, status,
-          valor_bruto, invoice_url, credit_card_token, data_vencimento, pago_em)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+          valor_bruto, invoice_url, credit_card_token, data_vencimento, pago_em, restaurant_id)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
         [result.id, customer.id, payment.id, 'CREDIT_CARD', payment.status,
          data.total, payment.invoiceUrl || null, payment.creditCardToken || data.creditCardToken || null, dueDateStr,
-         (payment.status === 'CONFIRMED' || payment.status === 'RECEIVED') ? new Date() : null]
+         (payment.status === 'CONFIRMED' || payment.status === 'RECEIVED') ? new Date() : null, restaurantId]
       );
 
       // Se cartão foi aprovado, já ativar o pedido
@@ -335,7 +364,7 @@ router.post('/criar', authenticate, async (req, res, next) => {
           `UPDATE pedidos SET status = 'pendente', atualizado_em = NOW() WHERE id = $1`,
           [result.id]
         );
-        emitNovoPedido({ ...result, status: 'pendente' });
+        emitNovoPedido({ ...result, status: 'pendente', restaurant_id: restaurantId });
       }
 
       res.status(201).json({
@@ -578,7 +607,14 @@ router.get('/:pedidoId/refund-status', authenticate, async (req, res, next) => {
     let asaasStatus = null;
 
     try {
-      const asaasPayment = await asaas.getPayment(pag.payment_id);
+      // Buscar restaurant_id do pagamento para usar credenciais corretas do Asaas
+      const pagTenantResult = await query(
+        'SELECT restaurant_id FROM pagamentos WHERE payment_id = $1',
+        [pag.payment_id]
+      );
+      const pagTenantId = pagTenantResult.rows[0]?.restaurant_id || null;
+
+      const asaasPayment = await asaas.getPayment(pag.payment_id, pagTenantId);
       asaasStatus = asaasPayment.status;
       deleted = asaasPayment.deleted || false;
 

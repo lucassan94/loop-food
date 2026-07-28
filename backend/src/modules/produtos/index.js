@@ -30,9 +30,10 @@ const productSchema = z.object({
 // ============================
 router.get('/categorias', async (req, res, next) => {
   try {
+    const restaurantId = req.restaurantId || config.restaurantId;
     const result = await query(
       'SELECT id, nome, slug, ordem FROM categorias WHERE restaurant_id = $1 ORDER BY ordem ASC',
-      [config.restaurantId]
+      [restaurantId]
     );
     res.json(result.rows);
   } catch (err) {
@@ -45,6 +46,7 @@ router.get('/categorias', async (req, res, next) => {
 // ============================
 router.get('/', async (req, res, next) => {
   try {
+    const restaurantId = req.restaurantId || config.restaurantId;
     const { categoria, ativo, busca } = req.query;
 
     let sql = `
@@ -55,7 +57,7 @@ router.get('/', async (req, res, next) => {
       LEFT JOIN categorias c ON p.categoria_id = c.id
       WHERE p.restaurant_id = $1
     `;
-    const params = [config.restaurantId];
+    const params = [restaurantId];
 
     if (categoria && categoria !== 'Todos') {
       sql += ' AND c.slug = $' + (params.length + 1);
@@ -86,6 +88,7 @@ router.get('/', async (req, res, next) => {
 // ============================
 router.get('/com-extras', async (req, res, next) => {
   try {
+    const restaurantId = req.restaurantId || config.restaurantId;
     const { categoria, busca } = req.query;
 
     let sql = `
@@ -95,7 +98,7 @@ router.get('/com-extras', async (req, res, next) => {
       LEFT JOIN categorias c ON p.categoria_id = c.id
       WHERE p.restaurant_id = $1 AND p.ativo = true
     `;
-    const params = [config.restaurantId];
+    const params = [restaurantId];
 
     if (categoria && categoria !== 'Todos') {
       sql += ' AND c.slug = $' + (params.length + 1);
@@ -138,6 +141,7 @@ router.get('/com-extras', async (req, res, next) => {
 // ============================
 router.get('/:id', async (req, res, next) => {
   try {
+    const restaurantId = req.restaurantId || config.restaurantId;
     const { id } = req.params;
 
     const productResult = await query(
@@ -145,7 +149,7 @@ router.get('/:id', async (req, res, next) => {
        FROM produtos p
        LEFT JOIN categorias c ON p.categoria_id = c.id
        WHERE p.id = $1 AND p.restaurant_id = $2`,
-      [id, config.restaurantId]
+      [id, restaurantId]
     );
 
     if (productResult.rows.length === 0) {
@@ -171,6 +175,7 @@ router.get('/:id', async (req, res, next) => {
 // ============================
 router.post('/', authenticate, authorize('admin', 'gerente', 'chef'), async (req, res, next) => {
   try {
+    const restaurantId = req.restaurantId || config.restaurantId;
     const data = productSchema.parse(req.body);
 
     const result = await transaction(async (client) => {
@@ -178,7 +183,7 @@ router.post('/', authenticate, authorize('admin', 'gerente', 'chef'), async (req
         `INSERT INTO produtos (restaurant_id, nome, descricao, categoria_id, preco, imagem_url, imagem_base64, ativo, destaque)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
          RETURNING *`,
-        [config.restaurantId, data.nome, data.descricao, data.categoria_id || null,
+        [restaurantId, data.nome, data.descricao, data.categoria_id || null,
          data.preco, data.imagem_url, data.imagem_base64, data.ativo, data.destaque]
       );
 
@@ -195,7 +200,7 @@ router.post('/', authenticate, authorize('admin', 'gerente', 'chef'), async (req
       return produto;
     });
 
-    emitToRestaurant('produto:novo', result);
+    emitToRestaurant('produto:novo', result, restaurantId);
     res.status(201).json(result);
   } catch (err) {
     next(err);
@@ -207,6 +212,7 @@ router.post('/', authenticate, authorize('admin', 'gerente', 'chef'), async (req
 // ============================
 router.put('/:id', authenticate, authorize('admin', 'gerente', 'chef'), async (req, res, next) => {
   try {
+    const restaurantId = req.restaurantId || config.restaurantId;
     const { id } = req.params;
     const data = productSchema.partial().parse(req.body);
 
@@ -214,7 +220,7 @@ router.put('/:id', authenticate, authorize('admin', 'gerente', 'chef'), async (r
       // Verificar se o produto existe
       const existing = await client.query(
         'SELECT id FROM produtos WHERE id = $1 AND restaurant_id = $2',
-        [id, config.restaurantId]
+        [id, restaurantId]
       );
       if (existing.rows.length === 0) {
         throw new AppError('Produto não encontrado.', 404);
@@ -269,7 +275,7 @@ router.put('/:id', authenticate, authorize('admin', 'gerente', 'chef'), async (r
       return { ...updated.rows[0], extras: extras.rows };
     });
 
-    emitToRestaurant('produto:atualizado', result);
+    emitToRestaurant('produto:atualizado', result, restaurantId);
     res.json(result);
   } catch (err) {
     next(err);
@@ -281,18 +287,19 @@ router.put('/:id', authenticate, authorize('admin', 'gerente', 'chef'), async (r
 // ============================
 router.delete('/:id', authenticate, authorize('admin', 'gerente', 'chef'), async (req, res, next) => {
   try {
+    const restaurantId = req.restaurantId || config.restaurantId;
     const { id } = req.params;
 
     const result = await query(
       'DELETE FROM produtos WHERE id = $1 AND restaurant_id = $2 RETURNING id',
-      [id, config.restaurantId]
+      [id, restaurantId]
     );
 
     if (result.rows.length === 0) {
       throw new AppError('Produto não encontrado.', 404);
     }
 
-    emitToRestaurant('produto:deletado', { id: parseInt(id) });
+    emitToRestaurant('produto:deletado', { id: parseInt(id) }, restaurantId);
     res.json({ message: 'Produto excluído com sucesso.', id: parseInt(id) });
   } catch (err) {
     next(err);

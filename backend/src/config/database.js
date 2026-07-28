@@ -37,10 +37,18 @@ export function clearUserContext() {
 }
 
 function getContextSQL() {
-  const settings = [`SET app.restaurant_id = ${config.restaurantId}`];
+  // restaurantId: usa o valor dinâmico do contexto (definido pelo tenantResolver)
+  // ou fallback para o config.restaurantId (desenvolvimento local / migrações)
+  const restaurantId = _userContext?.restaurantId || config.restaurantId;
+  const settings = [`SET app.restaurant_id = ${restaurantId}`];
+
   if (_userContext) {
-    settings.push(`SET app.user_role = '${_userContext.role}'`);
-    settings.push(`SET app.user_id = ${_userContext.id}`);
+    if (_userContext.role) {
+      settings.push(`SET app.user_role = '${_userContext.role}'`);
+    }
+    if (_userContext.id) {
+      settings.push(`SET app.user_id = ${_userContext.id}`);
+    }
     if (_userContext.cargo) {
       settings.push(`SET app.user_cargo = '${_userContext.cargo}'`);
     }

@@ -14,9 +14,10 @@ const router = Router();
 // ============================
 router.get('/', async (req, res, next) => {
   try {
+    const restaurantId = req.restaurantId || config.restaurantId;
     const result = await query(
       'SELECT id, nome, endereco, cep, cidade, estado, latitude, longitude, status_loja, tempo_preparo_min FROM restaurantes WHERE id = $1',
-      [config.restaurantId]
+      [restaurantId]
     );
 
     if (result.rows.length === 0) {
@@ -26,7 +27,7 @@ router.get('/', async (req, res, next) => {
     // Buscar categorias e produtos para cardápio público
     const categorias = await query(
       'SELECT id, nome, slug, ordem FROM categorias WHERE restaurant_id = $1 ORDER BY ordem ASC',
-      [config.restaurantId]
+      [restaurantId]
     );
 
     const produtos = await query(
@@ -36,13 +37,13 @@ router.get('/', async (req, res, next) => {
        LEFT JOIN categorias c ON p.categoria_id = c.id
        WHERE p.restaurant_id = $1 AND p.ativo = true
        ORDER BY p.destaque DESC, p.nome ASC`,
-      [config.restaurantId]
+      [restaurantId]
     );
 
     // Buscar raios de entrega
     const raios = await query(
       'SELECT * FROM raios_entrega WHERE restaurant_id = $1 ORDER BY raio_km ASC',
-      [config.restaurantId]
+      [restaurantId]
     );
 
     res.json({
@@ -61,6 +62,7 @@ router.get('/', async (req, res, next) => {
 // ============================
 router.put('/', authenticate, authorize('admin', 'gerente'), async (req, res, next) => {
   try {
+    const restaurantId = req.restaurantId || config.restaurantId;
     const { nome, endereco, cep, cidade, estado, latitude, longitude, tempo_preparo_min } = req.body;
 
     const result = await query(
@@ -75,10 +77,10 @@ router.put('/', authenticate, authorize('admin', 'gerente'), async (req, res, ne
         tempo_preparo_min = COALESCE($8, tempo_preparo_min)
        WHERE id = $9
        RETURNING *`,
-      [nome, endereco, cep, cidade, estado, latitude, longitude, tempo_preparo_min, config.restaurantId]
+      [nome, endereco, cep, cidade, estado, latitude, longitude, tempo_preparo_min, restaurantId]
     );
 
-    emitToRestaurant('restaurante:atualizado', result.rows[0]);
+    emitToRestaurant('restaurante:atualizado', result.rows[0], restaurantId);
     res.json(result.rows[0]);
   } catch (err) {
     next(err);
@@ -90,13 +92,14 @@ router.put('/', authenticate, authorize('admin', 'gerente'), async (req, res, ne
 // ============================
 router.post('/toggle-loja', authenticate, authorize('admin', 'gerente'), async (req, res, next) => {
   try {
+    const restaurantId = req.restaurantId || config.restaurantId;
     const result = await query(
       `UPDATE restaurantes SET status_loja = NOT status_loja WHERE id = $1
        RETURNING id, status_loja`,
-      [config.restaurantId]
+      [restaurantId]
     );
 
-    emitToRestaurant('restaurante:status_loja', result.rows[0]);
+    emitToRestaurant('restaurante:status_loja', result.rows[0], restaurantId);
     res.json(result.rows[0]);
   } catch (err) {
     next(err);
@@ -108,9 +111,10 @@ router.post('/toggle-loja', authenticate, authorize('admin', 'gerente'), async (
 // ============================
 router.get('/raios-entrega', authenticate, authorize('admin', 'gerente'), async (req, res, next) => {
   try {
+    const restaurantId = req.restaurantId || config.restaurantId;
     const result = await query(
       'SELECT * FROM raios_entrega WHERE restaurant_id = $1 ORDER BY raio_km ASC',
-      [config.restaurantId]
+      [restaurantId]
     );
     res.json(result.rows);
   } catch (err) {
@@ -120,12 +124,13 @@ router.get('/raios-entrega', authenticate, authorize('admin', 'gerente'), async 
 
 router.post('/raios-entrega', authenticate, authorize('admin', 'gerente'), async (req, res, next) => {
   try {
+    const restaurantId = req.restaurantId || config.restaurantId;
     const { raio_km, tempo_min, tempo_max, custo } = req.body;
     const result = await query(
       `INSERT INTO raios_entrega (restaurant_id, raio_km, tempo_min, tempo_max, custo)
        VALUES ($1, $2, $3, $4, $5)
        RETURNING *`,
-      [config.restaurantId, raio_km, tempo_min, tempo_max, custo]
+      [restaurantId, raio_km, tempo_min, tempo_max, custo]
     );
     res.status(201).json(result.rows[0]);
   } catch (err) {
@@ -135,7 +140,8 @@ router.post('/raios-entrega', authenticate, authorize('admin', 'gerente'), async
 
 router.delete('/raios-entrega/:id', authenticate, authorize('admin', 'gerente'), async (req, res, next) => {
   try {
-    await query('DELETE FROM raios_entrega WHERE id = $1 AND restaurant_id = $2', [req.params.id, config.restaurantId]);
+    const restaurantId = req.restaurantId || config.restaurantId;
+    await query('DELETE FROM raios_entrega WHERE id = $1 AND restaurant_id = $2', [req.params.id, restaurantId]);
     res.json({ message: 'Raio de entrega excluído.' });
   } catch (err) {
     next(err);
@@ -147,20 +153,21 @@ router.delete('/raios-entrega/:id', authenticate, authorize('admin', 'gerente'),
 // ============================
 router.post('/mensagens', authenticate, authorize('admin', 'gerente', 'chef'), async (req, res, next) => {
   try {
+    const restaurantId = req.restaurantId || config.restaurantId;
     const { pedido_id, mensagem } = req.body;
     const result = await query(
       `INSERT INTO mensagens_pedido (pedido_id, restaurante_id, mensagem)
        VALUES ($1, $2, $3) RETURNING *`,
-      [pedido_id, config.restaurantId, mensagem]
+      [pedido_id, restaurantId, mensagem]
     );
 
     // Buscar o cliente_id do pedido para notificar
     const pedido = await query('SELECT cliente_id FROM pedidos WHERE id = $1', [pedido_id]);
 
-    emitToRestaurant('mensagem:novo', result.rows[0]);
+    emitToRestaurant('mensagem:novo', result.rows[0], restaurantId);
     if (pedido.rows[0]?.cliente_id) {
       const { emitNovaMensagem } = await import('../../services/realtime.js');
-      emitNovaMensagem(result.rows[0], pedido.rows[0].cliente_id);
+      emitNovaMensagem(result.rows[0], pedido.rows[0].cliente_id, restaurantId);
     }
 
     res.status(201).json(result.rows[0]);
@@ -174,9 +181,10 @@ router.post('/mensagens', authenticate, authorize('admin', 'gerente', 'chef'), a
 // ============================
 router.get('/equipe', authenticate, authorize('admin', 'gerente'), async (req, res, next) => {
   try {
+    const restaurantId = req.restaurantId || config.restaurantId;
     const result = await query(
       'SELECT id, nome, email, cargo, ativo, ultimo_acesso, criado_em FROM restaurante_users WHERE restaurant_id = $1',
-      [config.restaurantId]
+      [restaurantId]
     );
     res.json(result.rows);
   } catch (err) {
@@ -186,6 +194,7 @@ router.get('/equipe', authenticate, authorize('admin', 'gerente'), async (req, r
 
 router.post('/equipe', authenticate, authorize('admin', 'gerente'), async (req, res, next) => {
   try {
+    const restaurantId = req.restaurantId || config.restaurantId;
     const { nome, email, password, cargo } = req.body;
     const senhaHash = await bcrypt.hash(password, 12);
 
@@ -193,7 +202,7 @@ router.post('/equipe', authenticate, authorize('admin', 'gerente'), async (req, 
       `INSERT INTO restaurante_users (restaurant_id, nome, email, senha_hash, cargo)
        VALUES ($1, $2, $3, $4, $5)
        RETURNING id, nome, email, cargo`,
-      [config.restaurantId, nome, email, senhaHash, cargo || 'caixa']
+      [restaurantId, nome, email, senhaHash, cargo || 'caixa']
     );
 
     res.status(201).json(result.rows[0]);
@@ -204,7 +213,8 @@ router.post('/equipe', authenticate, authorize('admin', 'gerente'), async (req, 
 
 router.delete('/equipe/:id', authenticate, authorize('admin', 'gerente'), async (req, res, next) => {
   try {
-    await query('DELETE FROM restaurante_users WHERE id = $1 AND restaurant_id = $2', [req.params.id, config.restaurantId]);
+    const restaurantId = req.restaurantId || config.restaurantId;
+    await query('DELETE FROM restaurante_users WHERE id = $1 AND restaurant_id = $2', [req.params.id, restaurantId]);
     res.json({ message: 'Usuário removido.' });
   } catch (err) {
     next(err);

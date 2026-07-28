@@ -51,6 +51,7 @@ const createOrderSchema = z.object({
 // ============================
 router.post('/', orderLimiter, optionalAuth, async (req, res, next) => {
     try {
+      const restaurantId = req.restaurantId || config.restaurantId;
       const data = createOrderSchema.parse(req.body);
 
       // SEGURANÇA: Se autenticado, usar cliente_id do JWT
@@ -61,7 +62,7 @@ router.post('/', orderLimiter, optionalAuth, async (req, res, next) => {
         // Verificar se a loja está aberta
         const loja = await client.query(
           'SELECT status_loja FROM restaurantes WHERE id = $1',
-          [config.restaurantId]
+          [restaurantId]
         );
         if (!loja.rows[0]?.status_loja) {
           throw new AppError('A loja está fechada no momento. Pedidos não podem ser realizados.', 400);
@@ -79,7 +80,7 @@ router.post('/', orderLimiter, optionalAuth, async (req, res, next) => {
         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, 'pendente')
         RETURNING *`,
           [
-            config.restaurantId, clienteId, data.nome_cliente, data.telefone_cliente,
+            restaurantId, clienteId, data.nome_cliente, data.telefone_cliente,
             data.endereco_cliente, data.numero_cliente, data.bairro_cliente, data.cep_cliente,
             data.cidade_cliente, data.estado_cliente, data.latitude_cliente, data.longitude_cliente,
             data.subtotal, data.valor_frete, data.total, data.metodo_pagamento,
@@ -163,8 +164,9 @@ router.get('/', authenticate, async (req, res, next) => {
 
     // Filtro por restaurante (admin vê todos do restaurante)
     if (role === 'restaurante') {
+      const restaurantId = req.restaurantId || config.restaurantId;
       sql += ' AND p.restaurant_id = $' + (params.length + 1);
-      params.push(config.restaurantId);
+      params.push(restaurantId);
     }
 
     // Filtro por status
@@ -389,9 +391,9 @@ router.patch('/:id/status', authenticate, async (req, res, next) => {
     // Se for recusa ou cancelamento de pedido pago online, estornar no Asaas
     if ((data.status === 'recusado' || data.status === 'cancelado') &&
         ['pix_online', 'credito_online'].includes(result.metodo_pagamento)) {
-      // Buscar payment_id no banco (fire-and-forget)
+      // Buscar payment_id + restaurant_id no banco (fire-and-forget)
       query(
-        'SELECT payment_id, status FROM pagamentos WHERE pedido_id = $1 ORDER BY criado_em DESC LIMIT 1',
+        'SELECT payment_id, status, restaurant_id FROM pagamentos WHERE pedido_id = $1 ORDER BY criado_em DESC LIMIT 1',
         [id]
       ).then(async (pagResult) => {
         if (pagResult.rows.length === 0) {
@@ -399,13 +401,14 @@ router.patch('/:id/status', authenticate, async (req, res, next) => {
           return;
         }
         const pag = pagResult.rows[0];
+        const pagTenantId = pag.restaurant_id || null;
 
         // CONSULTAR STATUS REAL no Asaas antes de decidir
         // (nosso BD pode estar desatualizado: /simular-pagamento só altera local,
         //  webhook pode não ter chegado em localhost, etc)
         let asaasStatus = pag.status;
         try {
-          const asaasPayment = await asaas.getPayment(pag.payment_id);
+          const asaasPayment = await asaas.getPayment(pag.payment_id, pagTenantId);
           asaasStatus = asaasPayment.status;
           console.log(`[Asaas] Status real de ${pag.payment_id}: ${asaasStatus} (local: ${pag.status})`);
 
@@ -425,7 +428,7 @@ router.patch('/:id/status', authenticate, async (req, res, next) => {
 
         if (isPago) {
           // Já foi pago: solicitar reembolso
-          asaas.refundPayment(pag.payment_id).then(() => {
+          asaas.refundPayment(pag.payment_id, null, pagTenantId).then(() => {
             console.log(`[Asaas] ✅ Reembolso solicitado: payment ${pag.payment_id} (pedido ${id})`);
             query(
               `UPDATE pagamentos SET status = 'REFUND_IN_PROGRESS', atualizado_em = NOW() WHERE pedido_id = $1`,
@@ -436,7 +439,7 @@ router.patch('/:id/status', authenticate, async (req, res, next) => {
           });
         } else {
           // Ainda não foi pago: apenas cancelar a cobrança
-          asaas.deletePayment(pag.payment_id).then(() => {
+          asaas.deletePayment(pag.payment_id, pagTenantId).then(() => {
             console.log(`[Asaas] ✅ Cobrança cancelada: payment ${pag.payment_id} (pedido ${id})`);
             query(
               `UPDATE pagamentos SET status = 'CANCELED', atualizado_em = NOW() WHERE pedido_id = $1`,
@@ -462,13 +465,14 @@ router.patch('/:id/status', authenticate, async (req, res, next) => {
 // ============================
 router.post('/calcular-frete', async (req, res, next) => {
   try {
+    const restaurantId = req.restaurantId || config.restaurantId;
     const { latitude, longitude } = req.body;
 
     if (!latitude || !longitude) {
       // Calcular frete fixo se não houver coordenadas
       const result = await query(
         'SELECT raio_km, tempo_min, tempo_max, custo FROM raios_entrega WHERE restaurant_id = $1 ORDER BY raio_km ASC LIMIT 1',
-        [config.restaurantId]
+        [restaurantId]
       );
       const faixa = result.rows[0] || { raio_km: 1, tempo_min: 15, tempo_max: 25, custo: 5.00 };
       return res.json({
@@ -481,7 +485,7 @@ router.post('/calcular-frete', async (req, res, next) => {
       });
     }
 
-    const frete = await calcularFrete(latitude, longitude);
+    const frete = await calcularFrete(latitude, longitude, restaurantId);
     res.json(frete);
   } catch (err) {
     next(err);

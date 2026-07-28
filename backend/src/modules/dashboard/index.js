@@ -27,9 +27,10 @@ function buildDateClause(params, dataInicio, dataFim, tablePrefix = '') {
 // ============================
 router.get('/', authenticate, authorize('admin', 'gerente', 'caixa'), async (req, res, next) => {
   try {
+    const restaurantId = req.restaurantId || config.restaurantId;
     const { data_inicio, data_fim } = req.query;
 
-    const params = [config.restaurantId];
+    const params = [restaurantId];
     const dateClause = buildDateClause(params, data_inicio, data_fim);
 
     // Resumo do período
@@ -62,7 +63,7 @@ router.get('/', authenticate, authorize('admin', 'gerente', 'caixa'), async (req
     `, params);
 
     // Produtos mais vendidos (usa prefixo p. para desambiguar criado_em no JOIN)
-    const paramsTop = [config.restaurantId];
+    const paramsTop = [restaurantId];
     const dateClauseTop = buildDateClause(paramsTop, data_inicio, data_fim, 'p.');
     const topProdutos = await query(`
       SELECT pi.nome_produto, SUM(pi.quantidade) as quantidade_vendida,
@@ -85,7 +86,7 @@ router.get('/', authenticate, authorize('admin', 'gerente', 'caixa'), async (req
       WHERE restaurant_id = $1
         AND status = 'entregue'
         AND criado_em >= CURRENT_DATE - 30
-    `, [config.restaurantId]);
+    `, [restaurantId]);
 
     // Totais do período filtrável
     const totais = await query(`
@@ -118,6 +119,7 @@ router.get('/', authenticate, authorize('admin', 'gerente', 'caixa'), async (req
 // ============================
 router.get('/resumo-dia', authenticate, authorize('admin', 'gerente', 'caixa'), async (req, res, next) => {
   try {
+    const restaurantId = req.restaurantId || config.restaurantId;
     const result = await query(`
       SELECT
         COUNT(*) FILTER (WHERE status = 'entregue') as pedidos_entregues,
@@ -126,7 +128,7 @@ router.get('/resumo-dia', authenticate, authorize('admin', 'gerente', 'caixa'), 
       FROM pedidos
       WHERE restaurant_id = $1
         AND criado_em >= CURRENT_DATE
-    `, [config.restaurantId]);
+    `, [restaurantId]);
 
     res.json(result.rows[0]);
   } catch (err) {

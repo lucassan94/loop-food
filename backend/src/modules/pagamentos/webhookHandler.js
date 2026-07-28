@@ -30,6 +30,23 @@ async function atualizarPagamento(conn, paymentId, status, extras = {}) {
   );
 }
 
+/**
+ * Garante que o restaurant_id está preenchido no pagamento.
+ * Usa o pedido vinculado para descobrir o tenant.
+ */
+async function garantirRestaurantId(conn, paymentId, pedidoId) {
+  if (!pedidoId) return;
+  await conn.query(
+    `UPDATE pagamentos p
+     SET restaurant_id = o.restaurant_id
+     FROM pedidos o
+     WHERE p.payment_id = $1
+       AND o.id = $2
+       AND p.restaurant_id IS NULL`,
+    [paymentId, pedidoId]
+  );
+}
+
 async function ativarPedidoSeAguardando(conn, externalReference) {
   // Busca pedido mais recente do cliente que está aguardando pagamento
   const result = await conn.query(
@@ -96,6 +113,7 @@ const EVENT_HANDLERS = {
         taxa: payment.fee,
       }),
       ativarPedidoSeAguardando(conn, payment.externalReference),
+      garantirRestaurantId(conn, payment.id, payment.externalReference),
     ]);
   },
 
@@ -104,6 +122,7 @@ const EVENT_HANDLERS = {
     await Promise.all([
       atualizarPagamento(conn, payment.id, 'CONFIRMED'),
       ativarPedidoSeAguardando(conn, payment.externalReference),
+      garantirRestaurantId(conn, payment.id, payment.externalReference),
     ]);
   },
 
@@ -112,6 +131,7 @@ const EVENT_HANDLERS = {
     await Promise.all([
       atualizarPagamento(conn, payment.id, 'OVERDUE'),
       cancelarPedido(conn, payment.externalReference, 'Pagamento não realizado no prazo'),
+      garantirRestaurantId(conn, payment.id, payment.externalReference),
     ]);
   },
 
@@ -120,28 +140,41 @@ const EVENT_HANDLERS = {
     await Promise.all([
       atualizarPagamento(conn, payment.id, 'DELETED'),
       cancelarPedido(conn, payment.externalReference, 'Cobrança cancelada no gateway'),
+      garantirRestaurantId(conn, payment.id, payment.externalReference),
     ]);
   },
 
   // 💰 Reembolso total
   PAYMENT_REFUNDED: async (payment, conn) => {
-    await atualizarPagamento(conn, payment.id, 'REFUNDED');
+    await Promise.all([
+      atualizarPagamento(conn, payment.id, 'REFUNDED'),
+      garantirRestaurantId(conn, payment.id, payment.externalReference),
+    ]);
   },
 
   // Reembolso parcial
   PAYMENT_PARTIALLY_REFUNDED: async (payment, conn) => {
-    await atualizarPagamento(conn, payment.id, 'PARTIALLY_REFUNDED');
+    await Promise.all([
+      atualizarPagamento(conn, payment.id, 'PARTIALLY_REFUNDED'),
+      garantirRestaurantId(conn, payment.id, payment.externalReference),
+    ]);
   },
 
   // Reembolso em processamento
   PAYMENT_REFUND_IN_PROGRESS: async (payment, conn) => {
-    await atualizarPagamento(conn, payment.id, 'REFUND_IN_PROGRESS');
+    await Promise.all([
+      atualizarPagamento(conn, payment.id, 'REFUND_IN_PROGRESS'),
+      garantirRestaurantId(conn, payment.id, payment.externalReference),
+    ]);
   },
 
   // Reembolso negado
   PAYMENT_REFUND_DENIED: async (payment, conn) => {
-    await atualizarPagamento(conn, payment.id, 'REFUND_DENIED');
-    notificarAdmin(`Reembolso negado para pedido ${payment.externalReference}`);
+    await Promise.all([
+      atualizarPagamento(conn, payment.id, 'REFUND_DENIED'),
+      notificarAdmin(`Reembolso negado para pedido ${payment.externalReference}`),
+      garantirRestaurantId(conn, payment.id, payment.externalReference),
+    ]);
   },
 
   // ❌ Captura do cartão recusada
@@ -149,17 +182,24 @@ const EVENT_HANDLERS = {
     await Promise.all([
       atualizarPagamento(conn, payment.id, 'REFUSED'),
       cancelarPedido(conn, payment.externalReference, 'Cartão recusado na captura'),
+      garantirRestaurantId(conn, payment.id, payment.externalReference),
     ]);
   },
 
   // ⚠️ Chargeback
   PAYMENT_CHARGEBACK_REQUESTED: async (payment, conn) => {
-    await atualizarPagamento(conn, payment.id, 'CHARGEBACK_REQUESTED');
-    notificarAdmin(`⚠️ CHARGEBACK solicitado para pedido ${payment.externalReference}!`);
+    await Promise.all([
+      atualizarPagamento(conn, payment.id, 'CHARGEBACK_REQUESTED'),
+      notificarAdmin(`⚠️ CHARGEBACK solicitado para pedido ${payment.externalReference}!`),
+      garantirRestaurantId(conn, payment.id, payment.externalReference),
+    ]);
   },
 
   PAYMENT_CHARGEBACK_DISPUTE: async (payment, conn) => {
-    await atualizarPagamento(conn, payment.id, 'CHARGEBACK_DISPUTE');
+    await Promise.all([
+      atualizarPagamento(conn, payment.id, 'CHARGEBACK_DISPUTE'),
+      garantirRestaurantId(conn, payment.id, payment.externalReference),
+    ]);
   },
 
   // Eventos de análise de risco
@@ -171,6 +211,7 @@ const EVENT_HANDLERS = {
     await Promise.all([
       atualizarPagamento(conn, payment.id, 'CONFIRMED'),
       ativarPedidoSeAguardando(conn, payment.externalReference),
+      garantirRestaurantId(conn, payment.id, payment.externalReference),
     ]);
   },
 
@@ -178,13 +219,17 @@ const EVENT_HANDLERS = {
     await Promise.all([
       atualizarPagamento(conn, payment.id, 'REPROVED'),
       cancelarPedido(conn, payment.externalReference, 'Reprovado pela análise de risco'),
+      garantirRestaurantId(conn, payment.id, payment.externalReference),
     ]);
   },
 
   // Eventos informativos (apenas log)
   PAYMENT_CREATED: async () => {},
   PAYMENT_UPDATED: async (payment, conn) => {
-    await atualizarPagamento(conn, payment.id, payment.status);
+    await Promise.all([
+      atualizarPagamento(conn, payment.id, payment.status),
+      garantirRestaurantId(conn, payment.id, payment.externalReference),
+    ]);
   },
   PAYMENT_BANK_SLIP_VIEWED: async () => {},
   PAYMENT_CHECKOUT_VIEWED: async () => {},

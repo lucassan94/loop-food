@@ -1,5 +1,6 @@
 import jwt from 'jsonwebtoken';
 import { config } from '../config/index.js';
+import { setUserContext } from '../config/database.js';
 
 // Extrair token do cookie ou header Authorization
 function extractToken(req) {
@@ -26,6 +27,20 @@ export function authenticate(req, res, next) {
   try {
     const decoded = jwt.verify(token, config.jwt.secret);
     req.user = decoded;
+
+    // Atualizar o contexto RLS com os dados do usuário logado
+    // Isso garante que app.user_role e app.user_id estejam definidos
+    // para as queries executadas pelo route handler
+    setUserContext({
+      restaurantId: req.restaurantId || decoded.restaurantId || config.restaurantId,
+      id: decoded.id,
+      role: decoded.role,
+      cargo: decoded.cargo,
+      email: decoded.email,
+      nome: decoded.nome,
+      module: decoded.module,
+    });
+
     next();
   } catch (err) {
     if (err.name === 'TokenExpiredError') {
@@ -43,6 +58,14 @@ export function optionalAuth(req, res, next) {
     try {
       const decoded = jwt.verify(token, config.jwt.secret);
       req.user = decoded;
+
+      // Atualizar contexto RLS se usuário foi autenticado opcionalmente
+      setUserContext({
+        restaurantId: req.restaurantId || decoded.restaurantId || config.restaurantId,
+        id: decoded.id,
+        role: decoded.role,
+        cargo: decoded.cargo,
+      });
     } catch {
       // Token inválido ou expirado, ignora
     }

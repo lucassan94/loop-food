@@ -1,27 +1,35 @@
 // ============================================================================
-// Migrar imagens base64 do banco para arquivos no disco
+// Migrar imagens base64 do banco para arquivos no disco (multi-tenant)
 // ============================================================================
 // Este script:
-// 1. Lê todos os produtos com imagem_base64
-// 2. Salva as imagens como arquivos em /uploads/cardapio/
+// 1. Lê todos os produtos com imagem_base64 (de todos os tenants)
+// 2. Salva as imagens como arquivos em /uploads/{tenantId}/cardapio/
 // 3. Atualiza imagem_url no banco para o caminho do arquivo
 // 4. Limpa imagem_base64 (opcional)
 //
 // Uso: node src/migrar-imagens-para-disco.js
+//       node src/migrar-imagens-para-disco.js --tenant=5
 // ============================================================================
 
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import pg from 'pg';
+import { getTenantUploadDir, getTenantUploadUrl } from './config/upload.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const UPLOADS_DIR = path.resolve(__dirname, '..', 'uploads', 'cardapio');
 const DB_HOST = process.env.DB_HOST || '86.48.18.22';
 const DB_PORT = parseInt(process.env.DB_PORT || '5432');
 const DB_NAME = process.env.DB_NAME || 'delivery';
 const DB_USER = process.env.DB_USER || 'default';
 const DB_PASS = process.env.DB_PASS || 'default';
+
+// Aceitar --tenant=X como argumento opcional
+const TENANT_ID = (() => {
+  const idx = process.argv.findIndex(a => a.startsWith('--tenant='));
+  if (idx >= 0) return parseInt(process.argv[idx].split('=')[1]);
+  return null; // Todos os tenants
+})();
 
 const pool = new pg.Pool({
   host: DB_HOST,
@@ -57,20 +65,17 @@ function slugify(text) {
 }
 
 async function main() {
-  console.log('🔍 Buscando produtos com imagem_base64...\n')
-
-  // Criar diretório se não existir
-  if (!fs.existsSync(UPLOADS_DIR)) {
-    fs.mkdirSync(UPLOADS_DIR, { recursive: true })
-    console.log(`📁 Diretório criado: ${UPLOADS_DIR}`)
-  }
+  const tenantFilter = TENANT_ID ? `restaurant_id = ${TENANT_ID}` : '1=1';
+  const tenantLabel = TENANT_ID ? `tenant ${TENANT_ID}` : 'TODOS os tenants';
+  console.log(`🔍 Buscando produtos com imagem_base64 (${tenantLabel})...\n`)
 
   // Buscar produtos com imagem_base64
   const result = await pool.query(
-    `SELECT id, nome, preco, imagem_base64, imagem_url
+    `SELECT id, nome, preco, restaurant_id, imagem_base64, imagem_url
      FROM produtos
      WHERE imagem_base64 IS NOT NULL AND imagem_base64 != ''
-     ORDER BY id ASC`
+       AND ${tenantFilter}
+     ORDER BY restaurant_id ASC, id ASC`
   )
 
   console.log(`📦 Encontrados ${result.rows.length} produtos com imagem base64\n`)
@@ -78,6 +83,7 @@ async function main() {
   let migrados = 0
   let erros = 0
   let ignorados = 0
+  const tenantsAfetados = new Set()
 
   for (const produto of result.rows) {
     const b64 = produto.imagem_base64
@@ -88,11 +94,20 @@ async function main() {
     }
 
     try {
+      const tenantId = produto.restaurant_id || 1
+      tenantsAfetados.add(tenantId)
+
       // Determinar extensão
       const ext = detectFileExtension(b64)
       const nomeArquivo = `${produto.id}_${slugify(produto.nome)}.${ext}`
-      const caminhoArquivo = path.join(UPLOADS_DIR, nomeArquivo)
-      const urlRelativa = `/uploads/cardapio/${nomeArquivo}`
+
+      // Diretório tenant-aware (usa o helper do upload.js para consistência)
+      const tenantDir = getTenantUploadDir(tenantId, 'cardapio')
+      if (!fs.existsSync(tenantDir)) {
+        fs.mkdirSync(tenantDir, { recursive: true })
+      }
+      const caminhoArquivo = path.join(tenantDir, nomeArquivo)
+      const urlRelativa = getTenantUploadUrl(tenantId, 'cardapio', nomeArquivo)
 
       // Decodificar base64 e salvar
       const buffer = Buffer.from(b64, 'base64')
@@ -109,7 +124,7 @@ async function main() {
         [urlRelativa, produto.id]
       )
 
-      console.log(`  ✅ ID ${produto.id} "${produto.nome}": ${nomeArquivo} (${tamanhoKB} KB)`)
+      console.log(`  ✅ [T${tenantId}] ID ${produto.id} "${produto.nome}": ${nomeArquivo} (${tamanhoKB} KB)`)
       migrados++
     } catch (err) {
       console.error(`  ❌ ID ${produto.id} "${produto.nome}": ${err.message}`)
@@ -121,7 +136,7 @@ async function main() {
   console.log(`   ✅ Migrados: ${migrados}`)
   console.log(`   ⏩ Ignorados: ${ignorados}`)
   console.log(`   ❌ Erros: ${erros}`)
-  console.log(`   📁 Diretório: ${UPLOADS_DIR}`)
+  console.log(`   🏪 Tenants afetados: ${[...tenantsAfetados].join(', ')}`)
 
   await pool.end()
   console.log('\n✅ Migração concluída!')
