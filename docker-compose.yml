@@ -53,9 +53,9 @@ services:
       retries: 2
       start_period: 5s
 
-  admin:
+  restaurante:
     build:
-      context: ./admin
+      context: ./restaurante
       dockerfile: Dockerfile
     restart: unless-stopped
     ports:

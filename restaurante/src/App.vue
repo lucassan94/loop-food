@@ -71,6 +71,7 @@
       <DashboardView v-if="currentView === 'dashboard'" />
       <ConfigView v-if="currentView === 'config'" />
       <DataManagerView v-if="currentView === 'dados'" />
+      <TenantsView v-if="currentView === 'tenants'" />
     </main>
 
     <!-- Confirm Modal -->
@@ -108,6 +109,7 @@ import RelatoriosView from './views/RelatoriosView.vue'
 import DashboardView from './views/DashboardView.vue'
 import ConfigView from './views/ConfigView.vue'
 import DataManagerView from './views/DataManagerView.vue'
+import TenantsView from './views/TenantsView.vue'
 
 const authStore = useAuthStore()
 const email = ref('')
@@ -135,6 +137,7 @@ const allMenuItems = [
   { id: 'dashboard', label: 'Dashboard', icon: 'fas fa-chart-pie', cargos: ['admin', 'gerente', 'caixa'] },
   { id: 'dados', label: 'Dados do Banco', icon: 'fas fa-database', cargos: ['admin'] },
   { id: 'config', label: 'Configurações', icon: 'fas fa-cog', cargos: ['admin', 'gerente'] },
+  { id: 'tenants', label: 'Gerenciar Tenants', icon: 'fas fa-store-alt', cargos: ['admin'] },
 ]
 
 // Sidebar filtrada pelo cargo do usuário logado

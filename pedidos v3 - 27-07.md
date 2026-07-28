@@ -1,5 +1,7 @@
-- Crie uma página com dois iFrame do tamanho de um celular para simular a execução do módulo do Entregador e do cliente. O link do cliente é http://86.48.18.22:8091/ e do entregador é http://86.48.18.22:8093/
+- Crir opção de desligar etapas do entregador. Assim, o restaurante deixa de depender do app do entregador e os status do pedido precisam ser movimentados sempre pelo restaurante. Porém, os status de confirmação de chegada ao destino deixa de existir e a confirmação de saída e entrega também é feita pelo restaurante.
 
-- Abaixo, um iframe com o link do painel admin http://86.48.18.22:8092/
+- Substitua TODAS as fontes de TODAS as telas pela fonte Inter. Não é para usar ARIAL em LUGAR NENHUM
 
-- adicione a borda de celular nos iframes de celular e a borda de um tabela no iframe do admin
+- Ao invés de filtro de data com seletor de data, adicione um radio moderno para selecionar a opção 'Hoje', 'Ontem', 'Últimos 7 dias'
+
+- Módulo do entregador não está abrindo. Revise o código.

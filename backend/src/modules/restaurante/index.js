@@ -249,7 +249,12 @@ router.put('/seguranca', authenticate, authorize('admin'), async (req, res, next
 });
 
 import bannersRouter from './banners.js';
+import tenantsRouter from './tenants.js';
 
 router.use('/banners', bannersRouter);
+
+// Rotas de gerenciamento de tenants (super admin)
+// ATENÇÃO: Estas rotas NÃO aplicam filtro de tenant — listam TODOS os restaurantes
+router.use('/tenants', authenticate, authorize('admin'), tenantsRouter);
 
 export default router;
