@@ -15,13 +15,19 @@ services:
       - DB_PASS=${DB_PASS:-default}
       - JWT_SECRET=${JWT_SECRET:-dev-secret-change-in-production}
       - RESTAURANT_ID=${RESTAURANT_ID:-1}
+      # CORS: incluir IPs dos containers + dominios dos tenants (Nginx Proxy Manager)
+      # Ex: https://palazzomooca.cliente.loop.food,https://saborexpress.admin.loop.food
       - CORS_ORIGIN=${CORS_ORIGIN:-http://86.48.18.22:8091,http://86.48.18.22:8092,http://86.48.18.22:8093}
-      # Asaas (preencha via Portainer em Stacks > palazzo > Environment variables)
+      # Asaas (preencha via Portainer em Stacks > loop-food > Environment variables)
       - ASAAS_API_KEY=${ASAAS_API_KEY}
       - ASAAS_ENV=${ASAAS_ENV:-sandbox}
       - ASAAS_WEBHOOK_TOKEN=${ASAAS_WEBHOOK_TOKEN}
       - ASAAS_WEBHOOK_SECRET=${ASAAS_WEBHOOK_SECRET}
       - ASAAS_PIX_EXPIRY=${ASAAS_PIX_EXPIRY:-30}
+      - ASAAS_REQUEST_TIMEOUT=${ASAAS_REQUEST_TIMEOUT:-30000}
+      # Upload
+      - UPLOAD_DIR=${UPLOAD_DIR:-./uploads}
+      - MAX_FILE_SIZE=${MAX_FILE_SIZE:-5242880}
     volumes:
       - backend_uploads:/app/uploads
     healthcheck:
