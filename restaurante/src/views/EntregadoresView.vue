@@ -2,7 +2,8 @@
   <div>
     <!-- Feedback Toast -->
     <div v-if="feedbackMsg" class="feedback-toast" :class="feedbackMsg.tipo" @click="feedbackMsg = null">
-      <i :class="feedbackMsg.tipo === 'success' ? 'fas fa-check-circle' : 'fas fa-exclamation-triangle'"></i>
+      <i-lucide-circle-check-big v-if="feedbackMsg.tipo === 'success'" style="width:20px;height:20px" />
+      <i-lucide-triangle-alert v-else style="width:20px;height:20px" />
       {{ feedbackMsg.texto }}
     </div>
 
@@ -38,7 +39,7 @@
         <h3 style="margin-bottom:1.5rem;">{{ editingId ? 'Editar' : 'Novo' }} Entregador</h3>
         
         <div v-if="formErrors.geral" class="form-error-banner">
-          <i class="fas fa-exclamation-triangle"></i> {{ formErrors.geral }}
+          <i-lucide-triangle-alert style="width:16px;height:16px" /> {{ formErrors.geral }}
         </div>
 
         <div class="form-group">
@@ -90,7 +91,8 @@
           <input v-model="form.endereco" placeholder="Rua, número..." />
         </div>
         <div v-if="cepMsg" class="cep-result" :class="cepMsg.tipo" style="margin-bottom:1rem;">
-          <i :class="cepMsg.tipo === 'success' ? 'fas fa-check-circle' : 'fas fa-times-circle'"></i>
+          <i-lucide-circle-check-big v-if="cepMsg.tipo === 'success'" style="width:16px;height:16px" />
+          <i-lucide-circle-x v-else style="width:16px;height:16px" />
           {{ cepMsg.texto }}
         </div>
 

@@ -1,0 +1,1067 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LoopFood Admin — Tenants</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{
+      --bg:#0f1218;--surface:#1a1f2b;--surface-2:#232a3a;
+      --border:#2a3347;--border-hover:#3a475f;
+      --text:#e2e8f0;--text-2:#8892a8;
+      --accent:#6366f1;--accent-hover:#5558e6;--accent-light:rgba(99,102,241,0.15);
+      --success:#22c55e;--success-bg:rgba(34,197,94,0.12);
+      --warning:#f59e0b;--warning-bg:rgba(245,158,11,0.12);
+      --danger:#ef4444;--danger-bg:rgba(239,68,68,0.12);
+      --radius:10px;--shadow:0 4px 24px rgba(0,0,0,.3);--transition:.2s ease;
+    }
+    body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;line-height:1.5}
+    ::-webkit-scrollbar{width:6px}::-webkit-scrollbar-track{background:var(--surface)}::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+    .header{background:var(--surface);border-bottom:1px solid var(--border);padding:16px 32px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
+    .header-left{display:flex;align-items:center;gap:16px}
+    .logo{width:36px;height:36px;background:var(--accent);border-radius:10px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:18px;color:#fff}
+    .header h1{font-size:18px;font-weight:600}
+    .header .subtitle{color:var(--text-2);font-size:13px}
+    .header .badge{background:var(--warning-bg);color:var(--warning);font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;text-transform:uppercase;letter-spacing:.5px}
+    .header-right{display:flex;align-items:center;gap:12px}
+    .db-status{font-size:12px;display:flex;align-items:center;gap:6px}
+    .db-dot{width:8px;height:8px;border-radius:50%;display:inline-block}
+    .db-dot.online{background:var(--success);box-shadow:0 0 8px var(--success)}
+    .db-dot.offline{background:var(--danger)}
+    .container{max-width:1300px;margin:0 auto;padding:24px 32px}
+    .toolbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;gap:16px;flex-wrap:wrap}
+    .toolbar h2{font-size:22px;font-weight:700}
+    .toolbar h2 small{font-size:14px;font-weight:400;color:var(--text-2);margin-left:8px}
+    .toolbar-actions{display:flex;gap:8px}
+    .search-box{position:relative;width:240px}
+    .search-box input{width:100%;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:9px 14px 9px 36px;color:var(--text);font-size:13px;transition:var(--transition);outline:none}
+    .search-box input:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-light)}
+    .search-box input::placeholder{color:var(--text-2)}
+    .search-box .icon{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--text-2);font-size:14px;pointer-events:none}
+    .btn{display:inline-flex;align-items:center;gap:6px;padding:9px 18px;border:none;border-radius:var(--radius);font-size:13px;font-weight:600;cursor:pointer;transition:var(--transition);text-decoration:none;white-space:nowrap;font-family:inherit}
+    .btn:active{transform:scale(.97)}
+    .btn-primary{background:var(--accent);color:#fff}
+    .btn-primary:hover{background:var(--accent-hover)}
+    .btn-outline{background:transparent;border:1px solid var(--border);color:var(--text)}
+    .btn-outline:hover{background:var(--surface);border-color:var(--border-hover)}
+    .btn-sm{padding:5px 12px;font-size:12px}
+    .btn-xs{padding:3px 8px;font-size:11px;border-radius:6px}
+    .btn-danger{background:var(--danger);color:#fff}
+    .btn-danger:hover{background:#dc2626}
+    .btn-success{background:var(--success);color:#fff}
+    .btn-success:hover{background:#16a34a}
+    .btn-warning{background:var(--warning);color:#000}
+    .btn-warning:hover{background:#d97706}
+    .btn-ghost{background:transparent;color:var(--text-2);padding:5px 8px}
+    .btn-ghost:hover{color:var(--text);background:var(--surface-2)}
+    .btn:disabled{opacity:.5;cursor:not-allowed;transform:none!important}
+    .table-wrap{background:var(--surface);border-radius:var(--radius);border:1px solid var(--border);overflow-x:auto}
+    table{width:100%;border-collapse:collapse}
+    thead th{text-align:left;padding:12px 16px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.6px;color:var(--text-2);background:var(--surface-2);border-bottom:1px solid var(--border);position:sticky;top:0}
+    tbody tr{border-bottom:1px solid var(--border);transition:var(--transition);cursor:pointer}
+    tbody tr:last-child{border-bottom:none}
+    tbody tr:hover{background:rgba(99,102,241,0.04)}
+    tbody td{padding:12px 16px;font-size:13px;vertical-align:middle}
+    .col-id{width:50px;color:var(--text-2);font-weight:500}
+    .empty-state{text-align:center;padding:60px 20px;color:var(--text-2)}
+    .empty-state .emoji{font-size:48px;margin-bottom:12px}
+    .empty-state h3{font-size:18px;color:var(--text);margin-bottom:6px}
+    .empty-state p{font-size:14px}
+    .tenant-name{font-weight:600;color:var(--text)}
+    .tenant-slug{font-size:12px;color:var(--text-2)}
+    .tag{display:inline-flex;align-items:center;gap:4px;padding:2px 10px;border-radius:20px;font-size:11px;font-weight:600}
+    .tag-on{background:var(--success-bg);color:var(--success)}
+    .tag-off{background:var(--danger-bg);color:var(--danger)}
+    .tag-asaas{background:var(--accent-light);color:var(--accent)}
+    .tag-no-asaas{background:var(--surface-2);color:var(--text-2)}
+    .tag-jwt{background:rgba(34,197,94,0.1);color:var(--success)}
+    .tag-no-jwt{background:var(--warning-bg);color:var(--warning)}
+    .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);display:none;align-items:center;justify-content:center;z-index:1000;backdrop-filter:blur(4px);padding:20px;animation:fadeIn .15s ease}
+    .modal-overlay.active{display:flex}
+    @keyframes fadeIn{from{opacity:0}to{opacity:1}}
+    @keyframes slideUp{from{opacity:0;transform:translateY(20px) scale(.97)}to{opacity:1;transform:translateY(0) scale(1)}}
+    .modal{background:var(--surface);border-radius:14px;border:1px solid var(--border);width:100%;max-width:640px;max-height:90vh;overflow-y:auto;animation:slideUp .2s ease;box-shadow:var(--shadow)}
+    .modal-lg .modal{max-width:900px}
+    .modal-header{display:flex;align-items:center;justify-content:space-between;padding:20px 24px 0}
+    .modal-header h3{font-size:18px;font-weight:700}
+    .modal-close{background:none;border:none;color:var(--text-2);font-size:22px;cursor:pointer;padding:4px;line-height:1;border-radius:6px;transition:var(--transition)}
+    .modal-close:hover{color:var(--text);background:var(--surface-2)}
+    .modal-body{padding:20px 24px}
+    .modal-footer{display:flex;justify-content:flex-end;gap:8px;padding:0 24px 20px}
+    .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+    .form-grid .full{grid-column:1/-1}
+    .form-group{display:flex;flex-direction:column;gap:4px}
+    .form-group label{font-size:12px;font-weight:600;color:var(--text-2);text-transform:uppercase;letter-spacing:.4px}
+    .form-group label .required{color:var(--danger)}
+    .form-group input,.form-group select,.form-group textarea{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:9px 12px;color:var(--text);font-size:13px;transition:var(--transition);outline:none;font-family:inherit}
+    .form-group input:focus,.form-group select:focus,.form-group textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-light)}
+    .form-group input::placeholder,.form-group textarea::placeholder{color:var(--text-2)}
+    .form-group textarea{resize:vertical;min-height:60px}
+    .form-group.checkbox{flex-direction:row;align-items:center;gap:8px;padding:8px 0}
+    .form-group.checkbox input[type=checkbox]{width:18px;height:18px;accent-color:var(--accent);cursor:pointer}
+    .toast-container{position:fixed;top:20px;right:20px;z-index:2000;display:flex;flex-direction:column;gap:8px}
+    .toast{padding:12px 20px;border-radius:var(--radius);font-size:13px;font-weight:500;display:flex;align-items:center;gap:10px;box-shadow:var(--shadow);animation:slideIn .25s ease;border:1px solid transparent;min-width:280px}
+    .toast.success{background:rgba(34,197,94,0.15);color:var(--success);border-color:rgba(34,197,94,0.3)}
+    .toast.error{background:rgba(239,68,68,0.15);color:var(--danger);border-color:rgba(239,68,68,0.3)}
+    .toast.info{background:rgba(99,102,241,0.15);color:var(--accent);border-color:rgba(99,102,241,0.3)}
+    @keyframes slideIn{from{opacity:0;transform:translateX(40px)}to{opacity:1;transform:translateX(0)}}
+    .credential-box{background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin:16px 0}
+    .credential-box h4{font-size:13px;color:var(--success);margin-bottom:10px}
+    .credential-item{display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border)}
+    .credential-item:last-child{border-bottom:none}
+    .credential-item .label{font-size:12px;color:var(--text-2)}
+    .credential-item .value{font-family:'SF Mono','Fira Code',monospace;font-size:13px;color:var(--text);background:var(--surface-2);padding:2px 8px;border-radius:4px}
+    .btn-copy{background:none;border:none;color:var(--accent);cursor:pointer;font-size:14px;padding:4px;border-radius:4px;transition:var(--transition)}
+    .btn-copy:hover{background:var(--accent-light)}
+    .spinner{display:inline-block;width:16px;height:16px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .6s linear infinite}
+    @keyframes spin{to{transform:rotate(360deg)}}
+
+    /* Management view */
+    #managementView{display:none}
+    #managementView.active{display:block}
+    .back-btn{cursor:pointer;display:inline-flex;align-items:center;gap:6px;color:var(--text-2);font-size:14px;padding:6px 12px;border-radius:8px;transition:var(--transition);background:none;border:none;font-family:inherit}
+    .back-btn:hover{color:var(--text);background:var(--surface)}
+    .mgmt-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;gap:12px;flex-wrap:wrap}
+    .mgmt-header-left{display:flex;align-items:center;gap:16px}
+    .mgmt-header-left h2{font-size:20px;font-weight:700}
+
+    /* Tabs */
+    .tabs{display:flex;gap:4px;margin-bottom:20px;background:var(--surface);padding:4px;border-radius:var(--radius);border:1px solid var(--border);overflow-x:auto}
+    .tab{display:flex;align-items:center;gap:6px;padding:8px 16px;border-radius:8px;font-size:13px;font-weight:600;color:var(--text-2);cursor:pointer;transition:var(--transition);border:none;background:none;white-space:nowrap;font-family:inherit}
+    .tab:hover{color:var(--text);background:var(--surface-2)}
+    .tab.active{background:var(--accent);color:#fff}
+    .tab-section{display:none;animation:fadeIn .2s ease}
+    .tab-section.active{display:block}
+
+    /* Section cards */
+    .section-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:16px;overflow:hidden}
+    .section-card-header{display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:1px solid var(--border);font-size:14px;font-weight:600}
+    .section-card-body{padding:16px 20px}
+
+    /* Payment checkbox grid */
+    .payment-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin-bottom:12px}
+    .payment-option{display:flex;align-items:center;gap:8px;padding:10px 14px;background:var(--bg);border-radius:8px;border:1px solid var(--border);cursor:pointer;transition:var(--transition)}
+    .payment-option:hover{border-color:var(--accent)}
+    .payment-option.selected{border-color:var(--accent);background:var(--accent-light)}
+    .payment-option input[type=checkbox]{width:16px;height:16px;accent-color:var(--accent);cursor:pointer}
+    .payment-option span{font-size:13px;font-weight:500}
+
+    /* Produto list item */
+    .produto-item{display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px;gap:12px}
+    .produto-item:last-child{border-bottom:none}
+    .produto-info{flex:1}
+    .produto-nome{font-weight:600}
+    .produto-categoria{font-size:11px;color:var(--text-2)}
+    .produto-preco{font-weight:700;color:var(--accent)}
+    .extra-chip{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;background:var(--surface-2);border-radius:4px;font-size:11px;margin:2px}
+    .extra-chip .remove-extra{cursor:pointer;color:var(--danger);font-size:12px;font-weight:700;margin-left:2px}
+    .extra-chip .remove-extra:hover{color:#ff6b6b}
+
+    /* Inline form */
+    .inline-form{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;align-items:flex-end}
+    .inline-form input,.inline-form select{padding:7px 10px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;outline:none;font-family:inherit}
+    .inline-form input:focus,.inline-form select:focus{border-color:var(--accent)}
+
+    @media(max-width:768px){.header{padding:12px 16px}.header h1{font-size:15px}.container{padding:16px}.toolbar{flex-direction:column;align-items:stretch}.search-box{width:100%}.form-grid{grid-template-columns:1fr}.modal{max-width:100%;margin:10px}.modal-lg .modal{max-width:100%}}
+  </style>
+</head>
+<body>
+  <header class="header">
+    <div class="header-left">
+      <div class="logo">L</div>
+      <div><h1>LoopFood <span class="subtitle">— Tenant Manager</span></h1></div>
+      <span class="badge">⏱ Local Only</span>
+    </div>
+    <div class="header-right">
+      <span class="db-status" id="dbStatus">
+        <span class="db-dot offline" id="dbDot"></span>
+        <span id="dbLabel">Conectando…</span>
+      </span>
+    </div>
+  </header>
+
+  <div class="toast-container" id="toastContainer"></div>
+
+  <!-- ==================== MAIN VIEW (Tenant List) ==================== -->
+  <main class="container" id="mainView">
+    <div class="toolbar">
+      <h2>Tenants <small id="totalCount">0</small></h2>
+      <div class="toolbar-actions">
+        <div class="search-box">
+          <span class="icon">🔍</span>
+          <input type="text" id="searchInput" placeholder="Buscar tenant…" oninput="renderTable()">
+        </div>
+        <button class="btn btn-outline" onclick="loadTenants()" title="Recarregar" id="refreshBtn">↻</button>
+        <button class="btn btn-primary" onclick="openCreateModal()">+ Novo Tenant</button>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th class="col-id">#</th><th>Nome</th><th>Slug / Domínio</th><th>Status</th><th>Asaas</th><th>JWT</th><th>Preparo</th><th style="width:100px;text-align:right">Ações</th>
+        </tr></thead>
+        <tbody id="tableBody">
+          <tr><td colspan="8" class="empty-state"><div class="spinner"></div><p style="margin-top:8px">Carregando…</p></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </main>
+
+  <!-- ==================== MANAGEMENT VIEW (per-tenant) ==================== -->
+  <main class="container" id="managementView">
+    <div class="mgmt-header">
+      <div class="mgmt-header-left">
+        <button class="back-btn" onclick="closeManagement()">← Voltar</button>
+        <h2 id="mgmtTenantName">—</h2>
+        <span class="tag" id="mgmtTenantId">#0</span>
+      </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tabs">
+      <button class="tab active" data-tab="dados" onclick="switchTab('dados')">📋 Dados</button>
+      <button class="tab" data-tab="usuarios" onclick="switchTab('usuarios')">👥 Usuários</button>
+      <button class="tab" data-tab="cardapio" onclick="switchTab('cardapio')">🍽️ Cardápio</button>
+      <button class="tab" data-tab="pagamentos" onclick="switchTab('pagamentos')">💳 Pagamentos</button>
+      <button class="tab" data-tab="entregadores" onclick="switchTab('entregadores')">🛵 Entregadores</button>
+    </div>
+
+    <!-- TAB: Dados -->
+    <div class="tab-section active" id="tab-dados">
+      <div class="section-card">
+        <div class="section-card-header">📋 Dados do Restaurante</div>
+        <div class="section-card-body">
+          <form id="tenantForm" onsubmit="saveTenantData(event)">
+            <div class="form-grid">
+              <div class="form-group full"><label>Nome <span class="required">*</span></label><input type="text" name="nome" id="f_nome" required></div>
+              <div class="form-group"><label>Slug</label><input type="text" name="slug" id="f_slug"></div>
+              <div class="form-group"><label>Domínio</label><input type="text" name="dominio" id="f_dominio"></div>
+              <div class="form-group full">
+                <label>Endereço</label>
+                <div style="display:flex;gap:8px">
+                  <input type="text" name="endereco" id="f_endereco" placeholder="Rua, número, bairro" style="flex:1">
+                </div>
+              </div>
+              <div class="form-group">
+                <label>CEP</label>
+                <div style="display:flex;gap:6px">
+                  <input type="text" name="cep" id="f_cep" placeholder="00000-000" maxlength="9" oninput="formatCEP(this)">
+                  <button type="button" class="btn btn-sm btn-outline" onclick="buscarCEP()" id="cepBtn">🔍</button>
+                </div>
+              </div>
+              <div class="form-group"><label>Cidade</label><input type="text" name="cidade" id="f_cidade"></div>
+              <div class="form-group"><label>Estado</label><input type="text" name="estado" id="f_estado" maxlength="2"></div>
+              <div class="form-group"><label>Latitude</label><input type="number" step="any" name="latitude" id="f_latitude" placeholder="-23.5505"></div>
+              <div class="form-group"><label>Longitude</label><input type="number" step="any" name="longitude" id="f_longitude" placeholder="-46.6333"></div>
+              <div class="form-group"><label>Tempo Preparo (min)</label><input type="number" name="tempo_preparo_min" id="f_tempo" min="1"></div>
+              <div class="form-group checkbox"><input type="checkbox" name="status_loja" id="f_statusLoja"><label for="f_statusLoja">Loja aberta</label></div>
+              <div class="form-group full" style="margin-top:8px;padding-top:12px;border-top:1px solid var(--border)">
+                <label style="color:var(--accent);font-size:13px;text-transform:none;letter-spacing:0">🔐 Credenciais Asaas</label>
+              </div>
+              <div class="form-group full"><label>API Key</label><input type="password" name="asaas_api_key" id="f_asaas_key" placeholder="$aass_..."></div>
+              <div class="form-group"><label>Ambiente</label><select name="asaas_env" id="f_asaas_env"><option value="sandbox">Sandbox</option><option value="production">Produção</option></select></div>
+              <div class="form-group"><label>Webhook Token</label><input type="text" name="asaas_webhook_token" id="f_asaas_wt"></div>
+              <div class="form-group full"><label>Webhook Secret</label><input type="password" name="asaas_webhook_secret" id="f_asaas_ws"></div>
+            </div>
+            <div style="margin-top:16px;display:flex;gap:8px">
+              <button type="submit" class="btn btn-primary" id="saveTenantBtn">Salvar Dados</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB: Usuários -->
+    <div class="tab-section" id="tab-usuarios">
+      <div class="section-card">
+        <div class="section-card-header">
+          <span>👥 Equipe do Restaurante</span>
+          <button class="btn btn-sm btn-primary" onclick="showUserForm()">+ Novo</button>
+        </div>
+        <div class="section-card-body">
+          <table>
+            <thead><tr><th>Nome</th><th>Email</th><th>Cargo</th><th>Último Acesso</th><th style="width:80px"></th></tr></thead>
+            <tbody id="usersTableBody"><tr><td colspan="5" class="empty-state"><div class="spinner"></div></td></tr></tbody>
+          </table>
+          <div id="userForm" style="display:none;margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
+            <h4 id="userFormTitle" style="font-size:14px;margin-bottom:8px">Novo Usuário</h4>
+            <div class="inline-form">
+              <input type="text" id="uf_nome" placeholder="Nome" style="width:160px">
+              <input type="email" id="uf_email" placeholder="Email" style="width:180px">
+              <select id="uf_cargo"><option value="admin">Admin</option><option value="gerente">Gerente</option><option value="chef">Chef</option><option value="caixa">Caixa</option></select>
+              <input type="password" id="uf_password" placeholder="Senha" style="width:130px">
+              <button class="btn btn-sm btn-success" onclick="saveUser()">Salvar</button>
+              <button class="btn btn-sm btn-outline" onclick="hideUserForm()">Cancelar</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB: Cardápio -->
+    <div class="tab-section" id="tab-cardapio">
+      <div class="section-card">
+        <div class="section-card-header">
+          <span>🍽️ Categorias</span>
+          <button class="btn btn-sm btn-primary" onclick="showCatForm()">+ Nova</button>
+        </div>
+        <div class="section-card-body">
+          <table>
+            <thead><tr><th>Nome</th><th>Slug</th><th>Ordem</th><th style="width:80px"></th></tr></thead>
+            <tbody id="catsTableBody"><tr><td colspan="4" class="empty-state"><div class="spinner"></div></td></tr></tbody>
+          </table>
+          <div id="catForm" style="display:none;margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
+            <h4 id="catFormTitle" style="font-size:14px;margin-bottom:8px">Nova Categoria</h4>
+            <div class="inline-form">
+              <input type="text" id="cf_nome" placeholder="Nome" style="width:160px">
+              <input type="text" id="cf_slug" placeholder="slug" style="width:140px">
+              <input type="number" id="cf_ordem" placeholder="Ordem" style="width:80px">
+              <button class="btn btn-sm btn-success" onclick="saveCat()">Salvar</button>
+              <button class="btn btn-sm btn-outline" onclick="hideCatForm()">Cancelar</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section-card">
+        <div class="section-card-header">
+          <span>🍕 Produtos</span>
+          <button class="btn btn-sm btn-primary" onclick="showProdForm()">+ Novo</button>
+        </div>
+        <div class="section-card-body" id="produtosContainer">
+          <div class="spinner" style="margin:20px auto"></div>
+        </div>
+        <div id="prodForm" style="display:none;padding:16px 20px;border-top:1px solid var(--border)">
+          <h4 id="prodFormTitle" style="font-size:14px;margin-bottom:8px">Novo Produto</h4>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;max-width:600px">
+            <input type="text" id="pf_nome" placeholder="Nome do produto" style="padding:7px 10px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;outline:none;font-family:inherit;grid-column:1/-1">
+            <input type="text" id="pf_desc" placeholder="Descrição" style="padding:7px 10px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;outline:none;font-family:inherit;grid-column:1/-1">
+            <input type="number" step="0.01" id="pf_preco" placeholder="Preço R$" style="padding:7px 10px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;outline:none;font-family:inherit">
+            <select id="pf_categoria" style="padding:7px 10px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;outline:none;font-family:inherit"></select>
+            <div style="display:flex;gap:6px;align-items:center">
+              <input type="checkbox" id="pf_destaque" style="width:16px;height:16px;accent-color:var(--accent)"><label for="pf_destaque" style="font-size:12px;color:var(--text-2)">Destaque</label>
+              <input type="checkbox" id="pf_ativo" checked style="width:16px;height:16px;accent-color:var(--accent);margin-left:8px"><label for="pf_ativo" style="font-size:12px;color:var(--text-2)">Ativo</label>
+            </div>
+            <input type="text" id="pf_imagem_url" placeholder="URL da imagem (opcional)" style="padding:7px 10px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;outline:none;font-family:inherit;grid-column:1/-1">
+            <div style="grid-column:1/-1;display:flex;gap:8px;align-items:center">
+              <input type="file" id="pf_imagem_file" accept="image/*" style="font-size:12px;color:var(--text-2)">
+              <div id="pf_imagem_preview" style="width:60px;height:60px;border-radius:6px;overflow:hidden;background:var(--surface-2);display:none;flex-shrink:0">
+                <img id="pf_imagem_preview_img" style="width:100%;height:100%;object-fit:cover" />
+              </div>
+            </div>
+          </div>
+          <div style="margin-top:10px;display:flex;gap:8px">
+            <button class="btn btn-sm btn-success" onclick="saveProd()">Salvar</button>
+            <button class="btn btn-sm btn-outline" onclick="hideProdForm()">Cancelar</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB: Pagamentos -->
+    <div class="tab-section" id="tab-pagamentos">
+      <div class="section-card">
+        <div class="section-card-header">💳 Formas de Pagamento Aceitas</div>
+        <div class="section-card-body">
+          <p style="font-size:13px;color:var(--text-2);margin-bottom:12px">Selecione as formas de pagamento disponíveis para este restaurante:</p>
+          <div class="payment-grid" id="paymentGrid"></div>
+          <button class="btn btn-primary" onclick="savePagamentos()">Salvar Formas de Pagamento</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB: Entregadores -->
+    <div class="tab-section" id="tab-entregadores">
+      <div class="section-card">
+        <div class="section-card-header">
+          <span>🛵 Entregadores</span>
+          <button class="btn btn-sm btn-primary" onclick="showDriverForm()">+ Novo</button>
+        </div>
+        <div class="section-card-body">
+          <table>
+            <thead><tr><th>Nome</th><th>Email</th><th>Telefone</th><th>Status</th><th>Entregas</th><th style="width:80px"></th></tr></thead>
+            <tbody id="driversTableBody"><tr><td colspan="6" class="empty-state"><div class="spinner"></div></td></tr></tbody>
+          </table>
+          <div id="driverForm" style="display:none;margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
+            <h4 id="driverFormTitle" style="font-size:14px;margin-bottom:8px">Novo Entregador</h4>
+            <div class="inline-form">
+              <input type="text" id="df_nome" placeholder="Nome" style="width:160px">
+              <input type="email" id="df_email" placeholder="Email" style="width:180px">
+              <input type="text" id="df_telefone" placeholder="Telefone" style="width:130px">
+              <select id="df_status"><option value="ativo">Ativo</option><option value="inativo">Inativo</option></select>
+              <input type="password" id="df_password" placeholder="Senha" style="width:120px">
+              <button class="btn btn-sm btn-success" onclick="saveDriver()">Salvar</button>
+              <button class="btn btn-sm btn-outline" onclick="hideDriverForm()">Cancelar</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- CREATE TENANT MODAL -->
+  <div class="modal-overlay" id="createModal">
+    <div class="modal">
+      <div class="modal-header"><h3>🏪 Novo Tenant</h3><button class="modal-close" onclick="closeModal('createModal')">✕</button></div>
+      <form onsubmit="createTenant(event)">
+        <div class="modal-body">
+          <div class="form-grid">
+            <div class="form-group full"><label>Nome <span class="required">*</span></label><input type="text" id="ct_nome" required placeholder="Ex: Palazzo Mooca"></div>
+            <div class="form-group"><label>Slug <span class="required">*</span></label><input type="text" id="ct_slug" required placeholder="palazzomooca"></div>
+            <div class="form-group"><label>Domínio</label><input type="text" id="ct_dominio" placeholder="palazzomooca"></div>
+            <div class="form-group full"><label>Endereço</label><input type="text" id="ct_endereco" placeholder="Rua, número"></div>
+            <div class="form-group"><label>CEP</label><input type="text" id="ct_cep" placeholder="00000-000" maxlength="9"></div>
+            <div class="form-group"><label>Cidade</label><input type="text" id="ct_cidade" placeholder="São Paulo"></div>
+            <div class="form-group"><label>Estado</label><input type="text" id="ct_estado" placeholder="SP" maxlength="2"></div>
+            <div class="form-group"><label>Tempo Preparo (min)</label><input type="number" id="ct_tempo" value="20" min="1"></div>
+            <div class="form-group checkbox"><input type="checkbox" id="ct_statusLoja" checked><label for="ct_statusLoja">Loja aberta</label></div>
+          </div>
+          <div id="createCredBox" class="credential-box" style="display:none"></div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline" onclick="closeModal('createModal')">Cancelar</button>
+          <button type="submit" class="btn btn-primary" id="createTenantBtn">Criar Tenant</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- EXTRA MODAL -->
+  <div class="modal-overlay modal-sm" id="extraModal">
+    <div class="modal">
+      <div class="modal-header"><h3>🧀 Gerenciar Extras</h3><button class="modal-close" onclick="closeModal('extraModal')">✕</button></div>
+      <div class="modal-body">
+        <p style="font-size:13px;color:var(--text-2);margin-bottom:8px">Produto: <strong id="extraProdName"></strong></p>
+        <div id="extrasList" style="margin-bottom:12px"></div>
+        <div class="inline-form">
+          <input type="text" id="ef_nome" placeholder="Nome do extra" style="width:160px">
+          <input type="number" step="0.01" id="ef_preco" placeholder="Preço R$" style="width:100px">
+          <button class="btn btn-sm btn-success" onclick="saveExtra()" id="saveExtraBtn">Adicionar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ─── State ────────────────
+    let tenants = [];
+    let currentTenantId = null;
+    let currentTenantData = null;
+    let editingUserId = null;
+    let editingCatId = null;
+    let editingProdId = null;
+    let editingDriverId = null;
+    let currentExtras = [];
+    let extraProdId = null;
+
+    const API = '/api/tenants';
+
+    // ─── Toast ────────────────
+    function toast(msg, type = 'info', duration = 4000) {
+      const c = document.getElementById('toastContainer');
+      const el = document.createElement('div'); el.className = `toast ${type}`; el.innerHTML = msg;
+      c.appendChild(el);
+      setTimeout(() => { el.style.opacity = '0'; el.style.transform = 'translateX(40px)'; el.style.transition = '.3s ease'; setTimeout(() => el.remove(), 300); }, duration);
+    }
+
+    // ─── DB Status ────────────
+    async function checkHealth() {
+      try {
+        const r = await fetch('/api/health'); const d = await r.json();
+        document.getElementById('dbDot').className = 'db-dot online';
+        document.getElementById('dbLabel').textContent = `Conectado • ${d.status}`;
+      } catch {
+        document.getElementById('dbDot').className = 'db-dot offline';
+        document.getElementById('dbLabel').textContent = 'Desconectado';
+      }
+    }
+
+    // ─── Load Tenants ──────────
+    async function loadTenants() {
+      const btn = document.getElementById('refreshBtn'); btn.disabled = true; btn.textContent = '⟳';
+      try {
+        const r = await fetch(API); if (!r.ok) throw new Error(await r.text());
+        tenants = await r.json(); renderTable();
+      } catch (err) { toast(`Erro: ${err.message}`, 'error'); }
+      finally { btn.disabled = false; btn.textContent = '↻'; }
+    }
+
+    function renderTable() {
+      const search = (document.getElementById('searchInput').value || '').toLowerCase();
+      const filtered = tenants.filter(t => t.nome.toLowerCase().includes(search) || (t.slug||'').toLowerCase().includes(search) || (t.dominio||'').toLowerCase().includes(search));
+      document.getElementById('totalCount').textContent = `${filtered.length} de ${tenants.length}`;
+      const tbody = document.getElementById('tableBody');
+      if (!filtered.length) {
+        tbody.innerHTML = '<tr><td colspan="8" class="empty-state"><div class="emoji">🔍</div><h3>Nenhum tenant</h3><p>Crie um novo tenant.</p></td></tr>';
+        return;
+      }
+      tbody.innerHTML = filtered.map(t => `<tr onclick="openManagement(${t.id})">
+        <td class="col-id">${t.id}</td>
+        <td><div class="tenant-name">${esc(t.nome)}</div></td>
+        <td><div class="tenant-slug">${esc(t.slug||'—')}</div><div class="tenant-slug" style="font-size:11px">${esc(t.dominio||'')}</div></td>
+        <td><span class="tag ${t.status_loja?'tag-on':'tag-off'}">${t.status_loja?'● Aberto':'○ Fechado'}</span></td>
+        <td><span class="tag ${t.tem_asaas?'tag-asaas':'tag-no-asaas'}">${t.tem_asaas?'✅ Configurado':'—'}</span></td>
+        <td><span class="tag ${t.tem_jwt?'tag-jwt':'tag-no-jwt'}">${t.tem_jwt?'🔑 OK':'⚠️ Pendente'}</span></td>
+        <td style="color:var(--text-2)">${t.tempo_preparo_min||'—'} min</td>
+        <td style="text-align:right" onclick="event.stopPropagation()">
+          <button class="btn btn-ghost btn-xs" onclick="openManagement(${t.id})" title="Gerenciar">⚙️</button>
+          <button class="btn btn-ghost btn-xs" onclick="event.stopPropagation();regenerateJwt(${t.id},'${esc(t.nome)}')" title="Regenerar JWT">🔑</button>
+          <button class="btn btn-ghost btn-xs" style="color:var(--danger)" onclick="event.stopPropagation();deleteTenant(${t.id},'${esc(t.nome)}')" title="Excluir">✕</button>
+        </td>
+      </tr>`).join('');
+    }
+
+    function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+    // ─── Create Tenant ─────────
+    function openCreateModal() {
+      document.getElementById('createModal').classList.add('active');
+      document.getElementById('createCredBox').style.display = 'none';
+      document.getElementById('createTenantBtn').textContent = 'Criar Tenant';
+      document.getElementById('createTenantBtn').disabled = false;
+    }
+    async function createTenant(e) {
+      e.preventDefault();
+      const data = {
+        nome: document.getElementById('ct_nome').value,
+        slug: document.getElementById('ct_slug').value,
+        dominio: document.getElementById('ct_dominio').value || document.getElementById('ct_slug').value,
+        endereco: document.getElementById('ct_endereco').value,
+        cep: document.getElementById('ct_cep').value,
+        cidade: document.getElementById('ct_cidade').value,
+        estado: document.getElementById('ct_estado').value,
+        tempo_preparo_min: parseInt(document.getElementById('ct_tempo').value) || 20,
+        status_loja: document.getElementById('ct_statusLoja').checked,
+      };
+      const btn = document.getElementById('createTenantBtn'); btn.disabled = true; btn.textContent = 'Criando…';
+      try {
+        const r = await fetch(API, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(data) });
+        if (!r.ok) { const err = await r.json(); throw new Error(err.error); }
+        const result = await r.json();
+        const box = document.getElementById('createCredBox');
+        box.style.display = 'block';
+        box.innerHTML = `<h4>✅ Criado com sucesso!</h4>
+          <div class="credential-item"><span class="label">Admin Email</span><span class="value">${result.adminEmail}</span><button class="btn-copy" onclick="copyText('${result.adminEmail}')">📋</button></div>
+          <div class="credential-item"><span class="label">Senha</span><span class="value">admin123</span><button class="btn-copy" onclick="copyText('admin123')">📋</button></div>
+          <p style="font-size:12px;color:var(--text-2);margin-top:8px">⚠️ Anote essas credenciais.</p>`;
+        btn.textContent = 'Fechar'; btn.onclick = () => { closeModal('createModal'); btn.onclick = null; };
+        toast(`✅ "${result.nome}" criado!`, 'success');
+        loadTenants();
+      } catch (err) { toast(`❌ ${err.message}`, 'error'); btn.disabled = false; btn.textContent = 'Criar Tenant'; }
+    }
+
+    // ─── Delete Tenant ─────────
+    async function deleteTenant(id, nome) {
+      if (!confirm(`Excluir "${nome}" e TODOS os dados relacionados?\n\nEsta ação é irreversível!`)) return;
+      try {
+        const r = await fetch(`${API}/${id}`, { method:'DELETE' });
+        if (!r.ok) { const err = await r.json(); throw new Error(err.error); }
+        const result = await r.json();
+        toast(`🗑️ ${result.message}`, 'info');
+        if (currentTenantId === id) closeManagement();
+        loadTenants();
+      } catch (err) { toast(`❌ ${err.message}`, 'error'); }
+    }
+
+    // ─── Regenerate JWT ────────
+    async function regenerateJwt(id, nome) {
+      if (!confirm(`Regenerar JWT de "${nome}"?\n\nIsso invalida todos os tokens existentes.`)) return;
+      try {
+        const r = await fetch(`${API}/${id}/regenerate-jwt`, { method:'POST' });
+        if (!r.ok) { const err = await r.json(); throw new Error(err.error); }
+        const result = await r.json(); toast(`🔑 ${result.message}`, 'success'); loadTenants();
+      } catch (err) { toast(`❌ ${err.message}`, 'error'); }
+    }
+
+    // ─── Open Management ────────
+    async function openManagement(id) {
+      currentTenantId = id;
+      document.getElementById('mainView').style.display = 'none';
+      document.getElementById('managementView').classList.add('active');
+      const t = tenants.find(t => t.id === id);
+      document.getElementById('mgmtTenantName').textContent = t ? t.nome : '—';
+      document.getElementById('mgmtTenantId').textContent = `#${id}`;
+      switchTab('dados');
+      await loadTenantData();
+      await loadUsers();
+      await loadCardapio();
+      await loadPagamentos();
+      await loadDrivers();
+    }
+
+    function closeManagement() {
+      currentTenantId = null;
+      editingUserId = null; editingCatId = null; editingProdId = null; editingDriverId = null;
+      document.getElementById('userForm').style.display = 'none';
+      document.getElementById('catForm').style.display = 'none';
+      document.getElementById('prodForm').style.display = 'none';
+      document.getElementById('driverForm').style.display = 'none';
+      document.getElementById('managementView').classList.remove('active');
+      document.getElementById('mainView').style.display = 'block';
+      loadTenants();
+    }
+
+    function switchTab(name) {
+      document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === name));
+      document.querySelectorAll('.tab-section').forEach(s => s.classList.toggle('active', s.id === 'tab-' + name));
+    }
+
+    // ─── TAB: Dados ────────────
+    async function loadTenantData() {
+      try {
+        const r = await fetch(`${API}/${currentTenantId}`);
+        if (!r.ok) return;
+        const t = await r.json();
+        currentTenantData = t;
+        document.getElementById('f_nome').value = t.nome || '';
+        document.getElementById('f_slug').value = t.slug || '';
+        document.getElementById('f_dominio').value = t.dominio || '';
+        document.getElementById('f_endereco').value = t.endereco || '';
+        document.getElementById('f_cep').value = t.cep || '';
+        document.getElementById('f_cidade').value = t.cidade || '';
+        document.getElementById('f_estado').value = t.estado || '';
+        document.getElementById('f_latitude').value = t.latitude ?? '';
+        document.getElementById('f_longitude').value = t.longitude ?? '';
+        document.getElementById('f_tempo').value = t.tempo_preparo_min ?? 20;
+        document.getElementById('f_statusLoja').checked = !!t.status_loja;
+        document.getElementById('f_asaas_key').value = t.asaas_api_key || '';
+        document.getElementById('f_asaas_env').value = t.asaas_env || 'sandbox';
+        document.getElementById('f_asaas_wt').value = t.asaas_webhook_token || '';
+        document.getElementById('f_asaas_ws').value = t.asaas_webhook_secret || '';
+      } catch (err) { toast('Erro ao carregar dados', 'error'); }
+    }
+
+    function formatCEP(el) {
+      el.value = el.value.replace(/\D/g,'').replace(/^(\d{5})(\d)/,'$1-$2').substring(0,9);
+    }
+
+    async function buscarCEP() {
+      const cep = document.getElementById('f_cep').value.replace(/\D/g,'');
+      if (cep.length !== 8) return toast('CEP deve ter 8 dígitos.', 'error');
+      const btn = document.getElementById('cepBtn'); btn.disabled = true;
+      try {
+        const r = await fetch(`/api/cep/${cep}`);
+        if (!r.ok) { const err = await r.json(); throw new Error(err.error); }
+        const data = await r.json();
+        document.getElementById('f_endereco').value = data.logradouro || '';
+        document.getElementById('f_cidade').value = data.cidade || '';
+        document.getElementById('f_estado').value = data.estado || '';
+        toast('✅ Endereço preenchido!', 'success');
+      } catch (err) { toast(`❌ ${err.message}`, 'error'); }
+      finally { btn.disabled = false; }
+    }
+
+    async function saveTenantData(e) {
+      e.preventDefault();
+      const data = {
+        nome: document.getElementById('f_nome').value,
+        slug: document.getElementById('f_slug').value,
+        dominio: document.getElementById('f_dominio').value,
+        endereco: document.getElementById('f_endereco').value,
+        cep: document.getElementById('f_cep').value,
+        cidade: document.getElementById('f_cidade').value,
+        estado: document.getElementById('f_estado').value,
+        latitude: parseFloat(document.getElementById('f_latitude').value) || null,
+        longitude: parseFloat(document.getElementById('f_longitude').value) || null,
+        tempo_preparo_min: parseInt(document.getElementById('f_tempo').value) || 20,
+        status_loja: document.getElementById('f_statusLoja').checked,
+        asaas_api_key: document.getElementById('f_asaas_key').value || null,
+        asaas_env: document.getElementById('f_asaas_env').value,
+        asaas_webhook_token: document.getElementById('f_asaas_wt').value || null,
+        asaas_webhook_secret: document.getElementById('f_asaas_ws').value || null,
+      };
+      const btn = document.getElementById('saveTenantBtn'); btn.disabled = true; btn.textContent = 'Salvando…';
+      try {
+        const r = await fetch(`${API}/${currentTenantId}`, { method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(data) });
+        if (!r.ok) { const err = await r.json(); throw new Error(err.error); }
+        toast('✅ Dados salvos!', 'success');
+      } catch (err) { toast(`❌ ${err.message}`, 'error'); }
+      finally { btn.disabled = false; btn.textContent = 'Salvar Dados'; }
+    }
+
+    // ─── TAB: Usuários ─────────
+    let users = [];
+    async function loadUsers() {
+      try {
+        const r = await fetch(`${API}/${currentTenantId}/users`);
+        if (!r.ok) return;
+        users = await r.json();
+        const tbody = document.getElementById('usersTableBody');
+        if (!users.length) { tbody.innerHTML = '<tr><td colspan="5" class="empty-state"><div class="emoji">👥</div><h3>Nenhum usuário</h3></td></tr>'; return; }
+        tbody.innerHTML = users.map(u => `<tr>
+          <td><strong>${esc(u.nome)}</strong></td>
+          <td>${esc(u.email)}</td>
+          <td><span class="tag" style="background:var(--surface-2)">${esc(u.cargo)}</span></td>
+          <td style="color:var(--text-2);font-size:12px">${u.ultimo_acesso ? new Date(u.ultimo_acesso).toLocaleString('pt-BR') : '—'}</td>
+          <td style="text-align:right">
+            <button class="btn btn-ghost btn-xs" onclick="editUser(${u.id})">✎</button>
+            <button class="btn btn-ghost btn-xs" style="color:var(--danger)" onclick="deleteUser(${u.id},'${esc(u.nome)}')">✕</button>
+          </td>
+        </tr>`).join('');
+      } catch (err) { toast('Erro ao carregar usuários', 'error'); }
+    }
+
+    function showUserForm(data) {
+      editingUserId = data ? data.id : null;
+      document.getElementById('userForm').style.display = 'block';
+      document.getElementById('userFormTitle').textContent = data ? '✎ Editar Usuário' : '👤 Novo Usuário';
+      document.getElementById('uf_nome').value = data ? data.nome : '';
+      document.getElementById('uf_email').value = data ? data.email : '';
+      document.getElementById('uf_cargo').value = data ? data.cargo : 'caixa';
+      document.getElementById('uf_password').value = '';
+      document.getElementById('uf_password').placeholder = data ? 'Nova senha (deixar vazio = manter)' : 'Senha';
+    }
+
+    function hideUserForm() { document.getElementById('userForm').style.display = 'none'; editingUserId = null; }
+
+    async function saveUser() {
+      const data = {
+        nome: document.getElementById('uf_nome').value,
+        email: document.getElementById('uf_email').value,
+        cargo: document.getElementById('uf_cargo').value,
+        password: document.getElementById('uf_password').value,
+      };
+      if (!data.nome || !data.email || (!editingUserId && !data.password)) return toast('Preencha nome, email e senha.', 'error');
+      try {
+        const url = editingUserId ? `${API}/${currentTenantId}/users/${editingUserId}` : `${API}/${currentTenantId}/users`;
+        const method = editingUserId ? 'PUT' : 'POST';
+        const body = editingUserId ? { nome: data.nome, email: data.email, cargo: data.cargo, password: data.password || undefined } : data;
+        const r = await fetch(url, { method, headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) });
+        if (!r.ok) { const err = await r.json(); throw new Error(err.error); }
+        toast(editingUserId ? '✅ Usuário atualizado!' : '✅ Usuário criado!', 'success');
+        hideUserForm(); loadUsers();
+      } catch (err) { toast(`❌ ${err.message}`, 'error'); }
+    }
+
+    function editUser(id) { showUserForm(users.find(u => u.id === id)); }
+    async function deleteUser(id, nome) {
+      if (!confirm(`Excluir "${nome}"?`)) return;
+      try {
+        const r = await fetch(`${API}/${currentTenantId}/users/${id}`, { method:'DELETE' });
+        if (!r.ok) { const err = await r.json(); throw new Error(err.error); }
+        const result = await r.json(); toast(`🗑️ ${result.message}`, 'info'); loadUsers();
+      } catch (err) { toast(`❌ ${err.message}`, 'error'); }
+    }
+
+    // ─── TAB: Cardápio ─────────
+    let cardapioData = { categorias: [], produtos: [], extras: [] };
+    async function loadCardapio() {
+      try {
+        const r = await fetch(`${API}/${currentTenantId}/cardapio`);
+        if (!r.ok) return;
+        cardapioData = await r.json();
+        renderCategorias();
+        renderProdutos();
+      } catch (err) { toast('Erro ao carregar cardápio', 'error'); }
+    }
+
+    function renderCategorias() {
+      const cats = cardapioData.categorias || [];
+      const tbody = document.getElementById('catsTableBody');
+      if (!cats.length) { tbody.innerHTML = '<tr><td colspan="4" class="empty-state"><div class="emoji">📂</div><h3>Nenhuma categoria</h3></td></tr>'; return; }
+      tbody.innerHTML = cats.map(c => `<tr>
+        <td><strong>${esc(c.nome)}</strong></td>
+        <td style="color:var(--text-2)">${esc(c.slug)}</td>
+        <td>${c.ordem ?? 0}</td>
+        <td style="text-align:right">
+          <button class="btn btn-ghost btn-xs" onclick="editCat(${c.id})">✎</button>
+          <button class="btn btn-ghost btn-xs" style="color:var(--danger)" onclick="deleteCat(${c.id},'${esc(c.nome)}')">✕</button>
+        </td>
+      </tr>`).join('');
+      // Update categoria select in product form
+      const sel = document.getElementById('pf_categoria');
+      sel.innerHTML = '<option value="">Sem categoria</option>' + cats.map(c => `<option value="${c.id}">${esc(c.nome)}</option>`).join('');
+    }
+
+    function renderProdutos() {
+      const container = document.getElementById('produtosContainer');
+      const prods = cardapioData.produtos || [];
+      const extras = cardapioData.extras || [];
+      if (!prods.length) {
+        container.innerHTML = '<div class="empty-state" style="padding:30px 20px"><div class="emoji">🍕</div><h3>Nenhum produto</h3><p>Clique em "+ Novo" para adicionar.</p></div>';
+        return;
+      }
+      container.innerHTML = prods.map(p => {
+        const prodExtras = extras.filter(e => e.produto_id === p.id);
+        const catName = p.categoria_nome || '—';
+        const imgSrc = p.imagem_url || (p.imagem_base64 ? (p.imagem_base64.startsWith('data:') ? p.imagem_base64 : 'data:image/jpeg;base64,' + p.imagem_base64) : null);
+        return `<div class="produto-item">
+          ${imgSrc ? `<div style="width:48px;height:48px;border-radius:8px;overflow:hidden;flex-shrink:0;background:var(--surface-2)"><img src="${esc(imgSrc)}" style="width:100%;height:100%;object-fit:cover" /></div>` : ''}
+          <div class="produto-info">
+            <div class="produto-nome">${esc(p.nome)} ${p.destaque?'⭐':''}</div>
+            <div class="produto-categoria">${esc(catName)} ${p.ativo?'':'• Inativo'}</div>
+            <div>${prodExtras.map(e => `<span class="extra-chip">${esc(e.nome)} R$${parseFloat(e.preco).toFixed(2)}<span class="remove-extra" onclick="deleteExtra(${e.id},'${esc(e.nome)}')">×</span></span>`).join('')}</div>
+          </div>
+          <div class="produto-preco">R$ ${parseFloat(p.preco).toFixed(2)}</div>
+          <div style="display:flex;gap:4px;flex-shrink:0">
+            <button class="btn btn-ghost btn-xs" onclick="editProd(${p.id})">✎</button>
+            <button class="btn btn-ghost btn-xs" onclick="openExtraModal(${p.id},'${esc(p.nome)}')">🧀</button>
+            <button class="btn btn-ghost btn-xs" style="color:var(--danger)" onclick="deleteProd(${p.id},'${esc(p.nome)}')">✕</button>
+          </div>
+        </div>`;
+      }).join('');
+    }
+
+    // Categories CRUD
+    function showCatForm(data) {
+      editingCatId = data ? data.id : null;
+      document.getElementById('catForm').style.display = 'block';
+      document.getElementById('catFormTitle').textContent = data ? '✎ Editar Categoria' : '📂 Nova Categoria';
+      document.getElementById('cf_nome').value = data ? data.nome : '';
+      document.getElementById('cf_slug').value = data ? data.slug : '';
+      document.getElementById('cf_ordem').value = data ? data.ordem : '';
+    }
+    function hideCatForm() { document.getElementById('catForm').style.display = 'none'; editingCatId = null; }
+    async function saveCat() {
+      const data = { nome: document.getElementById('cf_nome').value, slug: document.getElementById('cf_slug').value, ordem: parseInt(document.getElementById('cf_ordem').value) || 0 };
+      if (!data.nome || !data.slug) return toast('Nome e slug são obrigatórios.', 'error');
+      try {
+        const url = editingCatId ? `${API}/${currentTenantId}/categorias/${editingCatId}` : `${API}/${currentTenantId}/categorias`;
+        const method = editingCatId ? 'PUT' : 'POST';
+        const r = await fetch(url, { method, headers:{'Content-Type':'application/json'}, body:JSON.stringify(data) });
+        if (!r.ok) { const err = await r.json(); throw new Error(err.error); }
+        toast(editingCatId ? '✅ Categoria atualizada!' : '✅ Categoria criada!', 'success');
+        hideCatForm(); loadCardapio();
+      } catch (err) { toast(`❌ ${err.message}`, 'error'); }
+    }
+    function editCat(id) { showCatForm(cardapioData.categorias.find(c => c.id === id)); }
+    async function deleteCat(id, nome) {
+      if (!confirm(`Excluir categoria "${nome}"? Os produtos serão mantidos sem categoria.`)) return;
+      try { const r = await fetch(`${API}/${currentTenantId}/categorias/${id}`, { method:'DELETE' });
+        if (!r.ok) { const err = await r.json(); throw new Error(err.error); }
+        const result = await r.json(); toast(`🗑️ ${result.message}`, 'info'); loadCardapio();
+      } catch (err) { toast(`❌ ${err.message}`, 'error'); }
+    }
+
+    // Products CRUD
+    function showProdForm(data) {
+      editingProdId = data ? data.id : null;
+      document.getElementById('prodForm').style.display = 'block';
+      document.getElementById('prodFormTitle').textContent = data ? '✎ Editar Produto' : '🍕 Novo Produto';
+      document.getElementById('pf_nome').value = data ? data.nome : '';
+      document.getElementById('pf_desc').value = data ? data.descricao || '' : '';
+      document.getElementById('pf_preco').value = data ? data.preco : '';
+      document.getElementById('pf_categoria').value = data ? data.categoria_id || '' : '';
+      document.getElementById('pf_destaque').checked = data ? !!data.destaque : false;
+      document.getElementById('pf_ativo').checked = data ? !!data.ativo : true;
+      document.getElementById('pf_imagem_url').value = data ? data.imagem_url || '' : '';
+      document.getElementById('pf_imagem_file').value = '';
+      // Show preview if exists
+      const preview = document.getElementById('pf_imagem_preview');
+      const img = document.getElementById('pf_imagem_preview_img');
+      if (data && (data.imagem_url || data.imagem_base64)) {
+        img.src = data.imagem_url || (data.imagem_base64.startsWith('data:') ? data.imagem_base64 : 'data:image/jpeg;base64,' + data.imagem_base64);
+        preview.style.display = 'block';
+      } else {
+        preview.style.display = 'none';
+      }
+    }
+    function hideProdForm() {
+      document.getElementById('prodForm').style.display = 'none';
+      editingProdId = null;
+      document.getElementById('pf_imagem_file').value = '';
+      document.getElementById('pf_imagem_preview').style.display = 'none';
+    }
+    async function saveProd() {
+      const imagemFile = document.getElementById('pf_imagem_file').files[0];
+      let imagem_base64 = null;
+      if (imagemFile) {
+        if (imagemFile.size > 2 * 1024 * 1024) return toast('Imagem deve ter no máximo 2MB.', 'error');
+        imagem_base64 = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = (e) => resolve(e.target.result.split(',')[1]);
+          reader.onerror = reject;
+          reader.readAsDataURL(imagemFile);
+        });
+      }
+      const data = {
+        nome: document.getElementById('pf_nome').value,
+        descricao: document.getElementById('pf_desc').value,
+        preco: parseFloat(document.getElementById('pf_preco').value) || 0,
+        categoria_id: parseInt(document.getElementById('pf_categoria').value) || null,
+        destaque: document.getElementById('pf_destaque').checked,
+        ativo: document.getElementById('pf_ativo').checked,
+        imagem_url: document.getElementById('pf_imagem_url').value || null,
+      };
+      if (imagem_base64) data.imagem_base64 = imagem_base64;
+      if (!data.nome || !data.preco) return toast('Nome e preço são obrigatórios.', 'error');
+      try {
+        const url = editingProdId ? `${API}/${currentTenantId}/produtos/${editingProdId}` : `${API}/${currentTenantId}/produtos`;
+        const method = editingProdId ? 'PUT' : 'POST';
+        const r = await fetch(url, { method, headers:{'Content-Type':'application/json'}, body:JSON.stringify(data) });
+        if (!r.ok) { const err = await r.json(); throw new Error(err.error); }
+        toast(editingProdId ? '✅ Produto atualizado!' : '✅ Produto criado!', 'success');
+        hideProdForm(); loadCardapio();
+      } catch (err) { toast(`❌ ${err.message}`, 'error'); }
+    }
+    function editProd(id) { showProdForm(cardapioData.produtos.find(p => p.id === id)); }
+    async function deleteProd(id, nome) {
+      if (!confirm(`Excluir "${nome}"?`)) return;
+      try { const r = await fetch(`${API}/${currentTenantId}/produtos/${id}`, { method:'DELETE' });
+        if (!r.ok) { const err = await r.json(); throw new Error(err.error); }
+        const result = await r.json(); toast(`🗑️ ${result.message}`, 'info'); loadCardapio();
+      } catch (err) { toast(`❌ ${err.message}`, 'error'); }
+    }
+
+    // Extras
+    function openExtraModal(prodId, prodNome) {
+      extraProdId = prodId;
+      document.getElementById('extraProdName').textContent = prodNome;
+      document.getElementById('ef_nome').value = '';
+      document.getElementById('ef_preco').value = '';
+      renderExtras();
+      document.getElementById('extraModal').classList.add('active');
+    }
+    function renderExtras() {
+      const container = document.getElementById('extrasList');
+      const extras = (cardapioData.extras || []).filter(e => e.produto_id === extraProdId);
+      if (!extras.length) { container.innerHTML = '<p style="font-size:13px;color:var(--text-2)">Nenhum extra cadastrado.</p>'; return; }
+      container.innerHTML = extras.map(e => `<div class="credential-item">
+        <span>${esc(e.nome)}</span>
+        <span style="color:var(--accent);font-weight:600">R$ ${parseFloat(e.preco).toFixed(2)}</span>
+        <div style="display:flex;gap:4px">
+          <button class="btn-ghost btn-xs" onclick="editExtra(${e.id})">✎</button>
+          <button class="btn-ghost btn-xs" style="color:var(--danger)" onclick="deleteExtra(${e.id},'${esc(e.nome)}')">✕</button>
+        </div>
+      </div>`).join('');
+    }
+    let editingExtraId = null;
+    async function saveExtra() {
+      const nome = document.getElementById('ef_nome').value;
+      const preco = parseFloat(document.getElementById('ef_preco').value) || 0;
+      if (!nome) return toast('Nome do extra é obrigatório.', 'error');
+      try {
+        const url = editingExtraId ? `${API}/${currentTenantId}/extras/${editingExtraId}` : `${API}/${currentTenantId}/extras`;
+        const method = editingExtraId ? 'PUT' : 'POST';
+        const body = editingExtraId ? { nome, preco } : { produto_id: extraProdId, nome, preco };
+        const r = await fetch(url, { method, headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) });
+        if (!r.ok) { const err = await r.json(); throw new Error(err.error); }
+        document.getElementById('ef_nome').value = ''; document.getElementById('ef_preco').value = '';
+        toast(editingExtraId ? '✅ Extra atualizado!' : '✅ Extra adicionado!', 'success');
+        editingExtraId = null;
+        document.getElementById('saveExtraBtn').textContent = 'Adicionar';
+        await loadCardapio(); renderExtras();
+      } catch (err) { toast(`❌ ${err.message}`, 'error'); }
+    }
+    function editExtra(id) {
+      const extra = (cardapioData.extras || []).find(e => e.id === id);
+      if (!extra) return;
+      editingExtraId = id;
+      document.getElementById('ef_nome').value = extra.nome;
+      document.getElementById('ef_preco').value = extra.preco;
+      document.getElementById('saveExtraBtn').textContent = 'Atualizar';
+    }
+    async function deleteExtra(id, nome) {
+      try { const r = await fetch(`${API}/${currentTenantId}/extras/${id}`, { method:'DELETE' });
+        if (!r.ok) { const err = await r.json(); throw new Error(err.error); }
+        toast(`🗑️ "${nome}" removido.`, 'info'); await loadCardapio(); renderExtras();
+      } catch (err) { toast(`❌ ${err.message}`, 'error'); }
+    }
+
+    // ─── TAB: Pagamentos ────────
+    let paymentMethods = [];
+    async function loadPagamentos() {
+      try {
+        const r = await fetch(`${API}/${currentTenantId}/pagamentos`);
+        if (!r.ok) return;
+        paymentMethods = await r.json();
+        const labels = { dinheiro:'💵 Dinheiro', credito:'💳 Crédito', debito:'💳 Débito', pix:'📱 PIX', pix_online:'📱 PIX Online', credito_online:'💳 Cartão Online' };
+        const grid = document.getElementById('paymentGrid');
+        grid.innerHTML = Object.keys(labels).map(key => {
+          const checked = paymentMethods.includes(key);
+          return `<label class="payment-option ${checked?'selected':''}">
+            <input type="checkbox" value="${key}" ${checked?'checked':''} onchange="this.parentElement.classList.toggle('selected', this.checked)">
+            <span>${labels[key]}</span>
+          </label>`;
+        }).join('');
+      } catch (err) { toast('Erro ao carregar pagamentos', 'error'); }
+    }
+    async function savePagamentos() {
+      const checks = document.querySelectorAll('#paymentGrid input[type=checkbox]:checked');
+      const formas = Array.from(checks).map(c => c.value);
+      try {
+        const r = await fetch(`${API}/${currentTenantId}/pagamentos`, { method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ formas_pagamento: formas }) });
+        if (!r.ok) { const err = await r.json(); throw new Error(err.error); }
+        toast('✅ Formas de pagamento salvas!', 'success');
+      } catch (err) { toast(`❌ ${err.message}`, 'error'); }
+    }
+
+    // ─── TAB: Entregadores ─────
+    let drivers = [];
+    async function loadDrivers() {
+      try {
+        const r = await fetch(`${API}/${currentTenantId}/drivers`);
+        if (!r.ok) return;
+        drivers = await r.json();
+        const tbody = document.getElementById('driversTableBody');
+        if (!drivers.length) { tbody.innerHTML = '<tr><td colspan="6" class="empty-state"><div class="emoji">🛵</div><h3>Nenhum entregador</h3></td></tr>'; return; }
+        tbody.innerHTML = drivers.map(d => `<tr>
+          <td><strong>${esc(d.nome)}</strong></td>
+          <td>${esc(d.email)}</td>
+          <td>${esc(d.telefone||'—')}</td>
+          <td><span class="tag ${d.status==='ativo'?'tag-on':d.status==='inativo'?'tag-off':'tag-no-asaas'}">${d.status||'—'}</span></td>
+          <td>${d.entregas_total||0}</td>
+          <td style="text-align:right">
+            <button class="btn btn-ghost btn-xs" onclick="editDriver(${d.id})">✎</button>
+            <button class="btn btn-ghost btn-xs" style="color:var(--danger)" onclick="deleteDriver(${d.id},'${esc(d.nome)}')">✕</button>
+          </td>
+        </tr>`).join('');
+      } catch (err) { toast('Erro ao carregar entregadores', 'error'); }
+    }
+
+    function showDriverForm(data) {
+      editingDriverId = data ? data.id : null;
+      document.getElementById('driverForm').style.display = 'block';
+      document.getElementById('driverFormTitle').textContent = data ? '✎ Editar Entregador' : '🛵 Novo Entregador';
+      document.getElementById('df_nome').value = data ? data.nome : '';
+      document.getElementById('df_email').value = data ? data.email : '';
+      document.getElementById('df_telefone').value = data ? data.telefone||'' : '';
+      document.getElementById('df_status').value = data ? data.status : 'ativo';
+      document.getElementById('df_password').value = '';
+      document.getElementById('df_password').placeholder = data ? 'Nova senha (opcional)' : 'Senha';
+    }
+    function hideDriverForm() { document.getElementById('driverForm').style.display = 'none'; editingDriverId = null; }
+    async function saveDriver() {
+      const data = {
+        nome: document.getElementById('df_nome').value,
+        email: document.getElementById('df_email').value,
+        telefone: document.getElementById('df_telefone').value,
+        status: document.getElementById('df_status').value,
+        password: document.getElementById('df_password').value,
+      };
+      if (!data.nome || !data.email || (!editingDriverId && !data.password)) return toast('Preencha nome, email e senha.', 'error');
+      try {
+        const url = editingDriverId ? `${API}/${currentTenantId}/drivers/${editingDriverId}` : `${API}/${currentTenantId}/drivers`;
+        const method = editingDriverId ? 'PUT' : 'POST';
+        const body = editingDriverId ? { nome: data.nome, email: data.email, telefone: data.telefone, status: data.status, password: data.password || undefined } : data;
+        const r = await fetch(url, { method, headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) });
+        if (!r.ok) { const err = await r.json(); throw new Error(err.error); }
+        toast(editingDriverId ? '✅ Entregador atualizado!' : '✅ Entregador criado!', 'success');
+        hideDriverForm(); loadDrivers();
+      } catch (err) { toast(`❌ ${err.message}`, 'error'); }
+    }
+    function editDriver(id) { showDriverForm(drivers.find(d => d.id === id)); }
+    async function deleteDriver(id, nome) {
+      if (!confirm(`Excluir entregador "${nome}"?`)) return;
+      try { const r = await fetch(`${API}/${currentTenantId}/drivers/${id}`, { method:'DELETE' });
+        if (!r.ok) { const err = await r.json(); throw new Error(err.error); }
+        const result = await r.json(); toast(`🗑️ ${result.message}`, 'info'); loadDrivers();
+      } catch (err) { toast(`❌ ${err.message}`, 'error'); }
+    }
+
+    // ─── Utils ─────────────────
+    function copyText(text) {
+      navigator.clipboard.writeText(text).then(() => toast('📋 Copiado!', 'success', 2000))
+        .catch(() => { const ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); toast('📋 Copiado!', 'success', 2000); });
+    }
+    function closeModal(id) { document.getElementById(id).classList.remove('active'); document.body.style.overflow = ''; }
+    document.querySelectorAll('.modal-overlay').forEach(el => { el.addEventListener('click', (e) => { if (e.target === el) closeModal(el.id); }); });
+
+    // ─── Init ──────────────────
+    checkHealth(); loadTenants();
+  </script>
+</body>
+</html>

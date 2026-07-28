@@ -1,7 +1,7 @@
 <template>
   <div class="orders-view">
     <h2 class="section-title mb-4">
-      <i class="fas fa-receipt"></i> Meus Pedidos
+      <i-lucide-receipt style="width:20px;height:20px" /> Meus Pedidos
     </h2>
 
     <div v-if="loading" class="loading-wrapper">
@@ -9,7 +9,7 @@
     </div>
 
     <div v-else-if="orders.length === 0" class="empty-search p-4">
-      <i class="fas fa-shopping-bag icon-lg"></i>
+      <i-lucide-shopping-bag style="width:48px;height:48px" />
       <p>Você ainda não fez nenhum pedido.</p>
       <router-link to="/" class="btn btn-primary mt-3">
         Ver Cardápio
@@ -30,7 +30,7 @@
 
         <!-- Kitchen Messages -->
         <div v-if="order.mensagens?.length" class="order-kitchen-msg">
-          <i class="fas fa-comment-dots"></i>
+          <i-lucide-message-circle style="width:16px;height:16px" />
           💬 Mensagem da Cozinha
         </div>
 
@@ -52,26 +52,28 @@
             class="btn-track"
             @click="$router.push(`/pedidos/${order.id}`)"
           >
-            <i class="fas fa-map-marker-alt"></i> Acompanhar Pedido
+            <i-lucide-map-pin style="width:16px;height:16px" /> Acompanhar Pedido
           </button>
         </div>
 
         <!-- Motivo de Cancelamento/Recusa -->
         <div v-if="order.motivo_cancelamento" class="order-note" style="color:var(--error);border-color:var(--error);">
-          <i class="fas fa-info-circle"></i>
+          <i-lucide-info style="width:16px;height:16px" />
           {{ order.status === 'recusado' ? 'Motivo da recusa:' : 'Motivo do cancelamento:' }}
           {{ order.motivo_cancelamento }}
         </div>
         <!-- Refund status (cliente) -->
         <div v-if="(order.status === 'cancelado' || order.status === 'recusado') && isOnlinePayment(order.metodo_pagamento)"
              class="refund-badge-cliente" :class="'refund-cliente-' + (refundStatus[order.id] || 'null')">
-          <i :class="refundIcon(order.id)"></i>
+          <i-lucide-check-circle v-if="refundIcon(order.id) === 'check-circle'" style="width:14px;height:14px" />
+          <i-lucide-x-circle v-else-if="refundIcon(order.id) === 'x-circle'" style="width:14px;height:14px" />
+          <i-lucide-clock v-else style="width:14px;height:14px" />
           {{ refundLabel(order.id) }}
         </div>
 
         <!-- Observações -->
         <div v-if="order.observacoes" class="order-note">
-          <i class="fas fa-pen"></i> {{ order.observacoes }}
+          <i-lucide-pen style="width:16px;height:16px" /> {{ order.observacoes }}
         </div>
       </div>
 
@@ -104,9 +106,9 @@ function isOnlinePayment(metodo) {
 
 function refundIcon(orderId) {
   const s = refundStatus.value[orderId]
-  if (s === 'DONE') return 'fas fa-check-circle'
-  if (s === 'CANCELLED') return 'fas fa-times-circle'
-  return 'fas fa-clock'
+  if (s === 'DONE') return 'check-circle'
+  if (s === 'CANCELLED') return 'x-circle'
+  return 'clock'
 }
 
 function refundLabel(orderId) {
@@ -243,7 +245,7 @@ onUnmounted(() => {
   gap: 5px;
   font-weight: 600;
 }
-.refund-badge-cliente i { width: 14px; text-align: center; }
+.refund-badge-cliente svg { width: 14px; height: 14px; }
 
 /* Variações de status */
 .refund-badge-cliente.refund-cliente-null {

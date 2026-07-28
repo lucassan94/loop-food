@@ -5,7 +5,7 @@
 
     <!-- Search Bar -->
     <div class="search-bar">
-      <i class="fas fa-search search-icon"></i>
+      <i-lucide-search style="width:20px;height:20px" class="search-icon" />
       <input
         v-model="searchQuery"
         type="text"
@@ -13,7 +13,7 @@
         @input="filterProducts"
       />
       <button v-if="searchQuery" class="clear-btn" @click="searchQuery = ''">
-        <i class="fas fa-times"></i>
+        <i-lucide-x style="width:16px;height:16px" />
       </button>
     </div>
 
@@ -33,13 +33,13 @@
     <!-- Products Grid (agrupado por categoria com separadores) -->
     <section class="menu-section">
       <h2 class="section-title">
-        <i class="fas fa-utensils"></i>
+        <i-lucide-utensils-crossed style="width:20px;height:20px" />
         {{ sectionTitle }}
       </h2>
 
       <!-- Estado vazio -->
       <div v-if="filteredProducts.length === 0 && !loading" class="empty-search">
-        <i class="fas fa-search"></i>
+        <i-lucide-search style="width:48px;height:48px" />
         <p v-if="searchQuery">
           Nenhum prato encontrado para '{{ searchQuery }}'<br />
           <small>Tente buscar por outro nome ou categoria</small>
@@ -61,7 +61,7 @@
 
           <!-- Título da categoria -->
           <h3 class="category-group-title">
-            <i class="fas fa-tag"></i>
+            <i-lucide-tag style="width:16px;height:16px" />
             {{ group.categoria_nome }}
           </h3>
 
@@ -87,7 +87,7 @@
                 <div class="product-card-footer">
                   <span class="product-price">{{ formatPrice(product.preco) }}</span>
                   <button class="btn-add-cart" @click.stop="quickAdd(product)">
-                    <i class="fas fa-plus"></i>
+                    <i-lucide-plus style="width:16px;height:16px" />
                   </button>
                 </div>
               </div>
@@ -117,7 +117,7 @@
 
           <div v-if="selectedExtras.length > 0">
             <h4 class="modal-extras-title">
-              <i class="fas fa-plus-circle"></i> Adicionais (Opcional)
+              <i-lucide-plus-circle style="width:16px;height:16px" /> Adicionais (Opcional)
             </h4>
             <div class="extra-item" v-for="extra in selectedExtras" :key="extra.id">
               <div class="extra-item-left">
@@ -143,7 +143,7 @@
           <div class="modal-footer">
             <span class="price">{{ formatPrice(productTotal) }}</span>
             <button class="btn-add-modal" @click="addToCart">
-              <i class="fas fa-shopping-bag"></i> Adicionar
+              <i-lucide-shopping-bag style="width:16px;height:16px" /> Adicionar
             </button>
           </div>
         </div>

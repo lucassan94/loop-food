@@ -2,13 +2,14 @@
   <div>
     <!-- Feedback Toast -->
     <div v-if="feedbackMsg" class="feedback-toast" :class="feedbackMsg.tipo" @click="feedbackMsg = null">
-      <i :class="feedbackMsg.tipo === 'success' ? 'fas fa-check-circle' : 'fas fa-exclamation-triangle'"></i>
+      <i-lucide-circle-check-big v-if="feedbackMsg.tipo === 'success'" style="width:20px;height:20px" />
+      <i-lucide-triangle-alert v-else style="width:20px;height:20px" />
       {{ feedbackMsg.texto }}
     </div>
 
     <div class="filter-bar">
       <input v-model="busca" placeholder="Buscar por nome, email ou telefone..." style="flex:1;" @keyup.enter="load" />
-      <button class="btn btn-primary btn-sm" @click="load"><i class="fas fa-search"></i> Buscar</button>
+      <button class="btn btn-primary btn-sm" @click="load"><i-lucide-search style="width:16px;height:16px" /> Buscar</button>
     </div>
 
     <div class="card">
@@ -36,16 +37,16 @@
             <td><strong>{{ formatPrice(c.total_gasto) }}</strong></td>
             <td>
               <button class="btn btn-sm btn-outline" @click="editarCliente(c)" title="Editar cliente">
-                <i class="fas fa-edit"></i>
+                <i-lucide-pencil style="width:16px;height:16px" />
               </button>
               <button class="btn btn-sm btn-secondary" @click="verDetalhes(c.id)" style="margin-left:4px;" title="Ver detalhes">
-                <i class="fas fa-eye"></i>
+                <i-lucide-eye style="width:16px;height:16px" />
               </button>
             </td>
           </tr>
           <tr v-if="clientes.length === 0">
             <td colspan="7" style="text-align:center;color:var(--text-muted);padding:2rem;">
-              <i class="fas fa-users" style="font-size:1.5rem;display:block;margin-bottom:0.5rem;"></i>
+              <i-lucide-users style="width:24px;height:24px;display:block;margin:0 auto 0.5rem;" />
               Nenhum cliente encontrado
             </td>
           </tr>
@@ -58,13 +59,13 @@
       <div class="modal-content" style="max-width:550px;">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem;">
           <h3 style="font-size:1.1rem;">
-            <i class="fas fa-user-edit"></i> Editar Cliente
+            <i-lucide-user-pen style="width:20px;height:20px" /> Editar Cliente
           </h3>
           <button class="drawer-close" @click="editModal = false">&times;</button>
         </div>
 
         <div v-if="formErro" class="form-error-banner">
-          <i class="fas fa-exclamation-triangle"></i> {{ formErro }}
+          <i-lucide-triangle-alert style="width:16px;height:16px" /> {{ formErro }}
         </div>
 
         <!-- Dados Pessoais -->
@@ -111,7 +112,8 @@
         </div>
 
         <div v-if="cepMsg" class="cep-result" :class="cepMsg.tipo" style="margin:0.75rem 0;">
-          <i :class="cepMsg.tipo === 'success' ? 'fas fa-check-circle' : 'fas fa-times-circle'"></i>
+          <i-lucide-circle-check-big v-if="cepMsg.tipo === 'success'" style="width:16px;height:16px" />
+          <i-lucide-circle-x v-else style="width:16px;height:16px" />
           {{ cepMsg.texto }}
         </div>
 
@@ -151,7 +153,8 @@
         <!-- Ações -->
         <div style="display:flex;gap:8px;margin-top:1.5rem;padding-top:1rem;border-top:1px solid var(--border);">
           <button class="btn btn-primary" style="flex:1;justify-content:center;" @click="salvarEdicao" :disabled="salvando">
-            <i :class="salvando ? 'fas fa-spinner fa-spin' : 'fas fa-save'"></i>
+            <i-lucide-loader v-if="salvando" class="spinning" />
+            <i-lucide-save v-else />
             {{ salvando ? 'Salvando...' : 'Salvar Alterações' }}
           </button>
           <button class="btn btn-secondary" style="justify-content:center;" @click="editModal = false">Cancelar</button>
@@ -168,8 +171,8 @@
         </div>
 
         <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-bottom:1rem;">
-          <span class="info-chip"><i class="fas fa-envelope"></i> {{ selectedCliente.email }}</span>
-          <span class="info-chip"><i class="fas fa-phone"></i> {{ selectedCliente.telefone || '—' }}</span>
+          <span class="info-chip"><i-lucide-mail style="width:12px;height:12px" /> {{ selectedCliente.email }}</span>
+          <span class="info-chip"><i-lucide-phone style="width:12px;height:12px" /> {{ selectedCliente.telefone || '—' }}</span>
         </div>
 
         <div class="profile-section">
@@ -210,7 +213,7 @@
         <div style="display:flex;gap:8px;margin-top:1rem;">
           <button class="btn btn-secondary" style="flex:1;justify-content:center;" @click="selectedCliente = null">Fechar</button>
           <button class="btn btn-primary" style="flex:1;justify-content:center;" @click="editarDeDetalhes(selectedCliente)">
-            <i class="fas fa-edit"></i> Editar
+            <i-lucide-pencil style="width:16px;height:16px" /> Editar
           </button>
         </div>
       </div>

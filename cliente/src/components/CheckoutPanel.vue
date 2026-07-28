@@ -12,7 +12,7 @@
     <!-- Step 0: Cart Items -->
     <div v-if="currentStep === 0" class="checkout-step active">
       <div v-if="cartItems.length === 0" class="empty-cart-drawer text-center">
-        <i class="fas fa-shopping-bag"></i>
+        <i-lucide-shopping-bag style="width:48px;height:48px" />
         <p>Seu carrinho está vazio</p>
       </div>
 
@@ -31,7 +31,7 @@
         <div class="cart-item-right">
           <div class="cart-item-total">{{ formatPrice(item.subtotal) }}</div>
           <button class="cart-item-remove" @click="removeItem(index)" title="Remover">
-            <i class="fas fa-trash-alt"></i>
+            <i-lucide-trash-2 style="width:16px;height:16px" />
           </button>
         </div>
       </div>
@@ -42,14 +42,14 @@
           <span>{{ formatPrice(subtotal) }}</span>
         </div>
         <button class="btn btn-primary btn-block mt-3" @click="prosseguirDoCarrinho()">
-          Continuar <i class="fas fa-arrow-right"></i>
+          Continuar <i-lucide-arrow-right style="width:16px;height:16px" />
         </button>
       </div>
     </div>
 
     <!-- Step 1: Customer Data -->
     <div v-if="currentStep === 1" class="checkout-step active">
-      <h4><i class="fas fa-user"></i> Seus Dados</h4>
+      <h4><i-lucide-user style="width:18px;height:18px" /> Seus Dados</h4>
 
       <div class="form-row">
         <div class="form-group">
@@ -75,7 +75,7 @@
 
     <!-- Step 2: Address -->
     <div v-if="currentStep === 2" class="checkout-step active">
-      <h4><i class="fas fa-map-marker-alt"></i> Endereço de Entrega</h4>
+      <h4><i-lucide-map-pin style="width:18px;height:18px" /> Endereço de Entrega</h4>
 
       <div class="cep-row">
         <div class="form-group m-0">
@@ -123,7 +123,7 @@
 
       <!-- Frete Info -->
       <div v-if="freteInfo" class="cep-result success">
-        <i class="fas fa-truck"></i>
+        <i-lucide-truck style="width:16px;height:16px" />
         <strong>{{ freteInfo.distancia_km ? `~${freteInfo.distancia_km}km — ` : '' }}
         {{ freteInfo.tempo_min }}-{{ freteInfo.tempo_max }}min</strong>
         <br />Frete: {{ formatPrice(freteInfo.custo) }}
@@ -156,7 +156,7 @@
 
       <div v-if="form.metodo_pagamento === 'pix_online' || form.metodo_pagamento === 'credito_online'" class="credit-card-form">
         <h4 class="mt-3 mb-2" style="font-size:0.95rem;border-bottom:1px solid var(--border);padding-bottom:6px;">
-          <i class="fas fa-id-card"></i> Dados do Pagador
+          <i-lucide-credit-card style="width:16px;height:16px" /> Dados do Pagador
         </h4>
         <div class="form-group">
           <label>CPF</label>
@@ -168,7 +168,7 @@
       <!-- Cartão de Crédito Online: campos do cartão -->
       <div v-if="form.metodo_pagamento === 'credito_online'" class="credit-card-form">
         <h4 class="mt-3 mb-2" style="font-size:0.95rem;border-bottom:1px solid var(--border);padding-bottom:6px;">
-          <i class="fas fa-credit-card"></i> Dados do Cartão
+          <i-lucide-credit-card style="width:16px;height:16px" /> Dados do Cartão
         </h4>
         <div class="form-group">
           <label>Número do Cartão</label>
@@ -211,7 +211,7 @@
 
     <!-- Step 4: Review & Confirm -->
     <div v-if="currentStep === 4" class="checkout-step active">
-      <h4><i class="fas fa-check-circle"></i> Revisar Pedido</h4>
+      <h4><i-lucide-check-circle style="width:18px;height:18px" /> Revisar Pedido</h4>
 
       <div class="profile-section">
         <div class="profile-section-title">Itens</div>
@@ -259,11 +259,11 @@
       </div>
 
       <div v-if="freteInfo" class="est-time-footer">
-        <i class="fas fa-clock"></i> Tempo estimado: {{ freteInfo.tempo_preparo + freteInfo.tempo_min }}min a {{ freteInfo.tempo_preparo + freteInfo.tempo_max }}min
+        <i-lucide-clock style="width:16px;height:16px" /> Tempo estimado: {{ freteInfo.tempo_preparo + freteInfo.tempo_min }}min a {{ freteInfo.tempo_preparo + freteInfo.tempo_max }}min
       </div>
 
       <div v-if="!authStore.isAuthenticated" class="cep-result warning login-notice">
-        <i class="fas fa-info-circle"></i>
+        <i-lucide-info style="width:16px;height:16px" />
         Você precisa estar logado para finalizar o pedido.
         <button class="btn btn-primary btn-block mt-1" @click="$router.push('/auth')">
           Fazer Login / Cadastrar
@@ -277,7 +277,7 @@
           @click="confirmOrder"
           :disabled="submitting || !authStore.isAuthenticated"
         >
-          <i class="fas fa-check"></i>
+          <i-lucide-check style="width:16px;height:16px" />
           {{ submitting ? 'Enviando...' : 'Confirmar Pedido' }}
         </button>
       </div>

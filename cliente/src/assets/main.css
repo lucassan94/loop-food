@@ -247,8 +247,9 @@ input, textarea, select { font-family: inherit; }
   color: var(--primary-dark);
 }
 
-.category-group-title i {
-  font-size: 0.9rem;
+.category-group-title svg {
+  width: 16px;
+  height: 16px;
   color: var(--primary);
 }
 
@@ -349,8 +350,9 @@ input, textarea, select { font-family: inherit; }
   color: var(--text-muted);
 }
 
-.empty-search i {
-  font-size: 3rem;
+.empty-search svg {
+  width: 48px;
+  height: 48px;
   margin-bottom: 1rem;
   opacity: 0.5;
 }
@@ -385,8 +387,9 @@ input, textarea, select { font-family: inherit; }
   gap: 0.75rem;
 }
 
-.cart-bar-left i {
-  font-size: 1.2rem;
+.cart-bar-left svg {
+  width: 20px;
+  height: 20px;
   color: var(--secondary);
 }
 
@@ -1483,8 +1486,9 @@ input, textarea, select { font-family: inherit; }
   position: relative;
 }
 
-.bottom-nav-item i {
-  font-size: 1.15rem;
+.bottom-nav-item svg {
+  width: 20px;
+  height: 20px;
   transition: var(--transition);
 }
 
@@ -1492,7 +1496,7 @@ input, textarea, select { font-family: inherit; }
   color: var(--primary);
 }
 
-.bottom-nav-item.active i {
+.bottom-nav-item.active svg {
   transform: scale(1.1);
 }
 
@@ -1595,6 +1599,10 @@ input, textarea, select { font-family: inherit; }
   font-size: 0.95rem;
   font-weight: 500;
   text-shadow: 0 1px 4px rgba(0,0,0,0.2);
+}
+
+.spinning {
+  animation: spin 1s linear infinite;
 }
 
 @keyframes spin {

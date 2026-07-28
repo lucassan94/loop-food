@@ -2,7 +2,8 @@
   <div>
     <!-- Feedback Toast -->
     <div v-if="feedbackMsg" class="feedback-toast" :class="feedbackMsg.tipo" @click="feedbackMsg = null">
-      <i :class="feedbackMsg.tipo === 'success' ? 'fas fa-check-circle' : 'fas fa-exclamation-triangle'"></i>
+      <i-lucide-circle-check-big v-if="feedbackMsg.tipo === 'success'" style="width:20px;height:20px" />
+      <i-lucide-triangle-alert v-else style="width:20px;height:20px" />
       {{ feedbackMsg.texto }}
     </div>
 
@@ -70,7 +71,10 @@
           <!-- Badge de refund (Kanban) -->
           <div v-if="(order.status === 'cancelado' || order.status === 'recusado') && isOnlinePayment(order.metodo_pagamento)"
                class="refund-status" :class="refundClass(order.id)" style="margin-top:6px;font-size:0.7rem;">
-            <i :class="refundIcon(order.id)" style="font-size:0.65rem;"></i>
+            <i-lucide-clock v-if="refundIcon(order.id) === 'clock'" style="width:16px;height:16px" />
+            <i-lucide-circle-check-big v-else-if="refundIcon(order.id) === 'check-circle'" style="width:16px;height:16px" />
+            <i-lucide-circle-x v-else-if="refundIcon(order.id) === 'x-circle'" style="width:16px;height:16px" />
+            <i-lucide-loader v-else class="spinning" style="width:16px;height:16px" />
             {{ refundLabel(order.id) }}
           </div>
       </div>
@@ -90,7 +94,10 @@
             <!-- Badge de refund (restaurante) -->
             <div v-if="(order.status === 'cancelado' || order.status === 'recusado') && isOnlinePayment(order.metodo_pagamento)"
                  class="refund-status" :class="refundClass(order.id)" style="margin-top:4px;">
-              <i :class="refundIcon(order.id)"></i>
+              <i-lucide-clock v-if="refundIcon(order.id) === 'clock'" style="width:16px;height:16px" />
+            <i-lucide-circle-check-big v-else-if="refundIcon(order.id) === 'check-circle'" style="width:16px;height:16px" />
+            <i-lucide-circle-x v-else-if="refundIcon(order.id) === 'x-circle'" style="width:16px;height:16px" />
+            <i-lucide-loader v-else class="spinning" style="width:16px;height:16px" />
               {{ refundLabel(order.id) }}
             </div>
         </div>
@@ -103,7 +110,7 @@
         <!-- Timer -->
         <div v-if="isActiveOrder(order.status)" style="margin-top:8px;font-size:0.85rem;">
           <span :style="{ color: getTimerColor(order) }">
-            <i class="fas fa-clock"></i>
+            <i-lucide-clock style="width:14px;height:14px" />
             {{ getTimerText(order) }}
           </span>
         </div>
@@ -125,11 +132,12 @@
               @click="verificarPagamento(order)"
               :disabled="verificandoIds.has(order.id)"
             >
-              <i :class="verificandoIds.has(order.id) ? 'fas fa-spinner fa-spin' : 'fas fa-search'"></i>
+              <i-lucide-loader v-if="verificandoIds.has(order.id)" class="spinning" style="width:14px;height:14px" />
+              <i-lucide-search v-else style="width:14px;height:14px" />
               {{ verificandoIds.has(order.id) ? 'Verificando...' : '🔍 Verificar Pagamento' }}
             </button>
             <button v-if="isAdmin" class="btn btn-success btn-sm" @click="confirmarPagamento(order)">
-              <i class="fas fa-check"></i> ✅ Confirmar Pagamento
+              <i-lucide-check style="width:14px;height:14px" /> ✅ Confirmar Pagamento
             </button>
           </template>
 
@@ -197,7 +205,10 @@
               <!-- Badge de refund (Lista) -->
               <div v-if="(order.status === 'cancelado' || order.status === 'recusado') && isOnlinePayment(order.metodo_pagamento)"
                    class="refund-status" :class="refundClass(order.id)" style="margin-top:4px;font-size:0.7rem;">
-                <i :class="refundIcon(order.id)" style="font-size:0.65rem;"></i>
+                <i-lucide-clock v-if="refundIcon(order.id) === 'clock'" style="width:16px;height:16px" />
+            <i-lucide-circle-check-big v-else-if="refundIcon(order.id) === 'check-circle'" style="width:16px;height:16px" />
+            <i-lucide-circle-x v-else-if="refundIcon(order.id) === 'x-circle'" style="width:16px;height:16px" />
+            <i-lucide-loader v-else class="spinning" style="width:16px;height:16px" />
                 {{ refundLabel(order.id) }}
               </div>
             </td>
@@ -247,7 +258,7 @@
 
         <div style="display:flex;gap:8px;margin-top:1rem;">
           <button class="btn btn-primary" style="flex:1;" @click="imprimirPedido(selectedOrder)">
-            <i class="fas fa-print"></i> Imprimir
+            <i-lucide-printer style="width:16px;height:16px" /> Imprimir
           </button>
           <button class="btn btn-secondary" style="flex:1;" @click="selectedOrder = null">Fechar</button>
         </div>
@@ -259,7 +270,7 @@
       <div class="modal-content" style="max-width:420px;">
         <div style="text-align:center;margin-bottom:1rem;">
           <div style="width:48px;height:48px;border-radius:50%;background:var(--error-light);display:flex;align-items:center;justify-content:center;margin:0 auto 0.75rem;">
-            <i class="fas fa-exclamation-triangle" style="color:var(--error);font-size:1.3rem;"></i>
+            <i-lucide-triangle-alert style="width:24px;height:24px;color:var(--error)" />
           </div>
           <h3 style="font-size:1.1rem;font-weight:700;">
             {{ cancelModalAction === 'cancelado' ? 'Cancelar Pedido' : 'Recusar Pedido' }}
@@ -291,7 +302,7 @@
             @click="confirmarCancelamento"
             :disabled="!cancelModalMotivo.trim()"
           >
-            <i class="fas fa-check"></i>
+            <i-lucide-check style="width:16px;height:16px" />
             {{ cancelModalAction === 'cancelado' ? 'Cancelar Pedido' : 'Recusar Pedido' }}
           </button>
         </div>
@@ -361,10 +372,10 @@ function refundClass(orderId) {
 
 function refundIcon(orderId) {
   const s = refundStatus.value[orderId]
-  if (!s || s === 'PENDING') return 'fas fa-clock'
-  if (s === 'DONE') return 'fas fa-check-circle'
-  if (s === 'CANCELLED') return 'fas fa-times-circle'
-  return 'fas fa-spinner fa-spin'
+  if (!s || s === 'PENDING') return 'clock'
+  if (s === 'DONE') return 'check-circle'
+  if (s === 'CANCELLED') return 'x-circle'
+  return 'loader'
 }
 
 function refundLabel(orderId) {
@@ -855,7 +866,7 @@ onUnmounted(() => {
   align-items: center;
   gap: 4px;
 }
-.refund-status i { width: 14px; text-align: center; }
+.refund-status svg { width: 14px; height: 14px; }
 .refund-pending {
   background: #fef3c7;
   color: #92400e;

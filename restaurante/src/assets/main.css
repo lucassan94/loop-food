@@ -136,10 +136,9 @@ body {
   font-weight: 600;
 }
 
-.sidebar-item i {
+.sidebar-item svg {
   width: 20px;
-  text-align: center;
-  font-size: 1rem;
+  height: 20px;
 }
 
 /* ─── Sidebar Collapsed ─── */

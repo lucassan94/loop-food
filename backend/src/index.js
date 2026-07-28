@@ -23,7 +23,6 @@ import restauranteRoutes from './modules/restaurante/index.js';
 import dashboardRoutes from './modules/dashboard/index.js';
 import pagamentosRoutes from './modules/pagamentos/index.js';
 import pushRoutes from './modules/push/index.js';
-import adminDataRoutes from './modules/admin-data/index.js';
 
 const app = express();
 const server = http.createServer(app);
@@ -157,7 +156,6 @@ app.use('/api/push', pushRoutes);
 
 // Rotas exclusivas do módulo Admin (com restrição de módulo)
 app.use('/api/dashboard', restrictModule(), dashboardRoutes);
-app.use('/api/admin-data', restrictModule(), adminDataRoutes);
 
 // ============================
 // TENANT DIAGNOSTIC — mostra como o tenant está sendo resolvido

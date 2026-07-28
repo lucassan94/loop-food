@@ -2,7 +2,7 @@
   <div class="app">
     <!-- Store Closed Banner -->
     <div v-if="!storeOpen" class="store-closed-banner">
-      <i class="fas fa-clock"></i>
+      <i-lucide-clock style="width:16px;height:16px" />
       Loja Fechada no momento — novos pedidos não podem ser realizados
     </div>
 
@@ -21,7 +21,7 @@
         :class="{ active: $route.name === 'Home' }"
         @click="$router.push('/')"
       >
-        <i class="fas fa-home"></i>
+        <i-lucide-home style="width:20px;height:20px" />
         Início
       </button>
       <button
@@ -29,7 +29,7 @@
         :class="{ active: $route.name === 'Orders' || $route.name === 'OrderTracking' }"
         @click="$router.push('/pedidos')"
       >
-        <i class="fas fa-receipt"></i>
+        <i-lucide-receipt style="width:20px;height:20px" />
         Pedidos
         <span v-if="unreadMessages" class="badge">{{ unreadMessages }}</span>
       </button>
@@ -38,7 +38,7 @@
         :class="{ active: $route.name === 'Profile' }"
         @click="$router.push(authStore.isAuthenticated ? '/perfil' : '/auth')"
       >
-        <i class="fas fa-user"></i>
+        <i-lucide-user style="width:20px;height:20px" />
         Perfil
       </button>
     </nav>
@@ -46,15 +46,15 @@
     <!-- Cart Bar -->
     <div v-if="showCart" class="cart-bar">
       <div class="cart-bar-left" @click="openCart">
-        <i class="fas fa-shopping-bag"></i>
+        <i-lucide-shopping-bag style="width:20px;height:20px" />
         <span>{{ cartTotalItens }} {{ cartTotalItens === 1 ? 'item' : 'itens' }}</span>
       </div>
       <div class="cart-bar-right">
         <button class="btn-cart-view" @click="openCart">
-          <i class="fas fa-eye"></i> Ver
+          <i-lucide-eye style="width:16px;height:16px" /> Ver
         </button>
         <button class="btn-cart-checkout" @click="checkoutCart">
-          <i class="fas fa-arrow-right"></i> Checkout
+          <i-lucide-arrow-right style="width:16px;height:16px" /> Checkout
         </button>
       </div>
     </div>
@@ -82,7 +82,7 @@
         :class="[toast.type, { clickable: toast.onClick || toastListeners.has('click') }]"
         @click="handleToastClick(toast)"
       >
-        <i :class="toastIcon(toast.type)"></i>
+        <component :is="toastIcons[toast.type] || toastIcons.info" style="width:16px;height:16px" />
         {{ toast.message }}
       </div>
     </div>
@@ -96,13 +96,14 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, provide } from 'vue'
+import { ref, computed, onMounted, onUnmounted, markRaw } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from './stores/auth'
 import { connectRealtime, onEvent, offEvent } from './services/realtime'
 import CheckoutPanel from './components/CheckoutPanel.vue'
 import CepOnboarding from './components/CepOnboarding.vue'
 import * as pushService from './services/push.js'
+import { Clock, Home, Receipt, User, ShoppingBag, Eye, ArrowRight, CheckCircle, XCircle, TriangleAlert, Info } from 'lucide-vue-next'
 
 const authStore = useAuthStore()
 const $router = useRouter()
@@ -169,14 +170,11 @@ function removeToast(id) {
   toasts.value = toasts.value.filter(t => t.id !== id)
 }
 
-function toastIcon(type) {
-  const icons = {
-    success: 'fas fa-check-circle',
-    error: 'fas fa-times-circle',
-    warning: 'fas fa-exclamation-triangle',
-    info: 'fas fa-info-circle',
-  }
-  return icons[type] || icons.info
+const toastIcons = {
+  success: markRaw(CheckCircle),
+  error: markRaw(XCircle),
+  warning: markRaw(TriangleAlert),
+  info: markRaw(Info),
 }
 
 // Cart

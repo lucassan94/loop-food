@@ -10,7 +10,7 @@
     </div>
 
     <div v-else-if="!order" class="empty-search p-4">
-      <i class="fas fa-exclamation-circle icon-lg"></i>
+      <i-lucide-circle-alert style="width:48px;height:48px" />
       <p>Pedido não encontrado.</p>
       <router-link to="/pedidos" class="btn btn-primary mt-3">
         Meus Pedidos
@@ -22,7 +22,7 @@
       <div v-if="order.metodo_pagamento === 'pix_online' && order.status === 'aguardando_pagamento'" class="pix-payment-card">
         <div class="pix-header">
           <div class="pix-header-icon">
-            <i class="fas fa-qrcode"></i>
+            <i-lucide-qr-code style="width:24px;height:24px" />
           </div>
           <div class="pix-header-text">
             <h3>Pague com PIX</h3>
@@ -32,7 +32,7 @@
         <div class="pix-body">
           <div class="pix-qrcode-container">
             <div v-if="!pixData" class="pix-loading">
-              <i class="fas fa-spinner fa-spin"></i> Carregando QR Code...
+              <i-lucide-loader class="spinning" /> Carregando QR Code...
             </div>
             <img v-if="pixData?.encodedImage" :src="'data:image/png;base64,' + pixData.encodedImage" alt="QR Code PIX" class="pix-qrcode-img" />
           </div>
@@ -42,7 +42,7 @@
               <span class="pix-value">{{ formatPrice(order.total) }}</span>
             </div>
             <div class="pix-timer-row" :class="{ expired: pixExpired }">
-              <i class="fas fa-clock"></i>
+              <i-lucide-clock style="width:16px;height:16px" />
               <span v-if="!pixExpired">
                 Pagamento expira em <strong>{{ pixTimer }}</strong>
               </span>
@@ -53,10 +53,10 @@
           </div>
           <div class="pix-actions">
             <button class="btn btn-primary btn-block" @click="copiarPixPayload">
-              <i class="fas fa-copy"></i> Copiar código PIX
+              <i-lucide-copy style="width:16px;height:16px" /> Copiar código PIX
             </button>
             <button v-if="pixExpired" class="btn btn-secondary btn-block mt-1" @click="gerarNovoPix">
-              <i class="fas fa-redo"></i> Gerar novo QR Code
+              <i-lucide-refresh-ccw style="width:16px;height:16px" /> Gerar novo QR Code
             </button>
           </div>
         </div>
@@ -95,14 +95,14 @@
 
         <!-- Countdown -->
         <div class="estimated-time status-center">
-          <i class="fas fa-clock"></i>
+          <i-lucide-clock style="width:16px;height:16px" />
           <span class="countdown">{{ countdownText }}</span>
         </div>
 
         <!-- Delivery Driver Info -->
         <div v-if="order.entregador_nome" class="driver-info">
           <div class="driver-avatar">
-            <i class="fas fa-motorcycle"></i>
+            <i-lucide-bike style="width:24px;height:24px" />
           </div>
           <div>
             <div class="driver-name">{{ order.entregador_nome }}</div>
@@ -114,14 +114,16 @@
       <!-- Motivo de Cancelamento/Recusa -->
       <div v-if="order.motivo_cancelamento" class="tracking-card mt-3" style="border-left: 4px solid var(--error);">
         <h4 class="section-header" style="color:var(--error);">
-          <i class="fas fa-info-circle"></i>
+          <i-lucide-info style="width:16px;height:16px" />
           {{ order.status === 'recusado' ? 'Pedido Recusado' : 'Pedido Cancelado' }}
         </h4>
         <p style="font-size:0.9rem;margin-top:0.5rem;">{{ order.motivo_cancelamento }}</p>
         <!-- Refund status visível para o cliente -->
         <div v-if="isOnlinePayment(order.metodo_pagamento) && refundStatus"
              class="refund-badge" :class="'refund-' + refundStatus">
-          <i :class="refundIcon"></i>
+          <i-lucide-check-circle v-if="refundIcon === 'check-circle'" style="width:14px;height:14px" />
+          <i-lucide-x-circle v-else-if="refundIcon === 'x-circle'" style="width:14px;height:14px" />
+          <i-lucide-clock v-else style="width:14px;height:14px" />
           {{ refundLabel }}
         </div>
       </div>
@@ -129,7 +131,7 @@
       <!-- Kitchen Messages -->
       <div v-if="order.mensagens?.length" class="tracking-card mt-3">
         <h4 class="section-header">
-          <i class="fas fa-comment-dots" style="color:var(--warning);"></i>
+          <i-lucide-message-circle style="width:16px;height:16px;color:var(--warning)" />
           Mensagens da Cozinha
         </h4>
         <div
@@ -149,7 +151,7 @@
         to="/pedidos"
         class="btn btn-secondary btn-block mt-4"
       >
-        <i class="fas fa-arrow-left"></i> Voltar aos Pedidos
+        <i-lucide-arrow-left style="width:16px;height:16px" /> Voltar aos Pedidos
       </router-link>
     </template>
   </div>
@@ -194,9 +196,9 @@ async function checkRefundStatus(pedidoId) {
 
 const refundIcon = computed(() => {
   const s = refundStatus.value
-  if (s === 'DONE') return 'fas fa-check-circle'
-  if (s === 'CANCELLED') return 'fas fa-times-circle'
-  return 'fas fa-clock'
+  if (s === 'DONE') return 'check-circle'
+  if (s === 'CANCELLED') return 'x-circle'
+  return 'clock'
 })
 
 const refundLabel = computed(() => {

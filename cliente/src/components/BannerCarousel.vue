@@ -16,7 +16,7 @@
           <h2>{{ slide.title }}</h2>
           <p>{{ slide.subtitle }}</p>
           <span v-if="slide.link" class="carousel-cta">
-            Saiba mais <i class="fas fa-arrow-right"></i>
+            Saiba mais <i-lucide-arrow-right style="width:14px;height:14px" />
           </span>
         </div>
       </div>
@@ -24,10 +24,10 @@
 
     <!-- Navigation Arrows -->
     <button class="carousel-arrow carousel-arrow-left" @click="prev">
-      <i class="fas fa-chevron-left"></i>
+      <i-lucide-chevron-left style="width:20px;height:20px" />
     </button>
     <button class="carousel-arrow carousel-arrow-right" @click="next">
-      <i class="fas fa-chevron-right"></i>
+      <i-lucide-chevron-right style="width:20px;height:20px" />
     </button>
 
     <!-- Dots -->

@@ -55,7 +55,8 @@
           </div>
           <div class="form-group"><label>Tempo de Preparo (min)</label><input v-model.number="restaurante.tempo_preparo_min" type="number" min="5" /></div>
           <div v-if="cepMsg" class="cep-result" :class="cepMsg.tipo" style="margin-bottom:1rem;">
-            <i :class="cepMsg.tipo === 'success' ? 'fas fa-check-circle' : 'fas fa-times-circle'"></i>
+            <i-lucide-circle-check-big v-if="cepMsg.tipo === 'success'" style="width:16px;height:16px" />
+            <i-lucide-circle-x v-else style="width:16px;height:16px" />
             {{ cepMsg.texto }}
           </div>
           <button class="btn btn-primary" @click="salvarRestaurante" :disabled="salvando">
@@ -92,12 +93,12 @@
         <div class="card-header">
           <span>Gerenciar Carrossel (Banners)</span>
           <button class="btn btn-sm btn-primary" @click="abrirBannerEditor(null)">
-            <i class="fas fa-plus"></i> Novo Banner
+            <i-lucide-plus style="width:16px;height:16px" /> Novo Banner
           </button>
         </div>
         <div class="card-body">
           <div v-if="banners.length === 0" style="text-align:center;padding:2rem 0;color:var(--text-muted);">
-            <i class="fas fa-images" style="font-size:2rem;margin-bottom:0.75rem;display:block;"></i>
+            <i-lucide-images style="width:32px;height:32px;display:block;margin:0 auto 0.75rem;" />
             Nenhum banner cadastrado. Clique em "Novo Banner" para adicionar.
           </div>
 
@@ -113,19 +114,20 @@
             </div>
             <div class="banner-actions">
               <button class="btn btn-sm btn-secondary" @click="moverBanner(idx, -1)" :disabled="idx === 0" title="Subir">
-                <i class="fas fa-chevron-up"></i>
+                <i-lucide-chevron-up style="width:16px;height:16px" />
               </button>
               <button class="btn btn-sm btn-secondary" @click="moverBanner(idx, 1)" :disabled="idx === banners.length - 1" title="Descer">
-                <i class="fas fa-chevron-down"></i>
+                <i-lucide-chevron-down style="width:16px;height:16px" />
               </button>
               <button class="btn btn-sm btn-secondary" @click="toggleBannerAtivo(banner)" :title="banner.ativo ? 'Desativar' : 'Ativar'">
-                <i :class="banner.ativo ? 'fas fa-eye-slash' : 'fas fa-eye'"></i>
+                <i-lucide-eye-off v-if="banner.ativo" style="width:16px;height:16px" />
+                <i-lucide-eye v-else style="width:16px;height:16px" />
               </button>
               <button class="btn btn-sm btn-secondary" @click="abrirBannerEditor(banner)">
-                <i class="fas fa-edit"></i>
+                <i-lucide-pencil style="width:16px;height:16px" />
               </button>
               <button class="btn btn-sm btn-danger" @click="excluirBanner(banner)">
-                <i class="fas fa-trash"></i>
+                <i-lucide-trash-2 style="width:16px;height:16px" />
               </button>
             </div>
           </div>
@@ -150,7 +152,7 @@
                   <label>Link de redirecionamento (opcional)</label>
                   <input v-model="bannerForm.link_url" placeholder="https://... ou /cardapio, /promocoes" />
                   <small style="color:var(--text-muted);font-size:0.75rem;">
-                    <i class="fas fa-info-circle"></i>
+                    <i-lucide-info style="width:12px;height:12px" />
                     Se preenchido, o banner será clicável e redirecionará ao tocar.
                   </small>
                 </div>
@@ -210,7 +212,7 @@
                 <span>{{ mp.desc }}</span>
               </div>
               <div class="pm-check" :class="{ checked: formaspagamento.includes(mp.value) }">
-                <i class="fas fa-check"></i>
+                <i-lucide-check style="width:16px;height:16px" />
               </div>
             </label>
           </div>
@@ -223,7 +225,8 @@
             </button>
           </div>
           <div v-if="pagamentoMsg" class="cep-result" :class="pagamentoMsg.tipo" style="margin-top:0.75rem;">
-            <i :class="pagamentoMsg.tipo === 'success' ? 'fas fa-check-circle' : 'fas fa-times-circle'"></i>
+            <i-lucide-circle-check-big v-if="pagamentoMsg.tipo === 'success'" style="width:16px;height:16px" />
+            <i-lucide-circle-x v-else style="width:16px;height:16px" />
             {{ pagamentoMsg.texto }}
           </div>
         </div>
@@ -245,11 +248,10 @@
                   {{ u.ativo !== false ? 'Ativo' : 'Inativo' }}
                 </td>
                 <td>
-                  <button class="btn btn-sm btn-secondary" @click="editarUsuario(u)" style="margin-right:4px;">
-                    <i class="fas fa-edit"></i>
+                  <button class="btn btn-sm btn-secondary" @click="editarUsuario(u)" style="margin-right:4px;">                <i-lucide-pencil style="width:16px;height:16px" />
                   </button>
                   <button class="btn btn-sm btn-danger" @click="excluirUsuario(u.id)">
-                    <i class="fas fa-trash"></i>
+                <i-lucide-trash-2 style="width:16px;height:16px" />
                   </button>
                 </td>
               </tr>
@@ -901,13 +903,14 @@ onMounted(() => {
   background: var(--primary);
   border-color: var(--primary);
 }
-.pm-check i {
+.pm-check svg {
   color: white;
-  font-size: 0.75rem;
-  opacity: 0;
   transition: opacity 0.2s;
 }
-.pm-check.checked i {
+.pm-check:not(.checked) svg {
+  opacity: 0;
+}
+.pm-check.checked svg {
   opacity: 1;
 }
 

@@ -2,7 +2,7 @@
   <div class="auth-view">
     <div class="auth-card">
       <div class="auth-icon">
-        <i class="fas fa-hamburger"></i>
+        <i-lucide-chef-hat style="width:32px;height:32px" />
       </div>
 
       <!-- Login Form -->

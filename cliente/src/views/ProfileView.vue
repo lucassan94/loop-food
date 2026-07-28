@@ -3,12 +3,12 @@
     <!-- Header -->
     <div class="profile-header">
       <div class="profile-avatar">
-        <i class="fas fa-user"></i>
+        <i-lucide-user style="width:28px;height:28px" />
       </div>
       <h2>{{ authStore.userName || 'Bem-vindo(a)' }}</h2>
       <p class="profile-email">{{ authStore.user?.email || 'Identifique-se para continuar' }}</p>
       <div v-if="authStore.isAuthenticated && authStore.user?.telefone" class="profile-phone">
-        <i class="fas fa-phone-alt"></i> {{ authStore.user.telefone }}
+        <i-lucide-phone style="width:14px;height:14px" /> {{ authStore.user.telefone }}
       </div>
     </div>
 
@@ -17,7 +17,7 @@
       <!-- Card: Dados Pessoais -->
       <div class="profile-card">
         <div class="profile-card-header">
-          <i class="fas fa-id-card"></i>
+          <i-lucide-badge style="width:18px;height:18px" />
           <span>Dados Pessoais</span>
         </div>
         <div class="profile-card-body">
@@ -48,7 +48,7 @@
       <!-- Card: Endereço -->
       <div class="profile-card">
         <div class="profile-card-header">
-          <i class="fas fa-map-marker-alt"></i>
+          <i-lucide-map-pin style="width:18px;height:18px" />
           <span>Endereço</span>
         </div>
         <div class="profile-card-body">
@@ -58,7 +58,7 @@
               <input v-model="form.cep" type="text" maxlength="9" placeholder="00000-000" @input="formatCEP" />
             </div>
             <button class="btn btn-secondary btn-cep-buscar" @click="buscarCEP" :disabled="buscandoCEP">
-              <i class="fas fa-search"></i> {{ buscandoCEP ? '...' : 'Buscar' }}
+              <i-lucide-search style="width:16px;height:16px" /> {{ buscandoCEP ? '...' : 'Buscar' }}
             </button>
           </div>
 
@@ -102,13 +102,14 @@
         @click="salvar"
         :disabled="salvando"
       >
-        <i class="fas fa-save"></i>
+        <i-lucide-save style="width:16px;height:16px" />
         {{ salvando ? 'Salvando...' : 'Salvar Alterações' }}
       </button>
 
       <!-- Mensagem -->
       <div v-if="mensagem" class="profile-msg" :class="mensagem.tipo">
-        <i :class="mensagem.tipo === 'success' ? 'fas fa-check-circle' : 'fas fa-times-circle'"></i>
+        <i-lucide-check-circle v-if="mensagem.tipo === 'success'" style="width:16px;height:16px" />
+        <i-lucide-x-circle v-else style="width:16px;height:16px" />
         {{ mensagem.texto }}
       </div>
 
@@ -119,7 +120,7 @@
         class="btn btn-logout btn-block"
         @click="showLogoutConfirm = true"
       >
-        <i class="fas fa-sign-out-alt"></i>
+        <i-lucide-log-out style="width:16px;height:16px" />
         Sair da Conta
       </button>
     </div>
@@ -128,15 +129,15 @@
     <div v-else class="profile-guest">
       <div class="profile-card text-center">
         <div class="profile-card-body">
-          <i class="fas fa-lock" style="font-size:2rem;color:var(--text-muted);margin-bottom:1rem;"></i>
+          <i-lucide-lock style="width:32px;height:32px;color:var(--text-muted);margin-bottom:1rem;" />
           <p class="text-muted">
             Faça login para acessar seu perfil e histórico de pedidos.
           </p>
           <router-link to="/auth" class="btn btn-primary btn-block mb-2">
-            <i class="fas fa-sign-in-alt"></i> Fazer Login
+            <i-lucide-log-in style="width:16px;height:16px" /> Fazer Login
           </router-link>
           <router-link to="/auth" class="btn btn-outline-primary btn-block">
-            <i class="fas fa-user-plus"></i> Criar Conta
+            <i-lucide-user-plus style="width:16px;height:16px" /> Criar Conta
           </router-link>
         </div>
       </div>
@@ -349,11 +350,10 @@ async function salvar() {
   color: var(--text);
 }
 
-.profile-card-header i {
+.profile-card-header svg {
   color: var(--primary);
-  font-size: 1rem;
-  width: 20px;
-  text-align: center;
+  width: 18px;
+  height: 18px;
 }
 
 .profile-card-body {

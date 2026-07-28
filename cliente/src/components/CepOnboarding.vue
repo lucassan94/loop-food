@@ -1,7 +1,7 @@
 <template>
   <div class="cep-modal-overlay">
     <div class="cep-modal">
-      <i class="fas fa-map-marker-alt cep-icon"></i>
+      <i-lucide-map-pin style="width:32px;height:32px" class="cep-icon" />
       <h3>Qual seu endereço?</h3>
       <p>Informe seu CEP para verificar se entregamos na sua região</p>
 
@@ -26,16 +26,17 @@
       </button>
 
       <div v-if="resultado" class="cep-result" :class="resultado.tipo">
-        <i :class="resultado.tipo === 'success' ? 'fas fa-check-circle' : 'fas fa-times-circle'"></i>
+        <i-lucide-check-circle v-if="resultado.tipo === 'success'" style="width:16px;height:16px" />
+        <i-lucide-x-circle v-else style="width:16px;height:16px" />
         {{ resultado.mensagem }}
       </div>
 
       <div class="cep-actions">
         <button class="btn btn-primary btn-block" @click="$router.push('/auth')">
-          <i class="fas fa-sign-in-alt"></i> Fazer Login
+          <i-lucide-log-in style="width:16px;height:16px" /> Fazer Login
         </button>
         <button class="btn btn-outline-primary btn-block" @click="$router.push('/auth')">
-          <i class="fas fa-user-plus"></i> Criar uma conta
+          <i-lucide-user-plus style="width:16px;height:16px" /> Criar uma conta
         </button>
         <button class="btn-link-muted" @click="$emit('close')">
           Continuar navegando sem CEP

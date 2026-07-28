@@ -1,7 +1,7 @@
 <template>
   <div v-if="!authStore.isAuthenticated" class="login-page">
     <div class="login-card">
-      <div class="logo"><i class="fas fa-utensils"></i></div>
+      <div class="logo"><i-lucide-utensils-crossed style="width:24px;height:24px" /></div>
       <h2>⚙️ Painel Administrativo</h2>
       <p>Entre com suas credenciais de administrador</p>
 
@@ -21,10 +21,11 @@
 
   <div v-else class="admin-layout">      <aside class="sidebar" :class="{ collapsed: sidebarCollapsed }">
       <div class="sidebar-brand">
-        <div class="logo"><i class="fas fa-crown"></i></div>
+        <div class="logo"><i-lucide-crown style="width:24px;height:24px" /></div>
         <h2>🏰 Palazzo</h2>
         <button class="sidebar-toggle" @click="sidebarCollapsed = !sidebarCollapsed" :title="sidebarCollapsed ? 'Expandir menu' : 'Recolher menu'">
-          <i :class="sidebarCollapsed ? 'fas fa-chevron-right' : 'fas fa-chevron-left'"></i>
+          <i-lucide-chevron-right v-if="sidebarCollapsed" />
+          <i-lucide-chevron-left v-else />
         </button>
       </div>
       <nav class="sidebar-nav">
@@ -33,13 +34,13 @@
           :class="{ active: currentView === item.id }"
           @click="currentView = item.id"
         >
-          <i :class="item.icon"></i>
+          <component :is="item.icon" />
           <span>{{ item.label }}</span>
         </button>
       </nav>
       <div style="margin-top:auto;border-top:1px solid rgba(255,255,255,0.1);padding:1rem;">
         <button class="sidebar-item" @click="showLogoutConfirm = true">
-          <i class="fas fa-sign-out-alt"></i>
+          <i-lucide-log-out />
           <span>Sair</span>
         </button>
       </div>
@@ -50,14 +51,14 @@
         <h1>{{ currentViewTitle }}</h1>
         <div class="admin-header-right">
           <div class="store-status" :class="storeOpen ? 'open' : 'closed'">
-            <i class="fas fa-circle" style="font-size:8px;"></i>
+            <i-lucide-circle class="status-dot-indicator" />
             {{ storeOpen ? 'Loja Aberta' : 'Loja Fechada' }}
           </div>
           <span class="cargo-badge" :class="authStore.user?.cargo">
             {{ cargoLabel }}
           </span>
           <span style="color:var(--text-muted);font-size:0.85rem;">
-            <i class="fas fa-user"></i> {{ authStore.user?.nome }}
+            <i-lucide-user style="width:16px;height:16px" /> {{ authStore.user?.nome }}
           </span>
         </div>
       </div>
@@ -70,8 +71,7 @@
       <RelatoriosView v-if="currentView === 'relatorios'" />
       <DashboardView v-if="currentView === 'dashboard'" />
       <ConfigView v-if="currentView === 'config'" />
-      <DataManagerView v-if="currentView === 'dados'" />
-      <TenantsView v-if="currentView === 'tenants'" />
+
     </main>
 
     <!-- Confirm Modal -->
@@ -95,10 +95,12 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch, provide } from 'vue'
+import { ref, computed, onMounted, watch, provide, markRaw } from 'vue'
 import { useAuthStore } from './stores/auth'
 import { connectRealtime, onEvent, offEvent } from './services/realtime'
 import api from './services/api'
+
+import { ClipboardList, Hamburger, Users, Bike, BarChart3, PieChart, Settings } from 'lucide-vue-next'
 
 import ConfirmModal from './components/ConfirmModal.vue'
 import OrdersView from './views/OrdersView.vue'
@@ -108,8 +110,6 @@ import EntregadoresView from './views/EntregadoresView.vue'
 import RelatoriosView from './views/RelatoriosView.vue'
 import DashboardView from './views/DashboardView.vue'
 import ConfigView from './views/ConfigView.vue'
-import DataManagerView from './views/DataManagerView.vue'
-import TenantsView from './views/TenantsView.vue'
 
 const authStore = useAuthStore()
 const email = ref('')
@@ -129,15 +129,13 @@ const sidebarCollapsed = ref(false)
 
 // Menu completo com cargos permitidos para cada seção
 const allMenuItems = [
-  { id: 'pedidos', label: 'Fila de Pedidos', icon: 'fas fa-clipboard-list', cargos: ['admin', 'gerente', 'chef', 'caixa'] },
-  { id: 'produtos', label: 'Gerenciar Produtos', icon: 'fas fa-hamburger', cargos: ['admin', 'gerente', 'chef'] },
-  { id: 'clientes', label: 'Clientes / CRM', icon: 'fas fa-users', cargos: ['admin', 'gerente', 'caixa'] },
-  { id: 'entregadores', label: 'Entregadores', icon: 'fas fa-motorcycle', cargos: ['admin', 'gerente'] },
-  { id: 'relatorios', label: 'Rel. Entregas', icon: 'fas fa-chart-bar', cargos: ['admin', 'gerente'] },
-  { id: 'dashboard', label: 'Dashboard', icon: 'fas fa-chart-pie', cargos: ['admin', 'gerente', 'caixa'] },
-  { id: 'dados', label: 'Dados do Banco', icon: 'fas fa-database', cargos: ['admin'] },
-  { id: 'config', label: 'Configurações', icon: 'fas fa-cog', cargos: ['admin', 'gerente'] },
-  { id: 'tenants', label: 'Gerenciar Tenants', icon: 'fas fa-store-alt', cargos: ['admin'] },
+  { id: 'pedidos', label: 'Fila de Pedidos', icon: markRaw(ClipboardList), cargos: ['admin', 'gerente', 'chef', 'caixa'] },
+  { id: 'produtos', label: 'Gerenciar Produtos', icon: markRaw(Hamburger), cargos: ['admin', 'gerente', 'chef'] },
+  { id: 'clientes', label: 'Clientes / CRM', icon: markRaw(Users), cargos: ['admin', 'gerente', 'caixa'] },
+  { id: 'entregadores', label: 'Entregadores', icon: markRaw(Bike), cargos: ['admin', 'gerente'] },
+  { id: 'relatorios', label: 'Rel. Entregas', icon: markRaw(BarChart3), cargos: ['admin', 'gerente'] },
+  { id: 'dashboard', label: 'Dashboard', icon: markRaw(PieChart), cargos: ['admin', 'gerente', 'caixa'] },
+  { id: 'config', label: 'Configurações', icon: markRaw(Settings), cargos: ['admin', 'gerente'] },
 ]
 
 // Sidebar filtrada pelo cargo do usuário logado
@@ -240,5 +238,10 @@ watch(() => authStore.user?.cargo, () => {
 .cargo-badge.caixa {
   background: #dcfce7;
   color: #166534;
+}
+
+.status-dot-indicator {
+  width: 8px;
+  height: 8px;
 }
 </style>

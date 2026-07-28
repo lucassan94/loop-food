@@ -8,7 +8,7 @@
     >
       <div class="confirm-modal" :class="'variant-' + variant">
         <div class="confirm-icon" :class="'icon-' + variant">
-          <i :class="iconClass"></i>
+          <component :is="iconComponent" />
         </div>
         <h4 class="confirm-title">{{ title }}</h4>
         <p class="confirm-message">{{ message }}</p>
@@ -18,7 +18,7 @@
         <div class="confirm-actions">
           <button class="btn btn-secondary" @click="handleCancel">{{ cancelText }}</button>
           <button class="btn" :class="confirmButtonClass" @click="handleConfirm" :disabled="confirmDisabled">
-            <i :class="confirmIconClass"></i> {{ confirmText }}
+            <component :is="confirmIconClass" style="width:16px;height:16px" /> {{ confirmText }}
           </button>
         </div>
       </div>
@@ -28,6 +28,7 @@
 
 <script setup>
 import { computed, onMounted, onUnmounted } from 'vue'
+import { TriangleAlert, HelpCircle, AlertCircle, Check } from 'lucide-vue-next'
 
 const props = defineProps({
   show: { type: Boolean, default: false },
@@ -41,8 +42,8 @@ const props = defineProps({
 
 const emit = defineEmits(['confirm', 'cancel', 'update:show'])
 
-const iconClass = computed(() => {
-  const icons = { danger: 'fas fa-exclamation-triangle', primary: 'fas fa-question-circle', warning: 'fas fa-exclamation-circle' }
+const iconComponent = computed(() => {
+  const icons = { danger: TriangleAlert, primary: HelpCircle, warning: AlertCircle }
   return icons[props.variant] || icons.primary
 })
 
@@ -51,7 +52,7 @@ const confirmButtonClass = computed(() => {
   return classes[props.variant] || 'btn-primary'
 })
 
-const confirmIconClass = computed(() => 'fas fa-check')
+const confirmIconClass = computed(() => Check)
 
 function handleConfirm() { emit('confirm'); emit('update:show', false) }
 function handleCancel() { emit('cancel'); emit('update:show', false) }

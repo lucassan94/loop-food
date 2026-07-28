@@ -176,7 +176,7 @@ body {
   font-size: 0.85rem; margin-bottom: 6px;
   display: flex; align-items: flex-start; gap: 6px;
 }
-.delivery-address i { margin-top: 3px; color: var(--primary); }
+.delivery-address svg { margin-top: 3px; color: var(--primary); width: 16px; height: 16px; flex-shrink: 0; }
 .delivery-meta { font-size: 0.8rem; color: var(--text-muted); margin-bottom: 8px; }
 .delivery-fee { font-size: 1.15rem; font-weight: 800; color: var(--primary); }
 
@@ -218,7 +218,7 @@ body {
   transition: var(--transition); cursor: pointer;
   position: relative;
 }
-.nav-item i { font-size: 1.3rem; transition: var(--transition); }
+.nav-item svg { width: 20px; height: 20px; transition: var(--transition); }
 .nav-item.active { color: var(--primary); }
 .nav-item .badge {
   position: absolute; top: 0; right: 50%;

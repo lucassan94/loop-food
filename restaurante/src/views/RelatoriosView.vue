@@ -1,16 +1,16 @@
 <template>
   <div>
     <h2 style="font-size:1.2rem;margin-bottom:1rem;">
-      <i class="fas fa-chart-bar"></i> Relatórios
+      <i-lucide-bar-chart-3 style="width:16px;height:16px" /> Relatórios
     </h2>
 
     <!-- Tabs -->
     <div class="tabs" style="margin-bottom:1rem;">
       <button class="tab" :class="{ active: tabAtiva === 'geral' }" @click="tabAtiva = 'geral'">
-        <i class="fas fa-users"></i> Entregadores
+        <i-lucide-users style="width:16px;height:16px" /> Entregadores
       </button>
       <button class="tab" :class="{ active: tabAtiva === 'financeiro' }" @click="tabAtiva = 'financeiro'; carregarFinanceiro()">
-        <i class="fas fa-wallet"></i> Financeiro
+        <i-lucide-wallet style="width:16px;height:16px" /> Financeiro
       </button>
     </div>
 
@@ -59,7 +59,7 @@
         <!-- Daily list -->
         <div v-if="financeiro.dias?.length">
           <h3 style="font-size:0.85rem;color:var(--text-muted);margin-bottom:0.5rem;">
-            <i class="fas fa-calendar-alt"></i> Dias com entregas
+            <i-lucide-calendar style="width:16px;height:16px" /> Dias com entregas
           </h3>
           <div
             v-for="dia in financeiro.dias"
@@ -76,13 +76,13 @@
             </div>
             <div class="day-row-right">
               <span class="day-total">{{ formatPrice(dia.total_frete) }}</span>
-              <i class="fas fa-chevron-right day-arrow"></i>
+              <i-lucide-chevron-right class="day-arrow" style="width:14px;height:14px" />
             </div>
           </div>
         </div>
 
         <div v-else style="text-align:center;padding:2rem;color:var(--text-muted);">
-          <i class="fas fa-inbox" style="font-size:2rem;margin-bottom:0.75rem;opacity:0.3;"></i>
+          <i-lucide-inbox style="width:32px;height:32px;margin-bottom:0.75rem;opacity:0.3" />
           <p>Nenhuma entrega neste mês.</p>
         </div>
       </template>
@@ -93,7 +93,7 @@
       <div class="modal-content" style="max-width:520px;">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
           <h3 style="margin:0;">
-            <i class="fas fa-calendar-day"></i>
+            <i-lucide-calendar-days style="width:14px;height:14px" />
             {{ formatDateLabel(diaDetalhes.data) }}
           </h3>
           <span style="font-size:1.1rem;font-weight:800;color:var(--primary);">
@@ -124,7 +124,7 @@
             <span style="font-weight:700;color:var(--primary);font-size:0.95rem;">{{ formatPrice(item.valor_frete) }}</span>
           </div>
           <div style="font-size:0.75rem;color:var(--text-muted);margin-top:4px;">
-            <i class="fas fa-clock"></i> {{ formatHora(item.entregue_em) }}
+            <i-lucide-clock style="width:14px;height:14px" /> {{ formatHora(item.entregue_em) }}
           </div>
         </div>
 

@@ -10,7 +10,7 @@
       <div class="confirm-modal" :class="'variant-' + variant">
         <!-- Icon -->
         <div class="confirm-icon" :class="'icon-' + variant">
-          <i :class="iconClass"></i>
+          <component :is="iconClass" style="width:24px;height:24px" />
         </div>
 
         <!-- Title -->
@@ -38,7 +38,7 @@
             @click="handleConfirm"
             :disabled="confirmDisabled"
           >
-            <i :class="confirmIconClass"></i>
+            <component :is="confirmIconClass" style="width:16px;height:16px" />
             {{ confirmText }}
           </button>
         </div>
@@ -48,7 +48,8 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, markRaw } from 'vue'
+import { TriangleAlert, HelpCircle, CircleAlert, Check } from 'lucide-vue-next'
 
 const props = defineProps({
   show: { type: Boolean, default: false },
@@ -66,9 +67,9 @@ const overlayRef = ref(null)
 
 const iconClass = computed(() => {
   const icons = {
-    danger: 'fas fa-exclamation-triangle',
-    primary: 'fas fa-question-circle',
-    warning: 'fas fa-exclamation-circle',
+    danger: markRaw(TriangleAlert),
+    primary: markRaw(HelpCircle),
+    warning: markRaw(CircleAlert),
   }
   return icons[props.variant] || icons.primary
 })
@@ -82,14 +83,7 @@ const confirmButtonClass = computed(() => {
   return classes[props.variant] || 'btn-primary'
 })
 
-const confirmIconClass = computed(() => {
-  const icons = {
-    danger: 'fas fa-check',
-    primary: 'fas fa-check',
-    warning: 'fas fa-check',
-  }
-  return icons[props.variant] || 'fas fa-check'
-})
+const confirmIconClass = computed(() => markRaw(Check))
 
 function handleConfirm() {
   emit('confirm')

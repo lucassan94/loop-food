@@ -26,11 +26,11 @@
     </div>
 
     <div v-else-if="erroCarregamento" class="card" style="text-align:center;padding:2rem;">
-      <i class="fas fa-exclamation-triangle" style="font-size:2rem;color:var(--error);margin-bottom:0.75rem;"></i>
+      <i-lucide-triangle-alert style="width:32px;height:32px;color:var(--error);margin-bottom:0.75rem;" />
       <p style="color:var(--error);font-weight:600;">{{ erroCarregamento }}</p>
       <p style="color:var(--text-muted);font-size:0.85rem;margin-top:0.5rem;">Verifique sua sessão ou tente recarregar a página.</p>
       <button class="btn btn-primary btn-sm" style="margin-top:1rem;" @click="load">
-        <i class="fas fa-sync"></i> Tentar novamente
+        <i-lucide-refresh-cw class="h-4 w-4" /> Tentar novamente
       </button>
     </div>
 

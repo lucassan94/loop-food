@@ -2,7 +2,7 @@
   <div v-if="!user">
     <div class="login-page">
       <div class="login-card">
-        <div class="icon"><i class="fas fa-motorcycle"></i></div>
+        <div class="icon"><i-lucide-bike style="width:40px;height:40px" /></div>
         <h2>🏍️ Driver App</h2>
         <p>Entre com suas credenciais de entregador</p>
         <div v-if="errorMsg" style="background:#fee2e2;color:#991b1b;padding:0.75rem;border-radius:6px;font-size:0.85rem;margin-bottom:1rem;">{{ errorMsg }}</div>
@@ -22,10 +22,10 @@
         <div class="avatar">{{ initials }}</div>
         <div>
           <div class="header-name">{{ user.nome }}</div>
-          <div class="header-status"><i class="fas fa-circle" style="font-size:6px;"></i> Em serviço</div>
+          <div class="header-status"><i-lucide-circle style="width:8px;height:8px;color:var(--success)" /> Em serviço</div>
         </div>
       </div>
-      <button style="background:none;border:none;color:var(--text-muted);font-size:1.2rem;" @click="showLogoutConfirm = true"><i class="fas fa-sign-out-alt"></i></button>
+      <button style="background:none;border:none;color:var(--text-muted);font-size:1.2rem;" @click="showLogoutConfirm = true"><i-lucide-log-out style="width:20px;height:20px" /></button>
     </div>
 
     <!-- Stats Summary -->
@@ -37,7 +37,7 @@
     <!-- Content -->
     <div class="content">
       <div v-if="currentTab === 'entregas'">
-        <h3 class="section-title"><i class="fas fa-motorcycle"></i> Entregas</h3>
+        <h3 class="section-title"><i-lucide-bike style="width:18px;height:18px" /> Entregas</h3>
         <div v-if="entregasDisponiveis.length" class="section-title" style="font-size:0.85rem;color:var(--text-muted);margin-bottom:0.5rem;">
           {{ entregasDisponiveis.length }} entrega(s) disponível(is)
         </div>
@@ -47,11 +47,11 @@
             <span class="delivery-status">{{ statusLabel(entregaAtiva.status) }}</span>
           </div>
           <div class="delivery-address">
-            <i class="fas fa-store"></i>
+            <i-lucide-store style="width:16px;height:16px" />
             <span>SaborExpress Cozinha — Av. Principal, 500</span>
           </div>
           <div class="delivery-address">
-            <i class="fas fa-map-marker-alt"></i>
+            <i-lucide-map-pin style="width:16px;height:16px" />
             <span><strong>{{ entregaAtiva.nome_cliente }}</strong><br />{{ entregaAtiva.endereco_cliente }}, {{ entregaAtiva.numero_cliente }}<br />{{ entregaAtiva.bairro_cliente }}</span>
           </div>
           <div class="delivery-meta">
@@ -60,17 +60,17 @@
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
             <span class="delivery-fee">{{ formatPrice(entregaAtiva.valor_frete) }}</span>
             <span v-if="tempoTolerancia > 0" style="font-size:0.85rem;color:var(--warning);">
-              <i class="fas fa-hourglass-half"></i> {{ tempoTolerancia }}s
+              <i-lucide-timer style="width:14px;height:14px" /> {{ tempoTolerancia }}s
             </span>
           </div>
           <button v-if="entregaAtiva.status === 'pronto_entrega'" class="btn-delivery primary" @click="coletar(entregaAtiva)">
-            <i class="fas fa-rocket"></i> Coletar & Iniciar Rota
+            <i-lucide-rocket style="width:16px;height:16px" /> Coletar & Iniciar Rota
           </button>
           <button v-if="entregaAtiva.status === 'em_transito'" class="btn-delivery secondary" @click="chegarDestino(entregaAtiva)">
-            <i class="fas fa-map-pin"></i> Cheguei ao Destino
+            <i-lucide-map-pin style="width:16px;height:16px" /> Cheguei ao Destino
           </button>
           <button v-if="entregaAtiva.status === 'cheguei_destino'" class="btn-delivery success" @click="confirmarEntrega(entregaAtiva)">
-            <i class="fas fa-check"></i> Confirmar Entrega
+            <i-lucide-check style="width:16px;height:16px" /> Confirmar Entrega
           </button>
         </div>
 
@@ -81,20 +81,20 @@
             <span class="delivery-status">Pronto para Entrega</span>
           </div>
           <div class="delivery-address">
-            <i class="fas fa-map-marker-alt"></i>
+            <i-lucide-map-pin style="width:16px;height:16px" />
             <span><strong>{{ entrega.nome_cliente }}</strong><br />{{ entrega.endereco_cliente }}, {{ entrega.numero_cliente }}</span>
           </div>
           <div class="delivery-meta">{{ entrega.itens?.length }} item(ns)</div>
           <div style="display:flex;justify-content:space-between;align-items:center;">
             <span class="delivery-fee">{{ formatPrice(entrega.valor_frete) }}</span>
             <button class="btn-delivery primary" style="width:auto;padding:0.5rem 1rem;" @click.stop="assumirEntrega(entrega)">
-              <i class="fas fa-hand-paper"></i> Pegar
+              <i-lucide-hand style="width:16px;height:16px" /> Pegar
             </button>
           </div>
         </div>
 
         <div v-if="!entregaAtiva && entregasDisponiveis.length === 0" style="text-align:center;padding:3rem;color:var(--text-muted);">
-          <i class="fas fa-motorcycle" style="font-size:3rem;margin-bottom:1rem;opacity:0.3;"></i>
+          <i-lucide-bike style="width:48px;height:48px;margin-bottom:1rem;opacity:0.3" />
           <p>Nenhuma entrega disponível no momento.</p>
           <p style="font-size:0.85rem;">As entregas aparecerão aqui automaticamente.</p>
         </div>
@@ -112,7 +112,7 @@
       </div>
 
       <div v-if="currentTab === 'financeiro'">
-        <h3 class="section-title"><i class="fas fa-wallet"></i> Extrato Financeiro</h3>
+        <h3 class="section-title"><i-lucide-wallet style="width:18px;height:18px" /> Extrato Financeiro</h3>
 
         <!-- Summary: HOJE + Total do Mês -->
         <div class="stats-grid" style="grid-template-columns:1fr 1fr;">
@@ -132,7 +132,7 @@
         <!-- Lista de dias do mês -->
         <div v-if="financeiro.dias?.length" style="margin-top:1rem;">
           <div class="section-title" style="font-size:0.85rem;color:var(--text-muted);margin-bottom:0.5rem;">
-            <i class="fas fa-calendar-alt"></i> Dias com entregas
+            <i-lucide-calendar style="width:16px;height:16px" /> Dias com entregas
           </div>
           <div
             v-for="dia in financeiro.dias"
@@ -146,14 +146,14 @@
             </div>
             <div class="day-row-right">
               <span class="day-total">{{ formatPrice(dia.total_frete) }}</span>
-              <i class="fas fa-chevron-right day-arrow"></i>
+              <i-lucide-chevron-right class="day-arrow" style="width:14px;height:14px" />
             </div>
           </div>
         </div>
 
         <!-- Mês vazio -->
         <div v-else style="text-align:center;padding:2rem;color:var(--text-muted);">
-          <i class="fas fa-inbox" style="font-size:2rem;margin-bottom:0.75rem;opacity:0.3;"></i>
+          <i-lucide-inbox style="width:32px;height:32px;margin-bottom:0.75rem;opacity:0.3" />
           <p>Nenhuma entrega neste mês.</p>
         </div>
       </div>
@@ -163,7 +163,7 @@
         <div class="modal-content" style="max-width:480px;">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
             <h3 style="margin:0;">
-              <i class="fas fa-calendar-day"></i>
+              <i-lucide-calendar style="width:18px;height:18px" />
               {{ formatDate(diaDetalhes.data) }}
             </h3>
             <span style="font-size:1.1rem;font-weight:800;color:var(--primary);">
@@ -191,7 +191,7 @@
               <span class="delivery-fee" style="font-size:1rem;">{{ formatPrice(item.valor_frete) }}</span>
             </div>
             <div style="font-size:0.75rem;color:var(--text-muted);margin-top:4px;">
-              <i class="fas fa-clock"></i> {{ formatHora(item.entregue_em) }}
+              <i-lucide-clock style="width:14px;height:14px" /> {{ formatHora(item.entregue_em) }}
             </div>
           </div>
 
@@ -202,7 +202,7 @@
       </div>
 
       <div v-if="currentTab === 'perfil'">
-        <h3 class="section-title"><i class="fas fa-user"></i> Perfil</h3>
+        <h3 class="section-title"><i-lucide-user style="width:18px;height:18px" /> Perfil</h3>
         <div style="padding:0 1rem;">
           <div class="form-group"><label>Nome</label><input v-model="profile.nome" /></div>
           <div class="form-group"><label>Telefone</label><input v-model="profile.telefone" /></div>
@@ -216,16 +216,16 @@
     <!-- Bottom Nav -->
     <nav class="bottom-nav">
       <button class="nav-item" :class="{ active: currentTab === 'entregas' }" @click="currentTab = 'entregas'">
-        <i class="fas fa-motorcycle"></i>
+        <i-lucide-bike style="width:20px;height:20px" />
         Entregas
         <span v-if="entregasDisponiveis.length" class="badge">{{ entregasDisponiveis.length }}</span>
       </button>
       <button class="nav-item" :class="{ active: currentTab === 'financeiro' }" @click="currentTab = 'financeiro'">
-        <i class="fas fa-wallet"></i>
+        <i-lucide-wallet style="width:20px;height:20px" />
         Financeiro
       </button>
       <button class="nav-item" :class="{ active: currentTab === 'perfil' }" @click="currentTab = 'perfil'">
-        <i class="fas fa-user"></i>
+        <i-lucide-user style="width:20px;height:20px" />
         Perfil
       </button>
     </nav>

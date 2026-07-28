@@ -13,10 +13,10 @@
 
     <!-- Error -->
     <div v-else-if="erroLoad" class="card" style="text-align:center;padding:2rem;">
-      <i class="fas fa-exclamation-triangle" style="font-size:2rem;color:var(--error);margin-bottom:0.75rem;"></i>
+      <i-lucide-triangle-alert style="width:32px;height:32px;color:var(--error);margin-bottom:0.75rem;" />
       <p style="color:var(--error);font-weight:600;">{{ erroLoad }}</p>
       <button class="btn btn-primary btn-sm" style="margin-top:1rem;" @click="load">
-        <i class="fas fa-sync"></i> Tentar novamente
+        <i-lucide-refresh-cw style="width:16px;height:16px" /> Tentar novamente
       </button>
     </div>
 
@@ -47,7 +47,7 @@
             <td>
               <div class="table-img-thumb">
                 <img v-if="getImageSrc(p)" :src="getImageSrc(p)" @error="onImageError(p.id)" />
-                <i v-else class="fas fa-image" style="color:var(--text-muted);font-size:1.1rem;"></i>
+                <i-lucide-image v-else style="width:18px;height:18px;color:var(--text-muted)" />
               </div>
             </td>
             <td><strong>{{ p.nome }}</strong></td>
@@ -77,13 +77,13 @@
         <!-- Tabs -->
         <div class="form-tabs">
           <button class="form-tab" :class="{ active: formTab === 'dados' }" @click="formTab = 'dados'">
-            <i class="fas fa-info-circle"></i> Dados
+            <i-lucide-info style="width:16px;height:16px" /> Dados
           </button>
           <button class="form-tab" :class="{ active: formTab === 'imagem' }" @click="formTab = 'imagem'">
-            <i class="fas fa-image"></i> Imagem
+            <i-lucide-image style="width:16px;height:16px" /> Imagem
           </button>
           <button class="form-tab" :class="{ active: formTab === 'extras' }" @click="formTab = 'extras'">
-            <i class="fas fa-plus-circle"></i> Adicionais
+            <i-lucide-circle-plus style="width:16px;height:16px" /> Adicionais
           </button>
         </div>
 
@@ -134,11 +134,11 @@
             <div class="image-preview" v-if="previewImage">
               <img :src="previewImage" alt="Preview" />
               <button class="btn btn-sm btn-danger image-remove-btn" @click="removerImagem">
-                <i class="fas fa-trash"></i> Remover
+                <i-lucide-trash-2 style="width:14px;height:14px" /> Remover
               </button>
             </div>
             <div class="image-preview empty" v-else>
-              <i class="fas fa-cloud-upload-alt"></i>
+              <i-lucide-cloud-upload style="width:14px;height:14px" />
               <p>Clique para selecionar uma imagem</p>
             </div>
             <input
@@ -149,7 +149,7 @@
               style="display:none"
             />
             <button class="btn btn-secondary btn-block" @click="$refs.fileInput.click()">
-              <i class="fas fa-folder-open"></i> Selecionar Imagem
+              <i-lucide-folder-open style="width:14px;height:14px" /> Selecionar Imagem
             </button>
             <p class="image-hint">Formatos: PNG, JPG, WebP. Tamanho máximo: 2MB</p>
             <div class="form-group" style="margin-top:0.5rem;">
@@ -179,19 +179,20 @@
                 <input v-model.number="extra.maximo" type="number" min="0" max="99" placeholder="1" class="extra-max-input" />
               </div>
               <button class="btn btn-sm btn-danger" @click="form.extras.splice(i, 1)" title="Remover adicional">
-                <i class="fas fa-times"></i>
+                <i-lucide-x style="width:14px;height:14px" />
               </button>
             </div>
           </div>
           <button class="btn btn-secondary btn-block" @click="addExtra" style="margin-top:0.5rem;">
-            <i class="fas fa-plus"></i> Adicionar Opcional
+            <i-lucide-plus style="width:14px;height:14px" /> Adicionar Opcional
           </button>
         </div>
 
         <!-- Action Buttons -->
         <div style="display:flex;gap:8px;margin-top:1.5rem;padding-top:1rem;border-top:1px solid var(--border);">
           <button class="btn btn-primary" style="flex:1;" @click="salvar" :disabled="salvando">
-            <i :class="salvando ? 'fas fa-spinner fa-spin' : 'fas fa-save'"></i>
+            <i-lucide-loader v-if="salvando" class="spinning" style="width:16px;height:16px" />
+            <i-lucide-save v-else style="width:16px;height:16px" />
             {{ salvando ? 'Salvando...' : 'Salvar' }}
           </button>
           <button class="btn btn-secondary" @click="showForm = false">Cancelar</button>
@@ -457,7 +458,7 @@ onMounted(load)
   width: 100%; height: 100%; object-fit: cover;
 }
 .image-preview.empty { flex-direction: column; gap: 8px; cursor: pointer; }
-.image-preview.empty i { font-size: 2.5rem; color: var(--text-muted); }
+.image-preview.empty svg { width: 40px; height: 40px; color: var(--text-muted); }
 .image-preview.empty p { font-size: 0.85rem; color: var(--text-muted); }
 .image-remove-btn {
   position: absolute; top: 8px; right: 8px;
