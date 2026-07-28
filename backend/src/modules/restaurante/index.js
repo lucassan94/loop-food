@@ -16,7 +16,7 @@ router.get('/', async (req, res, next) => {
   try {
     const restaurantId = req.restaurantId || config.restaurantId;
     const result = await query(
-      'SELECT id, nome, endereco, cep, cidade, estado, latitude, longitude, status_loja, tempo_preparo_min, modo_sem_entregador FROM restaurantes WHERE id = $1',
+      'SELECT id, nome, endereco, cep, cidade, estado, latitude, longitude, status_loja, tempo_preparo_min, modo_sem_entregador, formas_pagamento_aceitas FROM restaurantes WHERE id = $1',
       [restaurantId]
     );
 
@@ -63,7 +63,7 @@ router.get('/', async (req, res, next) => {
 router.put('/', authenticate, authorize('admin', 'gerente'), async (req, res, next) => {
   try {
     const restaurantId = req.restaurantId || config.restaurantId;
-    const { nome, endereco, cep, cidade, estado, latitude, longitude, tempo_preparo_min, modo_sem_entregador } = req.body;
+    const { nome, endereco, cep, cidade, estado, latitude, longitude, tempo_preparo_min, modo_sem_entregador, formas_pagamento_aceitas } = req.body;
 
     const result = await query(
       `UPDATE restaurantes SET
@@ -75,10 +75,11 @@ router.put('/', authenticate, authorize('admin', 'gerente'), async (req, res, ne
         latitude = COALESCE($6, latitude),
         longitude = COALESCE($7, longitude),
         tempo_preparo_min = COALESCE($8, tempo_preparo_min),
-        modo_sem_entregador = COALESCE($9, modo_sem_entregador)
-       WHERE id = $10
+        modo_sem_entregador = COALESCE($9, modo_sem_entregador),
+        formas_pagamento_aceitas = COALESCE($10, formas_pagamento_aceitas)
+       WHERE id = $11
        RETURNING *`,
-      [nome, endereco, cep, cidade, estado, latitude, longitude, tempo_preparo_min, modo_sem_entregador, restaurantId]
+      [nome, endereco, cep, cidade, estado, latitude, longitude, tempo_preparo_min, modo_sem_entregador, formas_pagamento_aceitas ? JSON.stringify(formas_pagamento_aceitas) : null, restaurantId]
     );
 
     emitToRestaurant('restaurante:atualizado', result.rows[0], restaurantId);
@@ -207,6 +208,58 @@ router.post('/equipe', authenticate, authorize('admin', 'gerente'), async (req, 
     );
 
     res.status(201).json(result.rows[0]);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.put('/equipe/:id', authenticate, authorize('admin', 'gerente'), async (req, res, next) => {
+  try {
+    const restaurantId = req.restaurantId || config.restaurantId;
+    const { id } = req.params;
+    const { nome, email, password, cargo, ativo } = req.body;
+
+    const fields = [];
+    const params = [id, restaurantId];
+    let paramIdx = 3;
+
+    if (nome !== undefined) {
+      fields.push(`nome = $${paramIdx++}`);
+      params.push(nome);
+    }
+    if (email !== undefined) {
+      fields.push(`email = $${paramIdx++}`);
+      params.push(email);
+    }
+    if (cargo !== undefined) {
+      fields.push(`cargo = $${paramIdx++}`);
+      params.push(cargo);
+    }
+    if (ativo !== undefined) {
+      fields.push(`ativo = $${paramIdx++}`);
+      params.push(ativo);
+    }
+    if (password) {
+      const senhaHash = await bcrypt.hash(password, 12);
+      fields.push(`senha_hash = $${paramIdx++}`);
+      params.push(senhaHash);
+    }
+
+    if (fields.length === 0) {
+      throw new AppError('Nenhum campo para atualizar.', 400);
+    }
+
+    const result = await query(
+      `UPDATE restaurante_users SET ${fields.join(', ')} WHERE id = $1 AND restaurant_id = $2
+       RETURNING id, nome, email, cargo, ativo`,
+      params
+    );
+
+    if (result.rows.length === 0) {
+      throw new AppError('Usuário não encontrado.', 404);
+    }
+
+    res.json(result.rows[0]);
   } catch (err) {
     next(err);
   }

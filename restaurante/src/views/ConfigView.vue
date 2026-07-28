@@ -183,16 +183,75 @@
         </div>
       </div>
 
+      <!-- Payment Methods -->
+      <div class="card">
+        <div class="card-header">Formas de Pagamento Aceitas</div>
+        <div class="card-body">
+          <p style="font-size:0.85rem;color:var(--text-muted);margin-bottom:1rem;">
+            Selecione as formas de pagamento que o restaurante aceita.
+            Os clientes verão apenas as opções habilitadas no checkout.
+          </p>
+          <div class="payment-methods-grid">
+            <label
+              v-for="mp in allPaymentMethods"
+              :key="mp.value"
+              class="payment-method-card"
+              :class="{ active: formaspagamento.includes(mp.value) }"
+            >
+              <input
+                type="checkbox"
+                :value="mp.value"
+                :checked="formaspagamento.includes(mp.value)"
+                @change="togglePaymentMethod(mp.value)"
+              />
+              <div class="pm-icon">{{ mp.icon }}</div>
+              <div class="pm-info">
+                <strong>{{ mp.label }}</strong>
+                <span>{{ mp.desc }}</span>
+              </div>
+              <div class="pm-check" :class="{ checked: formaspagamento.includes(mp.value) }">
+                <i class="fas fa-check"></i>
+              </div>
+            </label>
+          </div>
+          <div style="margin-top:1rem;display:flex;gap:8px;">
+            <button class="btn btn-primary" @click="salvarFormasPagamento" :disabled="salvandoPagamento">
+              {{ salvandoPagamento ? 'Salvando...' : 'Salvar Configuração' }}
+            </button>
+            <button class="btn btn-secondary" @click="resetarFormasPagamento" :disabled="salvandoPagamento">
+              Restaurar Padrão
+            </button>
+          </div>
+          <div v-if="pagamentoMsg" class="cep-result" :class="pagamentoMsg.tipo" style="margin-top:0.75rem;">
+            <i :class="pagamentoMsg.tipo === 'success' ? 'fas fa-check-circle' : 'fas fa-times-circle'"></i>
+            {{ pagamentoMsg.texto }}
+          </div>
+        </div>
+      </div>
+
       <!-- Team Management -->
       <div class="card">
         <div class="card-header">Gestão de Equipe</div>
         <div class="card-body">
           <table class="data-table" v-if="equipe.length">
-            <thead><tr><th>Nome</th><th>E-mail</th><th>Cargo</th><th></th></tr></thead>
+            <thead><tr><th>Nome</th><th>E-mail</th><th>Cargo</th><th>Status</th><th>Ações</th></tr></thead>
             <tbody>
               <tr v-for="u in equipe" :key="u.id">
-                <td>{{ u.nome }}</td><td>{{ u.email }}</td><td><span class="role-badge" :class="u.cargo">{{ u.cargo }}</span></td>
-                <td><button class="btn btn-sm btn-danger" @click="excluirUsuario(u.id)">Excluir</button></td>
+                <td>{{ u.nome }}</td>
+                <td>{{ u.email }}</td>
+                <td><span class="role-badge" :class="u.cargo">{{ u.cargo }}</span></td>
+                <td>
+                  <span class="status-dot" :class="u.ativo !== false ? 'active' : 'inactive'"></span>
+                  {{ u.ativo !== false ? 'Ativo' : 'Inativo' }}
+                </td>
+                <td>
+                  <button class="btn btn-sm btn-secondary" @click="editarUsuario(u)" style="margin-right:4px;">
+                    <i class="fas fa-edit"></i>
+                  </button>
+                  <button class="btn btn-sm btn-danger" @click="excluirUsuario(u.id)">
+                    <i class="fas fa-trash"></i>
+                  </button>
+                </td>
               </tr>
             </tbody>
           </table>
@@ -215,12 +274,74 @@
         </div>
       </div>
     </div>
+
+    <!-- Edit User Modal -->
+    <div v-if="editUserModal" class="modal-backdrop" @click.self="editUserModal = false">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h3>Editar Usuário</h3>
+          <button class="drawer-close" @click="editUserModal = false">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label>Nome</label>
+            <input v-model="editUserForm.nome" placeholder="Nome completo" />
+          </div>
+          <div class="form-group">
+            <label>E-mail</label>
+            <input v-model="editUserForm.email" type="email" placeholder="email@exemplo.com" />
+          </div>
+          <div class="form-group">
+            <label>Nova Senha <span style="color:var(--text-muted);font-size:0.8rem;">(deixe em branco para manter)</span></label>
+            <input v-model="editUserForm.password" type="password" placeholder="Nova senha (mín. 8 caracteres)" minlength="8" />
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Cargo</label>
+              <select v-model="editUserForm.cargo">
+                <option value="gerente">Gerente</option>
+                <option value="chef">Chef</option>
+                <option value="caixa">Caixa</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Status</label>
+              <div style="display:flex;align-items:center;gap:10px;margin-top:8px;">
+                <label class="toggle">
+                  <input type="checkbox" v-model="editUserForm.ativo" />
+                  <span class="slider"></span>
+                </label>
+                <span style="font-size:0.9rem;font-weight:600;" :style="{ color: editUserForm.ativo ? 'var(--success)' : 'var(--error)' }">
+                  {{ editUserForm.ativo ? 'Ativo' : 'Inativo' }}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" @click="editUserModal = false">Cancelar</button>
+          <button class="btn btn-primary" @click="salvarEdicaoUsuario" :disabled="salvandoEditUser">
+            {{ salvandoEditUser ? 'Salvando...' : 'Salvar Alterações' }}
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted, reactive } from 'vue'
 import api from '../services/api'
+
+// ── Formas de Pagamento ──
+const allPaymentMethods = [
+  { value: 'dinheiro', label: 'Dinheiro', icon: '💵', desc: 'Pagamento em espécie na entrega' },
+  { value: 'credito', label: 'Cartão de Crédito', icon: '💳', desc: 'Cartão de crédito na entrega' },
+  { value: 'debito', label: 'Cartão de Débito', icon: '🏦', desc: 'Cartão de débito na entrega' },
+  { value: 'pix', label: 'PIX', icon: '📱', desc: 'PIX na entrega (código gerado pelo restaurante)' },
+  { value: 'pix_online', label: 'PIX Online', icon: '⚡', desc: 'Pagamento online via PIX — QR Code gerado na hora' },
+  { value: 'credito_online', label: 'Cartão Online', icon: '🌐', desc: 'Pagamento online via cartão — checkout transparente' },
+]
 
 const storeOpen = ref(true)
 const modoSemEntregador = ref(false)
@@ -232,6 +353,16 @@ const salvando = ref(false)
 const cepMsg = ref(null)
 const novoRaio = reactive({ raio_km: '', tempo_min: '', tempo_max: '', custo: '' })
 const novoUsuario = reactive({ nome: '', email: '', password: 'senha123', cargo: 'caixa' })
+
+// ── Payment Methods State ──
+const formaspagamento = ref(['dinheiro', 'credito', 'debito', 'pix', 'pix_online', 'credito_online'])
+const salvandoPagamento = ref(false)
+const pagamentoMsg = ref(null)
+
+// ── Edit User State ──
+const editUserModal = ref(false)
+const editUserForm = reactive({ id: null, nome: '', email: '', password: '', cargo: 'caixa', ativo: true })
+const salvandoEditUser = ref(false)
 
 // Banner management
 const banners = ref([])
@@ -256,6 +387,7 @@ async function load() {
   })
   storeOpen.value = r.data.status_loja
   modoSemEntregador.value = r.data.modo_sem_entregador || false
+  formaspagamento.value = r.data.formas_pagamento_aceitas || ['dinheiro', 'credito', 'debito', 'pix', 'pix_online', 'credito_online']
   raios.value = rios.data
   equipe.value = eq.data
 }
@@ -269,6 +401,7 @@ async function toggleModoSemEntregador() {
   }
 }
 
+// ── CEP Functions ──
 function formatCEP() {
   restaurante.cep = restaurante.cep.replace(/\D/g, '').replace(/^(\d{5})(\d)/, '$1-$2').substring(0, 9)
 }
@@ -288,7 +421,6 @@ async function buscarCEP() {
     restaurante.endereco = data.logradouro || restaurante.endereco
     restaurante.cidade = data.cidade || restaurante.cidade
     restaurante.estado = data.estado || restaurante.estado
-    // Preencher latitude/longitude se disponíveis
     if (data.latitude) restaurante.latitude = parseFloat(data.latitude)
     if (data.longitude) restaurante.longitude = parseFloat(data.longitude)
 
@@ -323,7 +455,6 @@ async function toggleLoja() {
 }
 
 async function adicionarRaio() {
-  // Validar todos os campos
   if (!novoRaio.raio_km || !novoRaio.tempo_min || !novoRaio.tempo_max || !novoRaio.custo) {
     cepMsg.value = { tipo: 'error', texto: 'Preencha todos os campos do raio (KM, tempo min, tempo máx e custo).' }
     return
@@ -347,6 +478,74 @@ async function adicionarRaio() {
 async function excluirRaio(id) {
   await api.delete(`/restaurante/raios-entrega/${id}`)
   raios.value = raios.value.filter(r => r.id !== id)
+}
+
+// ── Payment Methods ──
+function togglePaymentMethod(value) {
+  const idx = formaspagamento.value.indexOf(value)
+  if (idx >= 0) {
+    // Não permitir desmarcar todos
+    if (formaspagamento.value.length <= 1) {
+      pagamentoMsg.value = { tipo: 'error', texto: 'Pelo menos uma forma de pagamento deve estar ativa.' }
+      return
+    }
+    formaspagamento.value.splice(idx, 1)
+  } else {
+    formaspagamento.value.push(value)
+  }
+  pagamentoMsg.value = null
+}
+
+async function salvarFormasPagamento() {
+  salvandoPagamento.value = true
+  pagamentoMsg.value = null
+  try {
+    await api.put('/restaurante', { formas_pagamento_aceitas: [...formaspagamento.value] })
+    pagamentoMsg.value = { tipo: 'success', texto: 'Formas de pagamento atualizadas!' }
+  } catch (err) {
+    pagamentoMsg.value = { tipo: 'error', texto: err.response?.data?.error || 'Erro ao salvar.' }
+  } finally {
+    salvandoPagamento.value = false
+  }
+}
+
+async function resetarFormasPagamento() {
+  formaspagamento.value = ['dinheiro', 'credito', 'debito', 'pix', 'pix_online', 'credito_online']
+  await salvarFormasPagamento()
+}
+
+// ── Team Management ──
+function editarUsuario(u) {
+  editUserForm.id = u.id
+  editUserForm.nome = u.nome
+  editUserForm.email = u.email
+  editUserForm.password = ''
+  editUserForm.cargo = u.cargo
+  editUserForm.ativo = u.ativo !== false
+  editUserModal.value = true
+}
+
+async function salvarEdicaoUsuario() {
+  salvandoEditUser.value = true
+  try {
+    const payload = {
+      nome: editUserForm.nome,
+      email: editUserForm.email,
+      cargo: editUserForm.cargo,
+      ativo: editUserForm.ativo,
+    }
+    if (editUserForm.password && editUserForm.password.length >= 8) {
+      payload.password = editUserForm.password
+    }
+    await api.put(`/restaurante/equipe/${editUserForm.id}`, payload)
+    editUserModal.value = false
+    const { data } = await api.get('/restaurante/equipe')
+    equipe.value = data
+  } catch (err) {
+    alert(err.response?.data?.error || 'Erro ao atualizar usuário.')
+  } finally {
+    salvandoEditUser.value = false
+  }
 }
 
 async function criarUsuario() {
@@ -632,4 +831,113 @@ onMounted(() => {
   padding: 0;
   line-height: 1;
 }
+
+/* Payment Methods Grid */
+.payment-methods-grid {
+  display: grid;
+  gap: 0.75rem;
+}
+.payment-method-card {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem;
+  border: 2px solid var(--border);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s;
+  background: var(--white);
+  user-select: none;
+}
+.payment-method-card:hover {
+  border-color: var(--primary-light);
+  background: #fef2f2;
+}
+.payment-method-card.active {
+  border-color: var(--primary);
+  background: #fef2f2;
+}
+.payment-method-card input[type="checkbox"] {
+  display: none;
+}
+.pm-icon {
+  font-size: 1.5rem;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--background);
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+.payment-method-card.active .pm-icon {
+  background: #fee2e2;
+}
+.pm-info {
+  flex: 1;
+  min-width: 0;
+}
+.pm-info strong {
+  display: block;
+  font-size: 0.9rem;
+}
+.pm-info span {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+.pm-check {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 2px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: all 0.2s;
+}
+.pm-check.checked {
+  background: var(--primary);
+  border-color: var(--primary);
+}
+.pm-check i {
+  color: white;
+  font-size: 0.75rem;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+.pm-check.checked i {
+  opacity: 1;
+}
+
+/* Status dot */
+.status-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 6px;
+}
+.status-dot.active {
+  background: #16a34a;
+}
+.status-dot.inactive {
+  background: #94a3b8;
+}
+
+/* Toggle reutilizado */
+.toggle { position: relative; width: 44px; height: 24px; display: inline-block; }
+.toggle input { opacity: 0; width: 0; height: 0; }
+.toggle .slider {
+  position: absolute; inset: 0; background: #e2e8f0;
+  border-radius: 999px; cursor: pointer; transition: 0.2s;
+}
+.toggle .slider::before {
+  content: ''; position: absolute;
+  height: 18px; width: 18px; left: 3px; bottom: 3px;
+  background: white; border-radius: 50%; transition: 0.2s;
+}
+.toggle input:checked + .slider { background: #16a34a; }
+.toggle input:checked + .slider::before { transform: translateX(20px); }
 </style>

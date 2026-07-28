@@ -71,7 +71,8 @@ function extractDomain(hostname) {
 }
 
 /**
- * Busca tenant no cache ou no banco de dados (pela coluna dominio).
+ * Busca tenant no cache ou no banco de dados.
+ * Tenta primeiro pela coluna dominio, depois pela coluna slug como fallback.
  * Usado para resolução por subdomínio (Host header).
  */
 async function resolveTenant(domain) {
@@ -81,30 +82,40 @@ async function resolveTenant(domain) {
     return cached;
   }
 
-  // Buscar no banco
+  // Buscar no banco — TENTATIVA 1: pela coluna dominio
   try {
     const result = await query(
       'SELECT id, slug, asaas_api_key, asaas_env, config FROM restaurantes WHERE LOWER(dominio) = $1',
       [domain]
     );
 
-    if (result.rows.length === 0) {
-      return null;
+    if (result.rows.length > 0) {
+      const tenant = { ...result.rows[0], cachedAt: Date.now() };
+      tenantCache.set(domain, tenant);
+      return tenant;
     }
-
-    const tenant = {
-      ...result.rows[0],
-      cachedAt: Date.now(),
-    };
-
-    // Atualizar cache
-    tenantCache.set(domain, tenant);
-
-    return tenant;
   } catch (err) {
-    console.error('[TenantResolver] Erro ao buscar tenant:', err.message);
-    return null;
+    console.error('[TenantResolver] Erro ao buscar tenant por dominio:', err.message);
   }
+
+  // TENTATIVA 2: pela coluna slug (muitos usuários só preenchem o slug)
+  try {
+    const result = await query(
+      'SELECT id, slug, asaas_api_key, asaas_env, config FROM restaurantes WHERE LOWER(slug) = $1',
+      [domain]
+    );
+
+    if (result.rows.length > 0) {
+      const tenant = { ...result.rows[0], cachedAt: Date.now() };
+      tenantCache.set(domain, tenant);
+      console.log(`[TenantResolver] ✅ Resolvido por slug (dominio vazio): "${domain}" → tenant #${tenant.id} "${tenant.slug}"`);
+      return tenant;
+    }
+  } catch (err) {
+    console.error('[TenantResolver] Erro ao buscar tenant por slug:', err.message);
+  }
+
+  return null;
 }
 
 /**
@@ -219,8 +230,11 @@ export async function tenantResolver(req, res, next) {
     const host = req.headers.host;
     const hostname = getHostname(host);
 
+    console.log(`[TenantResolver] 🔍 Host header recebido: "${host}" → hostname: "${hostname}"`);
+
     // Sem host? Fallback
     if (!hostname) {
+      console.log('[TenantResolver] ⚠️ Nenhum hostname. Usando fallback.');
       req.restaurantId = config.restaurantId;
       req.tenant = null;
       return next();
@@ -228,12 +242,14 @@ export async function tenantResolver(req, res, next) {
 
     // IP ADDRESS? Usar fallback
     if (isIPAddress(hostname)) {
+      console.log(`[TenantResolver] ⚠️ IP address: "${hostname}". Usando fallback.`);
       req.restaurantId = config.restaurantId;
       req.tenant = null;
       return next();
     }
 
     const domain = extractDomain(hostname);
+    console.log(`[TenantResolver] 🔍 Domínio extraído: "${domain}" (de "${hostname}")`);
 
     if (!domain) {
       req.restaurantId = config.restaurantId;
@@ -243,28 +259,34 @@ export async function tenantResolver(req, res, next) {
 
     // PREFIXO DE INFRAESTRUTURA? Fallback
     if (NON_TENANT_PREFIXES.includes(domain)) {
+      console.log(`[TenantResolver] ⚠️ Prefixo de infraestrutura: "${domain}". Usando fallback.`);
       req.restaurantId = config.restaurantId;
       req.tenant = null;
       return next();
     }
 
-    // RESOLVER TENANT POR DOMÍNIO
+    // RESOLVER TENANT POR DOMÍNIO (ou slug como fallback)
     const tenant = await resolveTenant(domain);
 
     if (!tenant) {
+      const msg = `Restaurante "${domain}" não encontrado (nem por dominio, nem por slug).`;
+      console.log(`[TenantResolver] ❌ ${msg}`);
+
       if (config.nodeEnv === 'production') {
         return res.status(404).json({
-          error: 'Restaurante não encontrado. Verifique o endereço acessado.',
+          error: msg,
           code: 'TENANT_NOT_FOUND',
+          debug: { host, hostname, domain },
         });
       }
 
-      console.warn(`[TenantResolver] ⚠️ Domínio "${domain}" não encontrado. Usando fallback RESTAURANT_ID=${config.restaurantId}`);
+      console.warn(`[TenantResolver] ⚠️ Usando fallback RESTAURANT_ID=${config.restaurantId}`);
       req.restaurantId = config.restaurantId;
       req.tenant = null;
       return next();
     }
 
+    console.log(`[TenantResolver] ✅ Resolvido: "${domain}" → tenant #${tenant.id} "${tenant.slug}"`);
     req.restaurantId = tenant.id;
     req.tenant = tenant;
     setTenantCookie(req, res, tenant);

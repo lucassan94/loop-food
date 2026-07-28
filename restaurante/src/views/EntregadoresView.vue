@@ -72,6 +72,28 @@
           <div v-if="formErrors.password" class="field-error">{{ formErrors.password }}</div>
         </div>
 
+        <!-- Endereço com CEP -->
+        <div class="form-section-title">Endereço</div>
+        <div style="display:grid;grid-template-columns:2fr 1fr;gap:10px;">
+          <div class="form-group" style="margin-bottom:0;">
+            <label>CEP</label>
+            <input v-model="form.cep" maxlength="9" placeholder="00000-000" @input="formatCEP" />
+          </div>
+          <div style="display:flex;align-items:flex-end;">
+            <button class="btn btn-secondary" style="width:100%;height:42px;" @click="buscarCEPEntregador" :disabled="buscandoCEP">
+              {{ buscandoCEP ? 'Buscando...' : 'Buscar CEP' }}
+            </button>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Endereço</label>
+          <input v-model="form.endereco" placeholder="Rua, número..." />
+        </div>
+        <div v-if="cepMsg" class="cep-result" :class="cepMsg.tipo" style="margin-bottom:1rem;">
+          <i :class="cepMsg.tipo === 'success' ? 'fas fa-check-circle' : 'fas fa-times-circle'"></i>
+          {{ cepMsg.texto }}
+        </div>
+
         <div style="display:flex;gap:8px;margin-top:1.5rem;">
           <button class="btn btn-primary" style="flex:1;" @click="salvar" :disabled="salvando">
             {{ salvando ? 'Salvando...' : 'Salvar' }}
@@ -98,7 +120,9 @@ const entregadores = ref([])
 const showForm = ref(false)
 const editingId = ref(null)
 const salvando = ref(false)
-const form = reactive({ nome: '', email: '', telefone: '', cpf: '', password: '' })
+const buscandoCEP = ref(false)
+const cepMsg = ref(null)
+const form = reactive({ nome: '', email: '', telefone: '', cpf: '', password: '', cep: '', endereco: '' })
 const formErrors = reactive({ geral: '', nome: '', email: '', telefone: '', cpf: '', password: '' })
 
 function formatPrice(v) { return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v) }
@@ -106,6 +130,36 @@ function limparErros() { Object.keys(formErrors).forEach(k => formErrors[k] = ''
 
 function mascaraTelefone() { form.telefone = maskTelefone(form.telefone) }
 function mascaraCPF() { form.cpf = maskCPF(form.cpf) }
+
+function formatCEP() {
+  form.cep = form.cep.replace(/\D/g, '').replace(/^(\d{5})(\d)/, '$1-$2').substring(0, 9)
+}
+
+async function buscarCEPEntregador() {
+  const cep = form.cep.replace(/\D/g, '')
+  if (cep.length !== 8) {
+    cepMsg.value = { tipo: 'error', texto: 'CEP deve ter 8 dígitos.' }
+    return
+  }
+
+  buscandoCEP.value = true
+  cepMsg.value = null
+
+  try {
+    const { data } = await api.post('/cep', { cep })
+    if (data.logradouro) {
+      form.endereco = data.logradouro
+    }
+    cepMsg.value = {
+      tipo: 'success',
+      texto: `Endereço preenchido: ${data.logradouro || ''}, ${data.cidade || ''}/${data.estado || ''}`,
+    }
+  } catch (err) {
+    cepMsg.value = { tipo: 'error', texto: err.response?.data?.error || 'CEP não encontrado.' }
+  } finally {
+    buscandoCEP.value = false
+  }
+}
 
 async function load() {
   try {
@@ -116,7 +170,7 @@ async function load() {
 
 function novo() {
   editingId.value = null
-  Object.assign(form, { nome: '', email: '', telefone: '', cpf: '', password: '' })
+  Object.assign(form, { nome: '', email: '', telefone: '', cpf: '', password: '', cep: '', endereco: '' })
   limparErros()
   showForm.value = true
 }
@@ -124,7 +178,8 @@ function novo() {
 function editar(e) {
   editingId.value = e.id
   form.nome = e.nome; form.email = e.email
-  form.telefone = e.telefone || ''; form.cpf = e.cpf || ''; form.password = ''
+  form.telefone = e.telefone || ''; form.cpf = e.cpf || ''
+  form.password = ''; form.cep = ''; form.endereco = e.endereco || ''
   limparErros()
   showForm.value = true
 }
@@ -172,10 +227,20 @@ async function salvar() {
 
   salvando.value = true
   try {
+    // Incluir endereço no payload
+    const payload = {
+      nome: form.nome,
+      email: form.email,
+      telefone: form.telefone,
+      cpf: form.cpf,
+      endereco: form.endereco,
+    }
+    if (form.password) payload.password = form.password
+
     if (editingId.value) {
-      await api.put(`/entregadores/${editingId.value}`, form)
+      await api.put(`/entregadores/${editingId.value}`, payload)
     } else {
-      await api.post('/entregadores', form)
+      await api.post('/entregadores', payload)
     }
     showForm.value = false
     await load()
@@ -265,4 +330,17 @@ onMounted(load)
   padding: 0.75rem; border-radius: 8px; font-size: 0.85rem;
   margin-bottom: 1rem; display: flex; align-items: center; gap: 8px;
 }
+.form-section-title {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin: 1rem 0 0.75rem;
+  padding-bottom: 0.3rem;
+  border-bottom: 1px solid var(--border);
+}
+.cep-result { display:flex; align-items:center; gap:0.5rem; padding:0.75rem 1rem; border-radius:8px; font-size:0.85rem; }
+.cep-result.success { background:#dcfce7; color:#166534; border:1px solid #bbf7d0; }
+.cep-result.error { background:#fee2e2; color:#991b1b; border:1px solid #fecaca; }
 </style>

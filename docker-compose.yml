@@ -15,9 +15,11 @@ services:
       - DB_PASS=${DB_PASS:-default}
       - JWT_SECRET=${JWT_SECRET:-dev-secret-change-in-production}
       - RESTAURANT_ID=${RESTAURANT_ID:-1}
-      # CORS: incluir IPs dos containers + dominios dos tenants (Nginx Proxy Manager)
-      # Ex: https://palazzomooca.cliente.loop.food,https://saborexpress.admin.loop.food
-      - CORS_ORIGIN=${CORS_ORIGIN:-http://86.48.18.22:8091,http://86.48.18.22:8092,http://86.48.18.22:8093}
+      # CORS: incluir IPs dos containers + dominios dos tenants
+      # Para subdomínios wildcard, use prefixo *. (ex: *.loopautomacoes.com.br)
+      # O backend aceita wildcard: qualquer subdomínio que termine em .loopautomacoes.com.br
+      # Ex: https://palazzomooca.cliente.loopautomacoes.com.br será aceito
+      - CORS_ORIGIN=${CORS_ORIGIN:-http://86.48.18.22:8091,http://86.48.18.22:8092,http://86.48.18.22:8093,*.loopautomacoes.com.br}
       # Asaas (preencha via Portainer em Stacks > loop-food > Environment variables)
       - ASAAS_API_KEY=${ASAAS_API_KEY}
       - ASAAS_ENV=${ASAAS_ENV:-sandbox}

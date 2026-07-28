@@ -115,15 +115,20 @@
             </div>
             <div class="form-group">
               <label>Slug *</label>
-              <input v-model="form.slug" placeholder="Ex: palazzomooca" @input="form.slug = $event.target.value.toLowerCase().replace(/[^a-z0-9-]/g,'')" required />
-              <small style="color:var(--text-muted);font-size:0.7rem;">Usado no subdomínio: slug.api.loopfood.com</small>
+              <input v-model="form.slug" placeholder="Ex: palazzomooca" @input="slugChanged" required />
+              <small style="color:var(--text-muted);font-size:0.7rem;">
+                Subdomínio: <code>{{ form.slug || 'slug' }}.cliente.loopautomacoes.com.br</code>
+              </small>
             </div>
           </div>
 
           <div class="form-row">
             <div class="form-group">
               <label>Domínio *</label>
-              <input v-model="form.dominio" placeholder="Ex: palazzomooca" required />
+              <input v-model="form.dominio" placeholder="Igual ao slug" />
+              <small style="color:var(--text-muted);font-size:0.7rem;">
+                Normalmente igual ao slug. Valor usado pelo servidor para identificar o tenant pelo subdomínio.
+              </small>
             </div>
             <div class="form-group">
               <label>CEP</label>
@@ -226,7 +231,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, watch, onMounted } from 'vue'
 import api from '../services/api'
 
 const tenants = ref([])
@@ -250,6 +255,22 @@ function formatDate(d) {
   if (!d) return '—'
   return new Date(d).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })
 }
+
+// Quando o slug muda, auto-preenche o domínio (a menos que já tenha sido editado manualmente)
+let dominioEditadoManualmente = false
+function slugChanged(event) {
+  const val = event.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '')
+  form.slug = val
+  if (!dominioEditadoManualmente) {
+    form.dominio = val
+  }
+}
+// Se o usuário editar o domínio manualmente, não sobrescrever mais
+watch(() => form.dominio, () => {
+  if (form.dominio && form.dominio !== form.slug) {
+    dominioEditadoManualmente = true
+  }
+})
 
 function mostrarToast(tipo, mensagem) {
   toast.value = { tipo, mensagem }

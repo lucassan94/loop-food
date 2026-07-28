@@ -67,17 +67,36 @@ app.use(helmet({
 app.use(cors({
   origin: (origin, callback) => {
     if (!origin) return callback(null, true);
+
+    // 1. Exact match
     if (config.corsOrigins.includes(origin)) {
-      callback(null, true);
-    } else if (config.isDev) {
-      callback(null, true); // Allow all origins in dev
-    } else {
-      callback(new Error(`Origin ${origin} não permitida por CORS.`));
+      return callback(null, true);
     }
+
+    // 2. Wildcard subdomain match (ex: *.loopautomacoes.com.br)
+    //    matches https://palazzomooca.cliente.loopautomacoes.com.br:8091
+    for (const allowed of config.corsOrigins) {
+      if (allowed.startsWith('*.')) {
+        const wildcardDomain = allowed.substring(1); // ".loopautomacoes.com.br"
+        try {
+          const originUrl = new URL(origin);
+          if (originUrl.hostname.endsWith(wildcardDomain)) {
+            return callback(null, true);
+          }
+        } catch { /* ignore invalid URLs */ }
+      }
+    }
+
+    // 3. Dev mode: allow all
+    if (config.isDev) {
+      return callback(null, true);
+    }
+
+    callback(new Error(`Origin ${origin} não permitida por CORS.`));
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Auth-Guard', 'X-Module'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Auth-Guard', 'X-Module', 'X-Tenant-Slug'],
 }));
 
 app.use(cookieParser());
@@ -139,6 +158,20 @@ app.use('/api/push', pushRoutes);
 // Rotas exclusivas do módulo Admin (com restrição de módulo)
 app.use('/api/dashboard', restrictModule(), dashboardRoutes);
 app.use('/api/admin-data', restrictModule(), adminDataRoutes);
+
+// ============================
+// TENANT DIAGNOSTIC — mostra como o tenant está sendo resolvido
+// ============================
+// Acesse: GET /api/debug/tenant
+// Mostra o Host header, o domínio extraído, o tenant resolvido e o cache.
+app.get('/api/debug/tenant', async (req, res) => {
+  res.json({
+    host: req.headers.host,
+    hostname: req.headers.host?.split(':')[0]?.toLowerCase() || null,
+    restaurantId: req.restaurantId || null,
+    tenant: req.tenant || null,
+  });
+});
 
 // ============================
 // CEP SEARCH

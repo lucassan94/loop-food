@@ -88,7 +88,7 @@ router.get('/:id', authenticate, authorize('admin', 'gerente', 'caixa'), async (
 });
 
 // ============================
-// ATUALIZAR PERFIL (Cliente)
+// ATUALIZAR PERFIL (Cliente) — DEVE vir ANTES de /:id para evitar conflito
 // ============================
 router.put('/perfil', authenticate, async (req, res, next) => {
   try {
@@ -119,6 +119,51 @@ router.put('/perfil', authenticate, async (req, res, next) => {
     }
 
     res.json({ message: 'Perfil atualizado com sucesso!', user: result.rows[0] });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ============================
+// ATUALIZAR CLIENTE (Admin) — DEVE vir APÓS /perfil
+// ============================
+router.put('/:id', authenticate, authorize('admin', 'gerente'), async (req, res, next) => {
+  try {
+    const restaurantId = req.restaurantId || config.restaurantId;
+    const { id } = req.params;
+    const { nome, sobrenome, telefone, endereco, cep, numero, bairro, complemento, cidade, estado, cpf_cnpj } = req.body;
+
+    const fields = [];
+    const params = [id, restaurantId];
+    let paramIdx = 3;
+
+    const fieldMap = {
+      nome, sobrenome, telefone, endereco, cep, numero, bairro,
+      complemento, cidade, estado, cpf_cnpj
+    };
+
+    for (const [key, value] of Object.entries(fieldMap)) {
+      if (value !== undefined) {
+        fields.push(`${key} = $${paramIdx++}`);
+        params.push(value);
+      }
+    }
+
+    if (fields.length === 0) {
+      throw new AppError('Nenhum campo para atualizar.', 400);
+    }
+
+    const result = await query(
+      `UPDATE clientes SET ${fields.join(', ')} WHERE id = $1 AND restaurant_id = $2
+       RETURNING id, nome, sobrenome, email, telefone, endereco, cep, numero, bairro, complemento, cidade, estado, cpf_cnpj`,
+      params
+    );
+
+    if (result.rows.length === 0) {
+      throw new AppError('Cliente não encontrado.', 404);
+    }
+
+    res.json({ message: 'Cliente atualizado com sucesso!', cliente: result.rows[0] });
   } catch (err) {
     next(err);
   }

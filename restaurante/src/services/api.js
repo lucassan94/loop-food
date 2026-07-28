@@ -1,5 +1,14 @@
 import axios from 'axios'
 
+// Lê slug da URL (ex: ?slug=saborexpress) para fallback de tenant
+// O método principal de resolução é por subdomínio (Host header),
+// mas o slug na URL permite testes sem DNS configurado.
+let _urlSlug = null
+try {
+  const params = new URLSearchParams(window.location.search)
+  _urlSlug = params.get('slug')
+} catch { /* ignora */ }
+
 const api = axios.create({
   baseURL: '/api',
   headers: { 'Content-Type': 'application/json', 'X-Auth-Guard': 'saborexpress-secure' },
@@ -11,6 +20,10 @@ api.interceptors.request.use((config) => {
   if (token) config.headers.Authorization = `Bearer ${token}`
   // Cross-login prevention: identificar módulo para o backend
   config.headers['X-Module'] = 'admin'
+  // Se houver slug na URL, passar para o tenantResolver (fallback)
+  if (_urlSlug) {
+    config.headers['X-Tenant-Slug'] = _urlSlug
+  }
   return config
 })
 
