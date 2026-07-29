@@ -72,6 +72,7 @@
       <EntregadoresView v-if="currentView === 'entregadores'" />
       <RelatoriosView v-if="currentView === 'relatorios'" />
       <DashboardView v-if="currentView === 'dashboard'" />
+      <ConfigView v-if="currentView === 'config'" />
 
     </main>
 
@@ -101,7 +102,7 @@ import { useAuthStore } from './stores/auth'
 import { connectRealtime, onEvent, offEvent } from './services/realtime'
 import api from './services/api'
 
-import { ClipboardList, Hamburger, Users, Bike, BarChart3, PieChart, ShoppingCart, CookingPot } from 'lucide-vue-next'
+import { ClipboardList, Hamburger, Users, Bike, BarChart3, PieChart, ShoppingCart, CookingPot, Settings } from 'lucide-vue-next'
 
 import ConfirmModal from './components/ConfirmModal.vue'
 import OrdersView from './views/OrdersView.vue'
@@ -112,6 +113,7 @@ import RelatoriosView from './views/RelatoriosView.vue'
 import DashboardView from './views/DashboardView.vue'
 import PdvView from './views/PdvView.vue'
 import KdsView from './views/KdsView.vue'
+import ConfigView from './views/ConfigView.vue'
 
 const authStore = useAuthStore()
 const email = ref('')
@@ -138,6 +140,7 @@ const allMenuItems = [
   { id: 'clientes', label: 'Clientes / CRM', icon: markRaw(Users), cargos: ['admin', 'gerente', 'caixa'] },
   { id: 'entregadores', label: 'Entregadores', icon: markRaw(Bike), cargos: ['admin', 'gerente'] },
   { id: 'relatorios', label: 'Rel. Entregas', icon: markRaw(BarChart3), cargos: ['admin', 'gerente'] },
+  { id: 'config', label: 'Configurações', icon: markRaw(Settings), cargos: ['admin', 'gerente'] },
   { id: 'dashboard', label: 'Dashboard', icon: markRaw(PieChart), cargos: ['admin', 'gerente', 'caixa'] },
 ]
 
