@@ -19,6 +19,11 @@
           <span class="kds-stat-value">{{ readyCount }}</span>
           <span class="kds-stat-label">Prontos</span>
         </div>
+        <!-- Sound toggle -->
+        <button class="kds-sound-toggle" :class="{ muted: soundMuted }" @click="soundMuted = !soundMuted" :title="soundMuted ? 'Ativar som' : 'Desativar som'">
+          <i-lucide-volume-2 v-if="!soundMuted" style="width:18px;height:18px" />
+          <i-lucide-volume-x v-else style="width:18px;height:18px" />
+        </button>
       </div>
     </div>
 
@@ -107,6 +112,27 @@
           </template>
         </div>
       </div>
+    <!-- New Order Toast (sound notification banner) -->
+    <div v-if="newOrderToast" class="kds-new-order-overlay" @click="aceitarPedido(newOrderToast)" @mouseleave="dismissNewOrderToast">
+      <button class="kds-new-order-close" @click.stop="dismissNewOrderToast">&times;</button>
+      <div class="kds-new-order-header">
+        <i-lucide-bell-ring style="width:20px;height:20px" />
+        <strong>Novo Pedido!</strong>
+        <span class="kds-card-origin" :class="newOrderToast.origem" style="margin-left:auto;">
+          <i-lucide-store v-if="newOrderToast.origem === 'salao'" style="width:12px;height:12px" />
+          <i-lucide-truck v-else style="width:12px;height:12px" />
+          {{ newOrderToast.origem === 'salao' ? 'Salão' : 'Delivery' }}
+        </span>
+      </div>
+      <div class="kds-new-order-id">{{ newOrderToast.pedido_id }}</div>
+      <div class="kds-new-order-client">
+        {{ newOrderToast.nome_cliente }}
+        <span v-if="newOrderToast.mesa" style="font-weight:700;color:var(--purple);font-size:0.75rem;"> — Mesa {{ newOrderToast.mesa }}</span>
+      </div>
+      <div class="kds-new-order-items">
+        {{ newOrderToast.itens?.slice(0, 3).map(i => `${i.quantidade}x ${i.nome_produto}`).join(', ') }}
+        <span v-if="newOrderToast.itens?.length > 3"> e mais {{ newOrderToast.itens.length - 3 }} item(ns)</span>
+      </div>
     </div>
   </div>
 </template>
@@ -128,8 +154,11 @@ function showFeedback(texto, tipo = 'erro') {
 const orders = ref([])
 const loading = ref(true)
 const currentTime = ref('')
+const soundMuted = ref(false)
+const newOrderToast = ref(null)
 let timeInterval = null
 let pollingInterval = null
+let newOrderTimer = null
 
 // Computed
 const pendingCount = computed(() => orders.value.filter(o => o.status === 'pendente').length)
@@ -154,6 +183,64 @@ function getTimer(order) {
   const hours = Math.floor(mins / 60)
   if (hours > 0) return `${hours}h ${mins % 60}min`
   return `${mins} min`
+}
+
+// ─── Sound Alert System ───
+function playNotificationSound() {
+  if (soundMuted.value) return
+  try {
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)()
+    const now = audioCtx.currentTime
+
+    // Três notas ascendentes: Dó, Mi, Sol — som agradável de notificação
+    const notes = [523.25, 659.25, 783.99]
+    const duration = 0.12
+    const gap = 0.1
+
+    notes.forEach((freq, i) => {
+      const osc = audioCtx.createOscillator()
+      const gain = audioCtx.createGain()
+      osc.type = 'sine'
+      osc.frequency.value = freq
+      gain.gain.setValueAtTime(0.3, now + i * (duration + gap))
+      gain.gain.exponentialRampToValueAtTime(0.01, now + i * (duration + gap) + duration)
+      osc.connect(gain)
+      gain.connect(audioCtx.destination)
+      osc.start(now + i * (duration + gap))
+      osc.stop(now + i * (duration + gap) + duration)
+    })
+
+    // Leve ruído percussivo para dar "presença" ao som
+    const bufferSize = audioCtx.sampleRate * 0.05
+    const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate)
+    const data = buffer.getChannelData(0)
+    for (let i = 0; i < bufferSize; i++) {
+      data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (bufferSize * 0.1))
+    }
+    const noise = audioCtx.createBufferSource()
+    noise.buffer = buffer
+    const noiseGain = audioCtx.createGain()
+    noiseGain.gain.setValueAtTime(0.08, now)
+    noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.05)
+    noise.connect(noiseGain)
+    noiseGain.connect(audioCtx.destination)
+    noise.start(now)
+    noise.stop(now + 0.05)
+  } catch (e) {
+    // Web Audio API não disponível — ignora silenciosamente
+  }
+}
+
+// ─── Toast de novo pedido ───
+function showNewOrderToast(order) {
+  if (newOrderTimer) clearTimeout(newOrderTimer)
+  newOrderToast.value = order
+  newOrderTimer = setTimeout(() => { newOrderToast.value = null }, 5000)
+}
+
+function dismissNewOrderToast() {
+  newOrderToast.value = null
+  if (newOrderTimer) clearTimeout(newOrderTimer)
 }
 
 async function loadOrders() {
@@ -207,8 +294,15 @@ onMounted(() => {
   timeInterval = setInterval(updateTime, 1000)
 
   // Real-time updates
-  onEvent('pedido:novo', () => { loadOrders() })
-  onEvent('pedido:atualizado', () => { loadOrders() })
+  onEvent('pedido:novo', (novoPedido) => {
+    playNotificationSound()
+    showNewOrderToast(novoPedido)
+    loadOrders()
+  })
+
+  onEvent('pedido:atualizado', () => {
+    loadOrders()
+  })
 
   // Polling fallback every 8s
   pollingInterval = setInterval(loadOrders, 8000)
@@ -217,6 +311,7 @@ onMounted(() => {
 onUnmounted(() => {
   if (timeInterval) clearInterval(timeInterval)
   if (pollingInterval) clearInterval(pollingInterval)
+  if (newOrderTimer) clearTimeout(newOrderTimer)
 })
 </script>
 
@@ -263,6 +358,7 @@ onUnmounted(() => {
 
 .kds-header-right {
   display: flex;
+  align-items: center;
   gap: 1rem;
 }
 .kds-stat {
@@ -299,6 +395,31 @@ onUnmounted(() => {
   margin-top: 2px;
 }
 
+/* ── Sound Toggle ── */
+.kds-sound-toggle {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1.5px solid var(--border);
+  background: var(--surface);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: var(--transition);
+  color: var(--text-muted);
+}
+.kds-sound-toggle:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+  background: var(--error-light);
+}
+.kds-sound-toggle.muted {
+  background: var(--border-light);
+  color: var(--text-muted);
+  opacity: 0.6;
+}
+
 /* ── Toast ── */
 .kds-toast {
   position: fixed;
@@ -327,6 +448,65 @@ onUnmounted(() => {
 @keyframes slideDown {
   from { opacity: 0; transform: translateX(-50%) translateY(-10px); }
   to { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+/* ── New Order Toast ── */
+.kds-new-order-overlay {
+  position: fixed;
+  top: 4rem;
+  right: 1.5rem;
+  z-index: 9998;
+  background: white;
+  border: 2px solid var(--primary);
+  border-radius: var(--radius);
+  box-shadow: 0 8px 24px rgba(220,38,38,0.25);
+  padding: 1rem 1.25rem;
+  max-width: 360px;
+  animation: slideInRight 0.4s cubic-bezier(0.68, -0.55, 0.27, 1.55);
+  cursor: pointer;
+}
+@keyframes slideInRight {
+  from { opacity: 0; transform: translateX(100px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+.kds-new-order-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+.kds-new-order-header svg {
+  color: var(--primary);
+}
+.kds-new-order-header strong {
+  font-size: 0.9rem;
+}
+.kds-new-order-id {
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: var(--primary);
+}
+
+.kds-new-order-client {
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin-bottom: 0.35rem;
+}
+.kds-new-order-items {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+.kds-new-order-close {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  background: none;
+  border: none;
+  font-size: 1.1rem;
+  cursor: pointer;
+  color: var(--text-muted);
+  line-height: 1;
+  padding: 2px;
 }
 
 /* ── Loading & Empty ── */
