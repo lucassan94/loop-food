@@ -39,6 +39,7 @@
           v-for="product in filteredProducts"
           :key="product.id"
           class="pdv-product-btn"
+          :class="{ 'has-extras': product.extras?.length }"
           @click="addToCart(product)"
         >
           <div class="pdv-product-img">
@@ -50,6 +51,10 @@
           </div>
           <div class="pdv-product-add">
             <i-lucide-plus style="width:16px;height:16px" />
+          </div>
+          <div v-if="product.extras?.length" class="pdv-product-extras-badge">
+            <i-lucide-plus-circle style="width:12px;height:12px" />
+            {{ product.extras.length }}
           </div>
         </button>
       </div>
@@ -140,6 +145,75 @@
         </div>
       </div>
     </div>
+
+    <!-- ── Extras Modal ── -->
+    <Teleport to="body">
+      <div class="modal-backdrop" :class="{ open: extrasModalOpen }" @click.self="closeExtrasModal">
+        <div class="extras-modal">
+          <button class="modal-close-btn" @click="closeExtrasModal">&times;</button>
+
+          <div class="extras-modal-header">
+            <img
+              :src="productImgSrc(extrasProduct)"
+              :alt="extrasProduct?.nome"
+              class="extras-modal-img"
+              @error="onImgError"
+            />
+            <div class="extras-modal-title">
+              <h3>{{ extrasProduct?.nome }}</h3>
+              <p>{{ extrasProduct?.descricao || 'Sem descrição' }}</p>
+            </div>
+          </div>
+
+          <div class="extras-modal-body" v-if="extrasList.length > 0">
+            <h4 class="extras-section-title">
+              <i-lucide-plus-circle style="width:16px;height:16px" />
+              Adicionais (Opcional)
+            </h4>
+            <div class="extra-item" v-for="extra in extrasList" :key="extra.id">
+              <div class="extra-item-left">
+                <div class="extra-label">{{ extra.nome }}</div>
+                <!-- Qty selector for max > 1 or unlimited -->
+                <div v-if="!extra.maximo || extra.maximo > 1" class="extra-qty-selector">
+                  <button
+                    class="extra-qty-btn"
+                    @click="decrementExtra(extra)"
+                    :disabled="getExtraQty(extra) <= 0"
+                  >−</button>
+                  <span class="extra-qty-value">{{ getExtraQty(extra) }}</span>
+                  <button
+                    class="extra-qty-btn"
+                    @click="incrementExtra(extra)"
+                    :disabled="getExtraQty(extra) >= (extra.maximo || 99)"
+                  >+</button>
+                </div>
+                <!-- Simple checkbox for max = 1 -->
+                <label v-else class="extra-checkbox-label">
+                  <input
+                    type="checkbox"
+                    :checked="hasExtra(extra)"
+                    @change="toggleExtra(extra)"
+                  />
+                  <span>Adicionar</span>
+                </label>
+              </div>
+              <span class="extra-price">{{ formatPrice(extra.preco) }}</span>
+            </div>
+          </div>
+
+          <div class="extras-modal-footer">
+            <div class="extras-total">
+              <span>Total do item</span>
+              <span class="extras-total-value">{{ formatPrice(extrasItemTotal) }}</span>
+            </div>
+            <button class="btn btn-success btn-lg" @click="confirmExtras">
+              <i-lucide-shopping-bag style="width:18px;height:18px" />
+              Adicionar ao Carrinho
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>
 
@@ -176,6 +250,13 @@ const orderForm = ref({
 
 const sending = ref(false)
 
+// ── Extras Modal State ──
+const extrasModalOpen = ref(false)
+const extrasProduct = ref(null)
+const extrasList = ref([])
+const chosenExtras = ref([])          // [{extra, qty}] for qty-based extras
+const chosenExtraSet = ref(new Set()) // Set of extra IDs (simple checkbox mode)
+
 // Computed
 const filteredProducts = computed(() => {
   let result = products.value
@@ -194,6 +275,17 @@ const filteredProducts = computed(() => {
 
 const subtotal = computed(() => {
   return cart.value.reduce((acc, item) => acc + item.subtotal, 0)
+})
+
+const extrasItemTotal = computed(() => {
+  if (!extrasProduct.value) return 0
+  // Qty-based extras
+  const qtyExtrasTotal = chosenExtras.value.reduce((acc, e) => acc + (e.extra.preco * e.qty), 0)
+  // Checkbox extras (max = 1)
+  const setExtrasTotal = extrasList.value
+    .filter(e => chosenExtraSet.value.has(e.id))
+    .reduce((acc, e) => acc + e.preco, 0)
+  return Number(extrasProduct.value.preco) + qtyExtrasTotal + setExtrasTotal
 })
 
 function formatPrice(v) {
@@ -220,15 +312,23 @@ function filterProducts() {
   // Just triggers computed property reactivity
 }
 
-// Cart operations
+// ── Cart operations ──
+
 function addToCart(product) {
+  // If product has extras, open modal to choose them
+  if (product.extras && product.extras.length > 0) {
+    openExtrasModal(product)
+    return
+  }
+
+  // Quick add for products without extras
   const existing = cart.value.findIndex(
     item => item.produto_id === product.id && item.extras.length === 0
   )
   if (existing >= 0) {
     cart.value[existing].quantidade++
     cart.value[existing].subtotal = cart.value[existing].preco_unitario * cart.value[existing].quantidade
-    cart.value = [...cart.value] // trigger reactivity
+    cart.value = [...cart.value]
   } else {
     cart.value.push({
       produto_id: product.id,
@@ -271,7 +371,126 @@ function clearCart() {
   orderForm.value = { nome_cliente: '', mesa: '', metodo_pagamento: 'conta', observacoes: '' }
 }
 
-// Create order via PDV endpoint
+// ── Extras Modal ──
+
+function openExtrasModal(product) {
+  extrasProduct.value = product
+  extrasList.value = product.extras || []
+  chosenExtras.value = []
+  chosenExtraSet.value = new Set()
+  extrasModalOpen.value = true
+}
+
+function closeExtrasModal() {
+  extrasModalOpen.value = false
+  // Don't clear product immediately so animation can finish
+  setTimeout(() => {
+    extrasProduct.value = null
+  }, 200)
+}
+
+// Qty-based extras (max > 1 or unlimited)
+function getExtraQty(extra) {
+  const found = chosenExtras.value.find(e => e.extra.id === extra.id)
+  return found ? found.qty : 0
+}
+
+function incrementExtra(extra) {
+  const max = extra.maximo || 99
+  const found = chosenExtras.value.find(e => e.extra.id === extra.id)
+  if (found) {
+    if (found.qty < max) found.qty++
+  } else {
+    chosenExtras.value.push({ extra, qty: 1 })
+  }
+}
+
+function decrementExtra(extra) {
+  const idx = chosenExtras.value.findIndex(e => e.extra.id === extra.id)
+  if (idx >= 0) {
+    if (chosenExtras.value[idx].qty <= 1) {
+      chosenExtras.value.splice(idx, 1)
+    } else {
+      chosenExtras.value[idx].qty--
+    }
+  }
+}
+
+// Checkbox extras (max = 1)
+function hasExtra(extra) {
+  return chosenExtraSet.value.has(extra.id)
+}
+
+function toggleExtra(extra) {
+  if (chosenExtraSet.value.has(extra.id)) {
+    chosenExtraSet.value.delete(extra.id)
+  } else {
+    chosenExtraSet.value.add(extra.id)
+  }
+  chosenExtraSet.value = new Set(chosenExtraSet.value)
+}
+
+function buildChosenExtrasArray() {
+  const result = []
+  // Qty-based extras
+  for (const { extra, qty } of chosenExtras.value) {
+    if (qty > 0) {
+      result.push({ id: extra.id, nome: extra.nome, preco: extra.preco, qty })
+    }
+  }
+  // Checkbox extras
+  for (const extra of extrasList.value) {
+    if (chosenExtraSet.value.has(extra.id)) {
+      result.push({ id: extra.id, nome: extra.nome, preco: extra.preco, qty: 1 })
+    }
+  }
+  return result
+}
+
+function confirmExtras() {
+  if (!extrasProduct.value) return
+
+  const chosenExtrasArray = buildChosenExtrasArray()
+  let extrasTotal = 0
+  for (const e of chosenExtrasArray) {
+    extrasTotal += e.preco * e.qty
+  }
+
+  const itemTotal = Number(extrasProduct.value.preco) + extrasTotal
+
+  const extrasLegacy = chosenExtrasArray.map(e => ({
+    nome: e.nome,
+    preco: e.preco,
+    qty: e.qty,
+  }))
+
+  const product = extrasProduct.value
+  const existingIndex = cart.value.findIndex(
+    item => item.produto_id === product.id &&
+      JSON.stringify(item.extras) === JSON.stringify(extrasLegacy)
+  )
+
+  if (existingIndex >= 0) {
+    cart.value[existingIndex].quantidade++
+    cart.value[existingIndex].subtotal += itemTotal
+  } else {
+    cart.value.push({
+      produto_id: product.id,
+      nome_produto: product.nome,
+      quantidade: 1,
+      preco_unitario: Number(product.preco),
+      extras: extrasLegacy,
+      subtotal: itemTotal,
+    })
+  }
+
+  cart.value = [...cart.value]
+  closeExtrasModal()
+  showFeedback(`${product.nome} adicionado ao carrinho!`, 'success')
+}
+
+// ── Create order ──
+
 async function createOrder() {
   if (!orderForm.value.nome_cliente) {
     showFeedback('Informe o nome do cliente ou mesa.', 'erro')
@@ -448,6 +667,13 @@ onMounted(async () => {
 .pdv-product-btn:active {
   transform: translateY(0);
 }
+.pdv-product-btn.has-extras {
+  border-color: #f59e0b;
+}
+.pdv-product-btn.has-extras:hover {
+  border-color: var(--primary);
+  box-shadow: 0 4px 12px rgba(220,38,38,0.15);
+}
 
 .pdv-product-img {
   width: 100%;
@@ -501,6 +727,21 @@ onMounted(async () => {
 .pdv-product-btn:hover .pdv-product-add {
   opacity: 1;
   transform: scale(1);
+}
+
+.pdv-product-extras-badge {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  background: #f59e0b;
+  color: white;
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  gap: 3px;
 }
 
 .pdv-empty {
@@ -713,6 +954,217 @@ onMounted(async () => {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
+}
+
+/* ── Extras Modal ── */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+.modal-backdrop.open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.extras-modal {
+  background: var(--surface);
+  border-radius: var(--radius);
+  width: 480px;
+  max-width: 92vw;
+  max-height: 85vh;
+  overflow-y: auto;
+  position: relative;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+  animation: modalIn 0.25s ease;
+}
+@keyframes modalIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.modal-close-btn {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  background: rgba(0,0,0,0.5);
+  border: none;
+  color: white;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  font-size: 1.3rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  z-index: 2;
+  transition: background 0.15s;
+}
+.modal-close-btn:hover {
+  background: rgba(0,0,0,0.7);
+}
+
+.extras-modal-header {
+  display: flex;
+  gap: 1rem;
+  padding: 1.25rem;
+  border-bottom: 1px solid var(--border-light);
+}
+.extras-modal-img {
+  width: 80px;
+  height: 80px;
+  border-radius: var(--radius-sm);
+  object-fit: cover;
+  flex-shrink: 0;
+}
+.extras-modal-title h3 {
+  font-size: 1rem;
+  font-weight: 700;
+  margin: 0 0 4px;
+}
+.extras-modal-title p {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  line-height: 1.4;
+  margin: 0;
+}
+
+.extras-modal-body {
+  padding: 1rem 1.25rem;
+}
+
+.extras-section-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+  margin: 0 0 0.75rem;
+}
+
+.extra-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.65rem 0;
+  border-bottom: 1px solid var(--border-light);
+}
+.extra-item:last-child {
+  border-bottom: none;
+}
+
+.extra-item-left {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.extra-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.extra-qty-selector {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.extra-qty-btn {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 1.5px solid var(--border);
+  background: var(--surface);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+  transition: var(--transition);
+  font-family: inherit;
+  line-height: 1;
+}
+.extra-qty-btn:hover:not(:disabled) {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+.extra-qty-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.extra-qty-value {
+  min-width: 18px;
+  text-align: center;
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+
+.extra-checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+.extra-checkbox-label input[type="checkbox"] {
+  accent-color: var(--primary);
+  width: 16px;
+  height: 16px;
+}
+
+.extra-price {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--primary);
+  white-space: nowrap;
+}
+
+.extras-modal-footer {
+  padding: 1rem 1.25rem;
+  border-top: 1px solid var(--border-light);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.extras-total {
+  display: flex;
+  flex-direction: column;
+}
+.extras-total span:first-child {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+.extras-total-value {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: var(--primary);
+}
+
+.extras-modal-footer .btn {
+  padding: 0.65rem 1.25rem;
+  font-size: 0.85rem;
+  white-space: nowrap;
 }
 
 /* Feedback toast */
