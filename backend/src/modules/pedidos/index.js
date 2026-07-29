@@ -13,21 +13,23 @@ const router = Router();
 
 // Schema de criação de pedido
 const createOrderSchema = z.object({
-  cliente_id: z.number(),
-  nome_cliente: z.string().min(1),
-  telefone_cliente: z.string().min(1),
-  endereco_cliente: z.string().min(1),
-  numero_cliente: z.string().min(1),
-  bairro_cliente: z.string().min(1),
-  cep_cliente: z.string(),
-  cidade_cliente: z.string().default('São Paulo'),
-  estado_cliente: z.string().default('SP'),
+  cliente_id: z.number().optional(),
+  origem: z.enum(['delivery', 'salao']).optional().default('delivery'),
+  mesa: z.string().optional(),
+  nome_cliente: z.string().min(1, 'Nome do cliente é obrigatório.'),
+  telefone_cliente: z.string().optional().default(''),
+  endereco_cliente: z.string().optional().default(''),
+  numero_cliente: z.string().optional().default(''),
+  bairro_cliente: z.string().optional().default(''),
+  cep_cliente: z.string().optional().default(''),
+  cidade_cliente: z.string().optional().default('São Paulo'),
+  estado_cliente: z.string().optional().default('SP'),
   latitude_cliente: z.number().optional(),
   longitude_cliente: z.number().optional(),
   subtotal: z.number().positive(),
-  valor_frete: z.number().min(0),
+  valor_frete: z.number().min(0).optional().default(0),
   total: z.number().positive(),
-  metodo_pagamento: z.enum(['dinheiro', 'credito', 'debito', 'pix', 'pix_online', 'credito_online']),
+  metodo_pagamento: z.enum(['dinheiro', 'credito', 'debito', 'pix', 'pix_online', 'credito_online', 'salao', 'conta']),
   detalhes_pagamento: z.string().optional().default(''),
   tempo_preparo_estimado: z.number().int().positive().optional(),
   tempo_entrega_estimado: z.number().int().positive().optional(),
@@ -46,8 +48,29 @@ const createOrderSchema = z.object({
   })).min(1, 'Pedido deve ter pelo menos 1 item.'),
 });
 
+// Schema simplificado para PDV (salão)
+const pdvOrderSchema = z.object({
+  origem: z.enum(['delivery', 'salao']).optional().default('salao'),
+  mesa: z.string().optional(),
+  nome_cliente: z.string().min(1, 'Nome do cliente/mesa é obrigatório.'),
+  metodo_pagamento: z.enum(['dinheiro', 'credito', 'debito', 'pix', 'salao', 'conta']),
+  observacoes: z.string().optional().default(''),
+  itens: z.array(z.object({
+    produto_id: z.number(),
+    nome_produto: z.string(),
+    quantidade: z.number().int().positive(),
+    preco_unitario: z.number().positive(),
+    extras: z.array(z.object({
+      nome: z.string(),
+      preco: z.number(),
+      qty: z.number().int().positive().optional(),
+    })).optional().default([]),
+    subtotal: z.number().positive(),
+  })).min(1, 'Pedido deve ter pelo menos 1 item.'),
+});
+
 // ============================
-// CRIAR PEDIDO (Cliente) — com rate limiting
+// CRIAR PEDIDO (Cliente / Delivery) — com rate limiting
 // ============================
 router.post('/', orderLimiter, optionalAuth, async (req, res, next) => {
     try {
@@ -71,16 +94,17 @@ router.post('/', orderLimiter, optionalAuth, async (req, res, next) => {
         // Criar o pedido
         const pedido = await client.query(
           `INSERT INTO pedidos (
-          restaurant_id, cliente_id, nome_cliente, telefone_cliente,
+          restaurant_id, cliente_id, origem, nome_cliente, telefone_cliente,
           endereco_cliente, numero_cliente, bairro_cliente, cep_cliente,
           cidade_cliente, estado_cliente, latitude_cliente, longitude_cliente,
           subtotal, valor_frete, total, metodo_pagamento,
           detalhes_pagamento, observacoes,
           tempo_preparo_estimado, tempo_entrega_estimado, status
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, 'pendente')
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, 'pendente')
         RETURNING *`,
           [
-            restaurantId, clienteId, data.nome_cliente, data.telefone_cliente,
+            restaurantId, clienteId, data.origem || 'delivery',
+            data.nome_cliente, data.telefone_cliente,
             data.endereco_cliente, data.numero_cliente, data.bairro_cliente, data.cep_cliente,
             data.cidade_cliente, data.estado_cliente, data.latitude_cliente, data.longitude_cliente,
             data.subtotal, data.valor_frete, data.total, data.metodo_pagamento,
@@ -111,14 +135,108 @@ router.post('/', orderLimiter, optionalAuth, async (req, res, next) => {
           [pedidoCriado.id]
         );
 
-        // Atualizar total gasto do cliente
-        await client.query(
-          'UPDATE clientes SET total_gasto = total_gasto + $1, pedidos_total = pedidos_total + 1 WHERE id = $2',
-          [data.total, clienteId]
-        );
+        // Atualizar total gasto do cliente (se tiver cliente real)
+        if (clienteId) {
+          await client.query(
+            'UPDATE clientes SET total_gasto = total_gasto + $1, pedidos_total = pedidos_total + 1 WHERE id = $2',
+            [data.total, clienteId]
+          );
+        }
 
         return pedidoCriado;
       });
+
+    emitNovoPedido(result);
+    res.status(201).json(result);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ============================
+// CRIAR PEDIDO VIA PDV (Salão) — sem rate limiting, autenticado
+// ============================
+router.post('/pdv', authenticate, async (req, res, next) => {
+  try {
+    const restaurantId = req.restaurantId || config.restaurantId;
+    const data = pdvOrderSchema.parse(req.body);
+
+    const result = await transaction(async (client) => {
+      // Buscar ou criar cliente genérico "Salão" para este restaurante
+      let salaocliente = await client.query(
+        `SELECT id FROM clientes WHERE restaurant_id = $1 AND email LIKE 'salao-placeholder-%' LIMIT 1`,
+        [restaurantId]
+      );
+
+      let clienteId;
+      if (salaocliente.rows.length > 0) {
+        clienteId = salaocliente.rows[0].id;
+      } else {
+        // Criar cliente placeholder se não existir
+        const novo = await client.query(
+          `INSERT INTO clientes (restaurant_id, nome, email, senha_hash, ativo)
+           VALUES ($1, 'Salão', $2, $3, true)
+           RETURNING id`,
+          [restaurantId, `salao-placeholder-${restaurantId}@internal.local`, '$2b$12$placeholder']
+        );
+        clienteId = novo.rows[0].id;
+      }
+
+      // Calcular subtotal e total dos itens
+      let subtotalCalculado = 0;
+      for (const item of data.itens) {
+        let itemTotal = item.preco_unitario * item.quantidade;
+        if (item.extras && item.extras.length > 0) {
+          for (const extra of item.extras) {
+            itemTotal += (extra.preco || 0) * (extra.qty || 1);
+          }
+        }
+        subtotalCalculado += itemTotal;
+      }
+
+      const totalCalculado = subtotalCalculado; // Sem frete para salão
+
+      // Criar o pedido
+      const pedido = await client.query(
+        `INSERT INTO pedidos (
+          restaurant_id, cliente_id, origem, mesa, nome_cliente,
+          subtotal, valor_frete, total, metodo_pagamento,
+          observacoes, status
+        ) VALUES ($1, $2, 'salao', $3, $4, $5, 0, $6, $7, $8, 'pendente')
+        RETURNING *`,
+        [
+          restaurantId, clienteId, data.mesa || null,
+          data.nome_cliente,
+          subtotalCalculado, totalCalculado,
+          data.metodo_pagamento, data.observacoes,
+        ]
+      );
+
+      const pedidoCriado = pedido.rows[0];
+
+      // Inserir itens
+      for (const item of data.itens) {
+        await client.query(
+          `INSERT INTO pedido_itens (pedido_id, produto_id, nome_produto, quantidade, preco_unitario, extras, subtotal)
+           VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+          [
+            pedidoCriado.id, item.produto_id, item.nome_produto,
+            item.quantidade, item.preco_unitario,
+            JSON.stringify(item.extras || []),
+            (item.preco_unitario * item.quantidade) + (item.extras || []).reduce((acc, e) => acc + (e.preco || 0) * (e.qty || 1), 0),
+          ]
+        );
+      }
+
+      // Registrar timeline
+      await client.query(
+        `INSERT INTO pedido_timeline (pedido_id, status_novo, usuario_tipo, notas)
+         VALUES ($1, 'pendente', 'restaurante', 'Pedido criado via PDV (Salão)')`,
+        [pedidoCriado.id]
+      );
+
+      return pedidoCriado;
+    });
 
     emitNovoPedido(result);
     res.status(201).json(result);

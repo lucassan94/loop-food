@@ -64,13 +64,14 @@
       </div>
 
       <!-- Views -->
+      <PdvView v-if="currentView === 'pdv'" />
+      <KdsView v-if="currentView === 'kds'" />
       <OrdersView v-if="currentView === 'pedidos'" @change-view="currentView = $event" />
       <ProdutosView v-if="currentView === 'produtos'" />
       <ClientesView v-if="currentView === 'clientes'" />
       <EntregadoresView v-if="currentView === 'entregadores'" />
       <RelatoriosView v-if="currentView === 'relatorios'" />
       <DashboardView v-if="currentView === 'dashboard'" />
-      <ConfigView v-if="currentView === 'config'" />
 
     </main>
 
@@ -100,7 +101,7 @@ import { useAuthStore } from './stores/auth'
 import { connectRealtime, onEvent, offEvent } from './services/realtime'
 import api from './services/api'
 
-import { ClipboardList, Hamburger, Users, Bike, BarChart3, PieChart, Settings } from 'lucide-vue-next'
+import { ClipboardList, Hamburger, Users, Bike, BarChart3, PieChart, ShoppingCart, CookingPot } from 'lucide-vue-next'
 
 import ConfirmModal from './components/ConfirmModal.vue'
 import OrdersView from './views/OrdersView.vue'
@@ -109,7 +110,8 @@ import ClientesView from './views/ClientesView.vue'
 import EntregadoresView from './views/EntregadoresView.vue'
 import RelatoriosView from './views/RelatoriosView.vue'
 import DashboardView from './views/DashboardView.vue'
-import ConfigView from './views/ConfigView.vue'
+import PdvView from './views/PdvView.vue'
+import KdsView from './views/KdsView.vue'
 
 const authStore = useAuthStore()
 const email = ref('')
@@ -129,13 +131,14 @@ const sidebarCollapsed = ref(false)
 
 // Menu completo com cargos permitidos para cada seção
 const allMenuItems = [
+  { id: 'pdv', label: 'PDV (Salão)', icon: markRaw(ShoppingCart), cargos: ['admin', 'gerente', 'caixa'] },
+  { id: 'kds', label: 'Cozinha (KDS)', icon: markRaw(CookingPot), cargos: ['admin', 'gerente', 'chef', 'caixa'] },
   { id: 'pedidos', label: 'Fila de Pedidos', icon: markRaw(ClipboardList), cargos: ['admin', 'gerente', 'chef', 'caixa'] },
   { id: 'produtos', label: 'Gerenciar Produtos', icon: markRaw(Hamburger), cargos: ['admin', 'gerente', 'chef'] },
   { id: 'clientes', label: 'Clientes / CRM', icon: markRaw(Users), cargos: ['admin', 'gerente', 'caixa'] },
   { id: 'entregadores', label: 'Entregadores', icon: markRaw(Bike), cargos: ['admin', 'gerente'] },
   { id: 'relatorios', label: 'Rel. Entregas', icon: markRaw(BarChart3), cargos: ['admin', 'gerente'] },
   { id: 'dashboard', label: 'Dashboard', icon: markRaw(PieChart), cargos: ['admin', 'gerente', 'caixa'] },
-  { id: 'config', label: 'Configurações', icon: markRaw(Settings), cargos: ['admin', 'gerente'] },
 ]
 
 // Sidebar filtrada pelo cargo do usuário logado
