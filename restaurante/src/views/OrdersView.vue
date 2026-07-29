@@ -15,6 +15,25 @@
         <option value="cancelados">Cancelados</option>
         <option value="">Todos</option>
       </select>
+
+      <!-- Origem Filter -->
+      <div class="origem-radio-group">
+        <label class="origem-radio" :class="{ active: filtroOrigem === 'todos' }">
+          <input type="radio" name="origemFiltro" value="todos" v-model="filtroOrigem" @change="loadOrders" />
+          <span>Todos</span>
+        </label>
+        <label class="origem-radio" :class="{ active: filtroOrigem === 'salao' }">
+          <input type="radio" name="origemFiltro" value="salao" v-model="filtroOrigem" @change="loadOrders" />
+          <i-lucide-store style="width:14px;height:14px" />
+          <span>Salão</span>
+        </label>
+        <label class="origem-radio" :class="{ active: filtroOrigem === 'delivery' }">
+          <input type="radio" name="origemFiltro" value="delivery" v-model="filtroOrigem" @change="loadOrders" />
+          <i-lucide-truck style="width:14px;height:14px" />
+          <span>Delivery</span>
+        </label>
+      </div>
+
       <div class="date-radio-group">
         <label class="date-radio" :class="{ active: filtroDataPeriodo === 'hoje' }">
           <input type="radio" name="dataFiltro" value="hoje" v-model="filtroDataPeriodo" @change="aplicarFiltroData()" />
@@ -52,8 +71,8 @@
     <!-- Kanban View -->
     <div v-if="viewMode === 'kanban'" class="kanban-board">
       <div v-for="col in kanbanColumns" :key="col.status" class="kanban-column">
-        <h3>{{ col.label }} <span class="count">{{ orders.filter(o => o.status === col.status).length }}</span></h3>
-        <div v-for="order in orders.filter(o => o.status === col.status)" :key="order.id"
+        <h3>{{ col.label }} <span class="count">{{ filteredOrders.filter(o => o.status === col.status).length }}</span></h3>
+        <div v-for="order in filteredOrders.filter(o => o.status === col.status)" :key="order.id"
           class="order-card" :class="order.status" draggable="true"
           :draggable="podeArrastarKanban"
           @dragstart="dragOrder = order" @dragover.prevent
@@ -83,13 +102,20 @@
 
     <!-- Cards View -->
     <div v-if="viewMode === 'cards'">
-      <div v-for="order in orders" :key="order.id" class="order-card" :class="order.status">
+      <div v-for="order in filteredOrders" :key="order.id" class="order-card" :class="order.status">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;">
           <div>
-            <strong>{{ order.pedido_id }}</strong> — {{ order.nome_cliente }}
+            <strong>{{ order.pedido_id }}</strong>
+            <span class="origem-badge" :class="order.origem || 'delivery'">
+              <i-lucide-store v-if="order.origem === 'salao'" style="width:12px;height:12px" />
+              <i-lucide-truck v-else style="width:12px;height:12px" />
+              {{ order.origem === 'salao' ? 'Salão' : 'Delivery' }}
+            </span>
+            — {{ order.nome_cliente }}
             <div style="font-size:0.8rem;color:var(--text-muted);">{{ formatDate(order.criado_em) }}</div>
           </div>
           <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;">
+            <span v-if="order.mesa" class="mesa-badge">Mesa {{ order.mesa }}</span>
             <span class="status-badge" :class="order.status">{{ statusLabel(order.status) }}</span>
             <!-- Badge de refund (restaurante) -->
             <div v-if="(order.status === 'cancelado' || order.status === 'recusado') && isOnlinePayment(order.metodo_pagamento)"
@@ -193,12 +219,18 @@
       <table class="data-table">
         <thead>
           <tr>
-            <th>ID</th><th>Cliente</th><th>Status</th><th>Data/Hora</th><th>Itens</th><th>Total</th><th>Tempo</th><th>Ações</th>
+            <th>ID</th><th>Origem</th><th>Mesa</th><th>Cliente</th><th>Status</th><th>Data/Hora</th><th>Itens</th><th>Total</th><th>Tempo</th><th>Ações</th>
           </tr>
         </thead>
         <tbody>
-          <tr v-for="order in orders" :key="order.id">
+          <tr v-for="order in filteredOrders" :key="order.id">
             <td><strong>{{ order.pedido_id }}</strong></td>
+            <td>
+              <span class="origem-badge" :class="order.origem || 'delivery'" style="font-size:0.7rem;">
+                {{ order.origem === 'salao' ? 'Salão' : 'Delivery' }}
+              </span>
+            </td>
+            <td><span v-if="order.mesa" class="mesa-badge">{{ order.mesa }}</span></td>
             <td>{{ order.nome_cliente }}</td>
             <td>
               <span class="status-badge" :class="order.status">{{ statusLabel(order.status) }}</span>
@@ -401,6 +433,7 @@ async function checkRefundStatus(orderId) {
 
 const hoje = new Date().toISOString().split('T')[0]
 const filtroStatus = ref('')
+const filtroOrigem = ref('todos')
 const filtroDataPeriodo = ref('hoje')
 const filtroDataInicio = ref(hoje)
 const filtroDataFim = ref('')
@@ -425,6 +458,12 @@ function aplicarFiltroData() {
   }
   loadOrders()
 }
+
+// Computed que filtra pedidos pela origem selecionada
+const filteredOrders = computed(() => {
+  if (filtroOrigem.value === 'todos') return orders.value
+  return orders.value.filter(o => o.origem === filtroOrigem.value)
+})
 
 const kanbanColumns = computed(() => {
   const cols = [
@@ -497,14 +536,16 @@ function getTimerColor(order) {
 
 async function loadOrders() {
   try {
-    const { data } = await api.get('/pedidos', {
-      params: {
-        status: filtroStatus.value || undefined,
-        data_inicio: filtroDataInicio.value || undefined,
-        data_fim: filtroDataFim.value || undefined,
-        limit: 200,
-      }
-    })
+    const params = {
+      status: filtroStatus.value || undefined,
+      data_inicio: filtroDataInicio.value || undefined,
+      data_fim: filtroDataFim.value || undefined,
+      limit: 200,
+    }
+    if (filtroOrigem.value !== 'todos') {
+      params.origem = filtroOrigem.value
+    }
+    const { data } = await api.get('/pedidos', { params })
     orders.value = data
   } catch { /* ignore */ }
 }
@@ -663,6 +704,7 @@ async function loadConfig() {
 
 function limparFiltros() {
   filtroStatus.value = ''
+  filtroOrigem.value = 'todos'
   filtroDataPeriodo.value = 'hoje'
   filtroDataInicio.value = hoje
   filtroDataFim.value = ''
@@ -850,6 +892,82 @@ onUnmounted(() => {
   background: #fee2e2;
   color: #991b1b;
   border: 1px solid #fecaca;
+}
+
+/* ── Origem Filter ── */
+.origem-radio-group {
+  display: flex;
+  gap: 4px;
+  background: var(--background);
+  padding: 3px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
+.origem-radio {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 12px;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition);
+  color: var(--text-muted);
+  user-select: none;
+}
+.origem-radio:hover {
+  color: var(--text);
+}
+.origem-radio.active {
+  background: var(--surface);
+  color: var(--primary);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+}
+.origem-radio input[type="radio"] {
+  display: none;
+}
+.origem-radio svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* ── Origem Badge (cards) ── */
+.origem-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 7px;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  vertical-align: middle;
+  margin-left: 4px;
+}
+.origem-badge.salao {
+  background: #ede9fe;
+  color: #5b21b6;
+}
+.origem-badge.delivery {
+  background: #dbeafe;
+  color: #1e40af;
+}
+.origem-badge svg {
+  width: 12px;
+  height: 12px;
+}
+
+/* ── Mesa Badge ── */
+.mesa-badge {
+  display: inline-flex;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  background: var(--purple-light);
+  color: #5b21b6;
 }
 @keyframes slideDown {
   from { opacity: 0; transform: translateX(-50%) translateY(-10px); }
