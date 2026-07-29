@@ -644,6 +644,7 @@ onMounted(async () => {
   overflow-y: auto;
   padding: 4px;
   flex: 1;
+  align-content: start;
 }
 
 .pdv-product-btn {
