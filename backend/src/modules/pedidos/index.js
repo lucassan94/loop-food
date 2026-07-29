@@ -290,9 +290,9 @@ router.get('/', authenticate, async (req, res, next) => {
     // Filtro por status
     if (status) {
       if (status === 'ativos') {
-        sql += " AND p.status NOT IN ('entregue', 'cancelado', 'recusado')";
+        sql += " AND p.status NOT IN ('entregue', 'finalizado', 'cancelado', 'recusado')";
       } else if (status === 'concluidos') {
-        sql += " AND p.status IN ('entregue')";
+        sql += " AND p.status IN ('entregue', 'finalizado')";
       } else if (status === 'cancelados') {
         sql += " AND p.status IN ('cancelado', 'recusado')";
       } else {
@@ -383,7 +383,7 @@ router.patch('/:id/status', authenticate, async (req, res, next) => {
     const { role, id: userId, cargo } = req.user;
 
     const statusSchema = z.object({
-      status: z.enum(['aguardando_pagamento', 'pendente', 'preparando', 'pronto_entrega', 'em_transito', 'cheguei_destino', 'entregue', 'cancelado', 'recusado']),
+      status: z.enum(['aguardando_pagamento', 'pendente', 'preparando', 'pronto_entrega', 'pronto', 'em_transito', 'cheguei_destino', 'entregue', 'finalizado', 'cancelado', 'recusado']),
       motivo: z.string().optional(),
       entregador_id: z.number().optional(),
     });
@@ -432,15 +432,18 @@ router.patch('/:id/status', authenticate, async (req, res, next) => {
         // Se modo_sem_entregador, permitir pronto_entrega → entregue
       } else if (effectiveCargo === 'chef') {
         // Chef: transições de cozinha + cancelar
+        // Salão: pendente→preparando→pronto→finalizado
+        // Delivery: pendente→preparando→pronto_entrega, cancelado
         const allowedChef = ['preparando', 'pronto_entrega', 'cancelado'];
+        allowedChef.push('pronto', 'finalizado'); // salão transitions
         if (modoSemEntregador) allowedChef.push('entregue');
         if (!allowedChef.includes(data.status)) {
           throw new AppError('Chef só pode preparar, finalizar ou cancelar pedidos.', 403);
         }
       } else if (effectiveCargo === 'caixa') {
-        // Caixa: APENAS cancelar/recusar pedidos
-        if (!['cancelado', 'recusado'].includes(data.status)) {
-          throw new AppError('Caixa só pode cancelar ou recusar pedidos.', 403);
+        // Caixa: checkout (finalizado), cancelar/recusar
+        if (!['finalizado', 'cancelado', 'recusado'].includes(data.status)) {
+          throw new AppError('Caixa só pode finalizar conta, cancelar ou recusar pedidos.', 403);
         }
       } else {
         throw new AppError('Cargo sem permissão para alterar status.', 403);
@@ -463,9 +466,11 @@ router.patch('/:id/status', authenticate, async (req, res, next) => {
       const timeFields = {
         'preparando': 'aceito_em',
         'pronto_entrega': 'pronto_em',
+        'pronto': 'pronto_em',
         'em_transito': 'transito_inicio_em',
         'cheguei_destino': 'destino_chegada_em',
         'entregue': 'entregue_em',
+        'finalizado': 'entregue_em',
         'cancelado': 'cancelado_em',
       };
 

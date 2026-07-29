@@ -19,6 +19,10 @@
           <span class="kds-stat-value">{{ readyCount }}</span>
           <span class="kds-stat-label">Prontos</span>
         </div>
+        <div v-if="prontoCount > 0" class="kds-stat checkout">
+          <span class="kds-stat-value">{{ prontoCount }}</span>
+          <span class="kds-stat-label">p/ Finalizar</span>
+        </div>
         <!-- Sound toggle -->
         <button class="kds-sound-toggle" :class="{ muted: soundMuted }" @click="soundMuted = !soundMuted" :title="soundMuted ? 'Ativar som' : 'Desativar som'">
           <i-lucide-volume-2 v-if="!soundMuted" style="width:18px;height:18px" />
@@ -110,6 +114,16 @@
               Pronto!
             </button>
           </template>
+          <template v-if="order.status === 'pronto'">
+            <button v-if="order.origem === 'salao'" class="kds-btn kds-btn-checkout" @click="finalizarConta(order)">
+              <i-lucide-wallet style="width:18px;height:18px" />
+              Finalizar Conta
+            </button>
+            <button v-else class="kds-btn kds-btn-ready" @click="finalizarPedido(order)">
+              <i-lucide-circle-check-big style="width:18px;height:18px" />
+              Pronto!
+            </button>
+          </template>
         </div>
       </div>
     <!-- New Order Toast (sound notification banner) -->
@@ -164,12 +178,13 @@ let newOrderTimer = null
 // Computed
 const pendingCount = computed(() => orders.value.filter(o => o.status === 'pendente').length)
 const preppingCount = computed(() => orders.value.filter(o => o.status === 'preparando').length)
-const readyCount = computed(() => orders.value.filter(o => o.status === 'pronto_entrega').length)
+const readyCount = computed(() => orders.value.filter(o => o.status === 'pronto_entrega' || o.status === 'pronto').length)
+const prontoCount = computed(() => orders.value.filter(o => o.status === 'pronto').length)
 
 const activeOrders = computed(() => {
-  // Show: pendente, preparando, pronto_entrega — ordered by time (oldest first)
+  // Show: pendente, preparando, pronto_entrega, pronto — ordered by time (oldest first)
   return orders.value
-    .filter(o => ['pendente', 'preparando', 'pronto_entrega'].includes(o.status))
+    .filter(o => ['pendente', 'preparando', 'pronto_entrega', 'pronto'].includes(o.status))
     .sort((a, b) => new Date(a.criado_em) - new Date(b.criado_em))
 })
 
@@ -275,11 +290,26 @@ async function finalizarPedido(order) {
   globalLoading.value = true
   loadingMessage.value = 'Finalizando pedido...'
   try {
-    await api.patch(`/pedidos/${order.id}/status`, { status: 'pronto_entrega' })
+    const newStatus = order.origem === 'salao' ? 'pronto' : 'pronto_entrega'
+    await api.patch(`/pedidos/${order.id}/status`, { status: newStatus })
     showFeedback(`✅ Pedido ${order.pedido_id} pronto!`, 'success')
     await loadOrders()
   } catch (err) {
     showFeedback(err.response?.data?.error || 'Erro ao finalizar pedido', 'erro')
+  } finally {
+    globalLoading.value = false
+  }
+}
+
+async function finalizarConta(order) {
+  globalLoading.value = true
+  loadingMessage.value = 'Finalizando conta...'
+  try {
+    await api.patch(`/pedidos/${order.id}/status`, { status: 'finalizado' })
+    showFeedback(`✅ Conta do pedido ${order.pedido_id} finalizada!`, 'success')
+    await loadOrders()
+  } catch (err) {
+    showFeedback(err.response?.data?.error || 'Erro ao finalizar conta', 'erro')
   } finally {
     globalLoading.value = false
   }
@@ -387,6 +417,8 @@ onUnmounted(() => {
 .kds-stat.pending .kds-stat-value { color: #92400e; }
 .kds-stat.prepping .kds-stat-value { color: #1e40af; }
 .kds-stat.ready .kds-stat-value { color: #166534; }
+.kds-stat.checkout { background: #fef3c7; }
+.kds-stat.checkout .kds-stat-value { color: #92400e; }
 .kds-stat-label {
   font-size: 0.65rem;
   font-weight: 700;
@@ -764,5 +796,22 @@ onUnmounted(() => {
 .kds-btn-ready:hover {
   background: #15803d;
   box-shadow: 0 4px 12px rgba(22,163,74,0.35);
+}
+.kds-btn-checkout {
+  background: #f59e0b;
+  color: white;
+}
+.kds-btn-checkout:hover {
+  background: #d97706;
+  box-shadow: 0 4px 12px rgba(245,158,11,0.35);
+}
+
+/* Pronto (salão) card style */
+.kds-card.pronto::before {
+  background: #f59e0b;
+}
+.kds-card.pronto {
+  border-color: #f59e0b;
+  border-left-color: #f59e0b;
 }
 </style>

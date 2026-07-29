@@ -175,7 +175,16 @@
 
           <!-- Preparando: Pronto (admin/gerente/chef) -->
           <template v-if="order.status === 'preparando'">
-            <button v-if="podeMarcarPronto" class="btn btn-primary btn-sm" @click="changeStatus(order.id, 'pronto_entrega')">Pronto para Entrega</button>
+            <button v-if="order.origem === 'salao' && podeMarcarPronto" class="btn btn-primary btn-sm" @click="changeStatus(order.id, 'pronto')">✅ Pronto para Servir</button>
+            <button v-else-if="podeMarcarPronto" class="btn btn-primary btn-sm" @click="changeStatus(order.id, 'pronto_entrega')">Pronto para Entrega</button>
+          </template>
+
+          <!-- Pronto (Salão) - Finalizar Conta -->
+          <template v-if="order.status === 'pronto'">
+            <button v-if="podeMarcarPronto || isCaixa" class="btn btn-warning btn-sm" @click="changeStatus(order.id, 'finalizado')">
+              <i-lucide-wallet style="width:14px;height:14px" />
+              💰 Finalizar Conta
+            </button>
           </template>
 
           <!-- Pronto para entrega -->
@@ -196,9 +205,12 @@
             <span style="font-size:0.85rem;color:var(--primary);">Entregador no Local</span>
           </template>
 
-          <!-- Entregue -->
+          <!-- Entregue / Finalizado -->
           <template v-if="order.status === 'entregue'">
             <span style="font-size:0.85rem;color:var(--success);">✓ Entrega Concluída</span>
+          </template>
+          <template v-if="order.status === 'finalizado'">
+            <span style="font-size:0.85rem;color:var(--success);">✓ Conta Finalizada</span>
           </template>
 
           <!-- Cancelado / Recusado -->
@@ -207,7 +219,7 @@
           </template>
 
           <button class="btn btn-secondary btn-sm" @click="abrirDetalhes(order)">Detalhes</button>
-          <button v-if="podeEnviarMensagem && !['entregue','cancelado','recusado'].includes(order.status)" class="btn btn-secondary btn-sm" @click="abrirMensagem(order)">💬 Mensagem</button>
+          <button v-if="podeEnviarMensagem && !['entregue','finalizado','cancelado','recusado'].includes(order.status)" class="btn btn-secondary btn-sm" @click="abrirMensagem(order)">💬 Mensagem</button>
           <!-- Cancelar disponível durante toda jornada do pedido (antes de entregue/cancelado) -->
           <button v-if="podeCancelar && isActiveOrder(order.status) && order.status !== 'aguardando_pagamento'" class="btn btn-danger btn-sm" @click="abrirModalCancelamento(order, 'cancelado')">Cancelar</button>
         </div>
@@ -470,7 +482,8 @@ const kanbanColumns = computed(() => {
     { status: 'aguardando_pagamento', label: '⏳ Pagamento' },
     { status: 'pendente', label: 'Aguardando' },
     { status: 'preparando', label: 'Preparando' },
-    { status: 'pronto_entrega', label: 'Pronto' },
+    { status: 'pronto_entrega', label: 'Pronto (Delivery)' },
+    { status: 'pronto', label: 'Pronto (Salão)' },
   ]
   // Se modo sem entregador, esconder colunas de entrega (a menos que existam pedidos lá)
   if (modoSemEntregador.value) {
@@ -493,7 +506,7 @@ function formatDate(d) {
 }
 
 function statusLabel(s) {
-  const l = { pendente: 'Pendente', preparando: 'Preparando', pronto_entrega: 'Pronto', em_transito: 'Em Rota', cheguei_destino: 'No Local', entregue: 'Entregue', cancelado: 'Cancelado', recusado: 'Recusado', aguardando_pagamento: 'Aguardando Pagamento' }
+  const l = { pendente: 'Pendente', preparando: 'Preparando', pronto_entrega: 'Pronto (Delivery)', pronto: 'Pronto (Salão)', finalizado: 'Conta Finalizada', em_transito: 'Em Rota', cheguei_destino: 'No Local', entregue: 'Entregue', cancelado: 'Cancelado', recusado: 'Recusado', aguardando_pagamento: 'Aguardando Pagamento' }
   return l[s] || s
 }
 
@@ -502,7 +515,7 @@ function paymentLabel(m) {
   return l[m] || m
 }
 
-function isActiveOrder(s) { return !['entregue', 'cancelado', 'recusado'].includes(s) }
+function isActiveOrder(s) { return !['entregue', 'finalizado', 'cancelado', 'recusado'].includes(s) }
 
 // ============================================
 // Helper functions de permissão por cargo
