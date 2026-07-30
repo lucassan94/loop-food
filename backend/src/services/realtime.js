@@ -3,6 +3,21 @@ import jwt from 'jsonwebtoken';
 import { config } from '../config/index.js';
 import { notificarStatusPedido } from './push.js';
 
+// Cache de secrets por tenant (importação lazy para evitar circular dependency)
+let _getTenantJwtSecret = null;
+async function getTenantSecret(restaurantId) {
+  if (!restaurantId) return null;
+  if (!_getTenantJwtSecret) {
+    const auth = await import('../middleware/auth.js');
+    _getTenantJwtSecret = auth.getTenantJwtSecret;
+  }
+  try {
+    return await _getTenantJwtSecret(restaurantId);
+  } catch {
+    return null;
+  }
+}
+
 let io = null;
 
 // Inicializar Socket.IO com o servidor HTTP
@@ -18,7 +33,7 @@ export function initRealtime(httpServer) {
   });
 
   // Middleware de autenticação
-  io.use((socket, next) => {
+  io.use(async (socket, next) => {
     const token = socket.handshake.auth?.token || socket.handshake.query?.token;
     const restaurantId = socket.handshake.auth?.restaurantId || socket.handshake.query?.restaurantId;
 
@@ -34,7 +49,25 @@ export function initRealtime(httpServer) {
     }
 
     try {
-      const decoded = jwt.verify(token, config.jwt.secret);
+      // Decodificar sem verificar para extrair o restaurantId do payload
+      const payload = jwt.decode(token);
+      if (!payload) throw new Error('Token inválido');
+
+      const rid = payload.restaurantId || config.restaurantId;
+      const tenantSecret = await getTenantSecret(rid);
+
+      // Verificar o token: tenta per-tenant primeiro, fallback global
+      let decoded;
+      if (tenantSecret) {
+        try {
+          decoded = jwt.verify(token, tenantSecret);
+        } catch {
+          // Fallback: token pode ter sido assinado com o secret global (migração)
+          decoded = jwt.verify(token, config.jwt.secret);
+        }
+      } else {
+        decoded = jwt.verify(token, config.jwt.secret);
+      }
       socket.user = decoded;
       next();
     } catch {

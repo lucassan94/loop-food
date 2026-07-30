@@ -435,7 +435,7 @@ onUnmounted(() => {
   transform: translateX(-50%);
   z-index: 9999;
   padding: 0.75rem 1.5rem;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   font-size: 1rem;
   font-weight: 700;
   box-shadow: 0 4px 12px rgba(0,0,0,0.15);

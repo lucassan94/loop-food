@@ -71,6 +71,7 @@
               v-for="product in group.products"
               :key="product.id"
               class="product-card"
+              :class="{ featured: product.categoria_slug === 'destaques' }"
               @click="openProductModal(product)"
             >
               <div class="product-card-image">
@@ -82,7 +83,29 @@
                 />
               </div>
               <div class="product-card-body">
-                <h3>{{ product.nome }}</h3>
+                <h3>
+                  <span v-if="product.categoria_slug === 'destaques'" class="featured-fire-badge-inline">
+                    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M12 23C15.5 23 18.5 20.5 18.5 16.5C18.5 12.5 14.5 9 13 7C12.5 6 12 4.5 12 2C10 4.5 5.5 9.5 5.5 16.5C5.5 20.5 8.5 23 12 23Z"
+                        fill="url(#fire-grad)" stroke="url(#fire-stroke)" stroke-width="0.5" />
+                      <path d="M12 20C14 20 15.5 18.5 15.5 16C15.5 13.5 13 11.5 12 10.5C11 11.5 8.5 13.5 8.5 16C8.5 18.5 10 20 12 20Z"
+                        fill="#fef08a" opacity="0.7" />
+                      <defs>
+                        <linearGradient id="fire-grad" x1="12" y1="2" x2="12" y2="23" gradientUnits="userSpaceOnUse">
+                          <stop offset="0%" stop-color="#facc15" />
+                          <stop offset="40%" stop-color="#f97316" />
+                          <stop offset="100%" stop-color="#dc2626" />
+                        </linearGradient>
+                        <linearGradient id="fire-stroke" x1="12" y1="2" x2="12" y2="23" gradientUnits="userSpaceOnUse">
+                          <stop offset="0%" stop-color="#fef08a" />
+                          <stop offset="50%" stop-color="#f97316" />
+                          <stop offset="100%" stop-color="#b91c1c" />
+                        </linearGradient>
+                      </defs>
+                    </svg>
+                  </span>
+                  {{ product.nome }}
+                </h3>
                 <p>{{ product.descricao || 'Sem descrição' }}</p>
                 <div class="product-card-footer">
                   <span class="product-price">{{ formatPrice(product.preco) }}</span>
@@ -196,6 +219,7 @@ const chosenExtraSet = ref(new Set()) // Set of extra IDs (simple checkbox mode)
 // Cart
 const cartItems = inject('cartItems')
 const updateCart = inject('updateCart')
+const triggerCartBump = inject('triggerCartBump')
 
 // Filtragem normal (plana)
 const filteredProducts = computed(() => {
@@ -250,6 +274,24 @@ const productTotal = computed(() => {
     .reduce((acc, e) => acc + e.preco, 0)
   return selectedProduct.value.preco + qtyExtrasTotal + setExtrasTotal
 })
+
+function playPopSound() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)()
+    const osc = ctx.createOscillator()
+    const gain = ctx.createGain()
+    osc.type = 'sine'
+    osc.connect(gain)
+    gain.connect(ctx.destination)
+    // Quick descending tone = pop!
+    osc.frequency.setValueAtTime(800, ctx.currentTime)
+    osc.frequency.exponentialRampToValueAtTime(300, ctx.currentTime + 0.08)
+    gain.gain.setValueAtTime(0.25, ctx.currentTime)
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.12)
+    osc.start(ctx.currentTime)
+    osc.stop(ctx.currentTime + 0.12)
+  } catch { /* Audio not available */ }
+}
 
 function formatPrice(value) {
   return new Intl.NumberFormat('pt-BR', {
@@ -401,6 +443,8 @@ function addToCart() {
     updateCart([...cartItems.value, newItem])
   }
 
+  playPopSound()
+  triggerCartBump()
   addToast(`${selectedProduct.value.nome} adicionado ao carrinho!`, 'success')
   closeProductModal()
 }
@@ -428,6 +472,8 @@ function quickAdd(product) {
     updateCart([...cartItems.value, newItem])
   }
 
+  playPopSound()
+  triggerCartBump()
   addToast(`${product.nome} adicionado ao carrinho!`, 'success')
 }
 

@@ -32,8 +32,8 @@
   --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.08), 0 4px 6px -2px rgba(0,0,0,0.04);
   --shadow-xl: 0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04);
   --radius: 12px;
-  --radius-sm: 8px;
-  --radius-xs: 6px;
+  --radius-sm: 6px;
+  --radius-xs: 4px;
   --transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   --font: 'Inter', system-ui, -apple-system, sans-serif;
 }
@@ -183,12 +183,13 @@ body {
   color: white;
 }
 
-/* No collapsed, toggle fica flutuante na borda direita */
+/* No collapsed, toggle fica centralizado no topo da sidebar */
 .sidebar.collapsed .sidebar-toggle {
   display: flex;
   position: fixed;
-  left: 54px;
-  top: 1.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  top: 1rem;
   background: #1e293b;
   border: 1px solid rgba(255,255,255,0.15);
   z-index: 101;

@@ -4,7 +4,6 @@ const api = axios.create({
   baseURL: '/api',
   headers: {
     'Content-Type': 'application/json',
-    'X-Auth-Guard': 'saborexpress-secure',
   },
   withCredentials: true,
 })

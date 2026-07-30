@@ -42,6 +42,92 @@ router.get('/categorias', async (req, res, next) => {
 });
 
 // ============================
+// CRIAR CATEGORIA (Admin)
+// ============================
+router.post('/categorias', authenticate, authorize('admin', 'gerente'), async (req, res, next) => {
+  try {
+    const restaurantId = req.restaurantId || config.restaurantId;
+    const { nome } = req.body;
+    if (!nome || !nome.trim()) throw new AppError('Nome da categoria é obrigatório.', 400);
+
+    const slug = nome.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+
+    // Buscar próxima ordem
+    const ordemResult = await query(
+      'SELECT COALESCE(MAX(ordem), 0) + 1 as next_ordem FROM categorias WHERE restaurant_id = $1',
+      [restaurantId]
+    );
+    const ordem = ordemResult.rows[0]?.next_ordem || 1;
+
+    const result = await query(
+      `INSERT INTO categorias (restaurant_id, nome, slug, ordem)
+       VALUES ($1, $2, $3, $4)
+       RETURNING *`,
+      [restaurantId, nome.trim(), slug, ordem]
+    );
+
+    res.status(201).json(result.rows[0]);
+  } catch (err) {
+    if (err.code === '23505') {
+      return next(new AppError('Já existe uma categoria com este nome.', 409));
+    }
+    next(err);
+  }
+});
+
+// ============================
+// ATUALIZAR CATEGORIA (Admin)
+// ============================
+router.put('/categorias/:id', authenticate, authorize('admin', 'gerente'), async (req, res, next) => {
+  try {
+    const restaurantId = req.restaurantId || config.restaurantId;
+    const { id } = req.params;
+    const { nome } = req.body;
+    if (!nome || !nome.trim()) throw new AppError('Nome da categoria é obrigatório.', 400);
+
+    const slug = nome.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+
+    const result = await query(
+      `UPDATE categorias SET nome = $1, slug = $2 WHERE id = $3 AND restaurant_id = $4
+       RETURNING *`,
+      [nome.trim(), slug, id, restaurantId]
+    );
+
+    if (result.rows.length === 0) throw new AppError('Categoria não encontrada.', 404);
+    res.json(result.rows[0]);
+  } catch (err) {
+    if (err.code === '23505') {
+      return next(new AppError('Já existe uma categoria com este nome.', 409));
+    }
+    next(err);
+  }
+});
+
+// ============================
+// EXCLUIR CATEGORIA (Admin)
+// ============================
+router.delete('/categorias/:id', authenticate, authorize('admin', 'gerente'), async (req, res, next) => {
+  try {
+    const restaurantId = req.restaurantId || config.restaurantId;
+    const { id } = req.params;
+
+    // Verificar se há produtos usando esta categoria
+    const prodCount = await query(
+      'SELECT COUNT(*) as count FROM produtos WHERE categoria_id = $1 AND restaurant_id = $2',
+      [id, restaurantId]
+    );
+    if (parseInt(prodCount.rows[0].count) > 0) {
+      throw new AppError('Não é possível excluir: existem produtos vinculados a esta categoria. Remova ou altere a categoria dos produtos primeiro.', 400);
+    }
+
+    await query('DELETE FROM categorias WHERE id = $1 AND restaurant_id = $2', [id, restaurantId]);
+    res.json({ message: 'Categoria excluída.' });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ============================
 // LISTAR PRODUTOS
 // ============================
 router.get('/', async (req, res, next) => {

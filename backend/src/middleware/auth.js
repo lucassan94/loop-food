@@ -22,7 +22,7 @@ const JWT_SECRET_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutos
  * Usa cache em memória para evitar consultas repetidas ao banco.
  * Retorna null se o tenant não tiver secret próprio (usa fallback global).
  */
-async function getTenantJwtSecret(restaurantId) {
+export async function getTenantJwtSecret(restaurantId) {
   if (!restaurantId) return null;
 
   const cached = jwtSecretCache.get(restaurantId);
@@ -219,12 +219,6 @@ export function authorize(...allowedRolesOrCargos) {
   };
 }
 
-export function guardCheck(req, res, next) {
-  if (req.headers['x-auth-guard'] === 'saborexpress-secure') {
-    return next();
-  }
-  next();
-}
 
 export function restrictModule() {
   return (req, res, next) => {

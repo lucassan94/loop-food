@@ -287,8 +287,26 @@ router.post('/refresh', refreshLimiter, async (req, res, next) => {
     const refreshToken = req.cookies?.refreshToken || req.body?.refreshToken;
     if (!refreshToken) throw new AppError('Refresh token não fornecido.', 401);
 
-    const decoded = jwt.verify(refreshToken, config.jwt.secret);
-    if (decoded.type !== 'refresh') throw new AppError('Token inválido.', 401);
+    // Decodificar sem verificar primeiro para extrair o restaurantId
+    const payload = jwt.decode(refreshToken);
+    if (!payload || payload.type !== 'refresh') throw new AppError('Token inválido.', 401);
+
+    // Resolver o secret do tenant
+    const rid = payload.restaurantId || req.restaurantId || config.restaurantId;
+    const tenantSecret = await ensureTenantJwtSecret(rid);
+
+    // Verificar o refresh token com o secret correto (per-tenant ou global)
+    let decoded;
+    if (tenantSecret) {
+      try {
+        decoded = jwt.verify(refreshToken, tenantSecret);
+      } catch {
+        // Fallback: token pode ter sido assinado com o secret global (migração)
+        decoded = jwt.verify(refreshToken, config.jwt.secret);
+      }
+    } else {
+      decoded = jwt.verify(refreshToken, config.jwt.secret);
+    }
 
     const user = {
       id: decoded.id,
@@ -297,7 +315,7 @@ router.post('/refresh', refreshLimiter, async (req, res, next) => {
       role: decoded.role,
     };
 
-    const tokens = await gerarTokens(user);
+    const tokens = await gerarTokens(user, rid);
     setTokenCookies(req, res, tokens);
 
     res.json({

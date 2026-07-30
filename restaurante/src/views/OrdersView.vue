@@ -52,6 +52,10 @@
           <span>Todos</span>
         </label>
       </div>
+      <div v-if="filtroMesa.value" class="mesa-filter-badge">
+        <i-lucide-table-2 style="width:14px;height:14px" /> Mesa: <strong>{{ filtroMesa.value }}</strong>
+        <button class="btn-clear-filter" @click="limparFiltroMesa" title="Remover filtro de mesa">✕</button>
+      </div>
       <button class="btn btn-secondary btn-sm" @click="limparFiltros">Limpar</button>
     </div>
 
@@ -64,40 +68,7 @@
 <!-- View Mode Tabs -->
     <div class="tabs">
       <button class="tab" :class="{ active: viewMode === 'cards' }" @click="viewMode = 'cards'">Cartões</button>
-      <button class="tab" :class="{ active: viewMode === 'kanban' }" @click="viewMode = 'kanban'">Kanban</button>
       <button class="tab" :class="{ active: viewMode === 'lista' }" @click="viewMode = 'lista'">Lista</button>
-    </div>
-
-    <!-- Kanban View -->
-    <div v-if="viewMode === 'kanban'" class="kanban-board">
-      <div v-for="col in kanbanColumns" :key="col.status" class="kanban-column">
-        <h3>{{ col.label }} <span class="count">{{ filteredOrders.filter(o => o.status === col.status).length }}</span></h3>
-        <div v-for="order in filteredOrders.filter(o => o.status === col.status)" :key="order.id"
-          class="order-card" :class="order.status" draggable="true"
-          :draggable="podeArrastarKanban"
-          @dragstart="dragOrder = order" @dragover.prevent
-          @drop="podeArrastarKanban && changeStatus(order.id, col.status)"
-          @click="abrirDetalhes(order)"
-          style="cursor:pointer;"
-        >
-          <strong>{{ order.pedido_id }}</strong>
-          <div style="font-size:0.8rem;color:var(--text-muted);">{{ order.nome_cliente }}</div>
-          <!-- Preview dos pratos (Kanban) -->
-          <div v-if="order.itens?.length" style="font-size:0.72rem;color:var(--text-secondary);margin-top:4px;line-height:1.3;">
-            {{ order.itens.slice(0, 3).map(i => i.nome_produto).join(', ') }}<span v-if="order.itens.length > 3">...</span>
-          </div>
-          <div style="font-size:0.8rem;margin-top:4px;">R$ {{ parseFloat(order.total).toFixed(2) }}</div>
-          <!-- Badge de refund (Kanban) -->
-          <div v-if="(order.status === 'cancelado' || order.status === 'recusado') && isOnlinePayment(order.metodo_pagamento)"
-               class="refund-status" :class="refundClass(order.id)" style="margin-top:6px;font-size:0.7rem;">
-            <i-lucide-clock v-if="refundIcon(order.id) === 'clock'" style="width:16px;height:16px" />
-            <i-lucide-circle-check-big v-else-if="refundIcon(order.id) === 'check-circle'" style="width:16px;height:16px" />
-            <i-lucide-circle-x v-else-if="refundIcon(order.id) === 'x-circle'" style="width:16px;height:16px" />
-            <i-lucide-loader v-else class="spinning" style="width:16px;height:16px" />
-            {{ refundLabel(order.id) }}
-          </div>
-      </div>
-    </div>
     </div>
 
     <!-- Cards View -->
@@ -130,7 +101,7 @@
         </div>
 
         <div v-if="order.entregador_nome" style="font-size:0.85rem;color:var(--text-secondary);margin-top:4px;">
-          🛵 {{ order.entregador_nome }}
+          <i-lucide-bike style="width:14px;height:14px;vertical-align:middle;" /> {{ order.entregador_nome }}
         </div>
 
         <!-- Timer -->
@@ -146,8 +117,8 @@
           <br />{{ paymentLabel(order.metodo_pagamento) }}
         </div>
 
-        <div v-if="order.observacoes" style="background:var(--warning-light);padding:6px 8px;border-radius:4px;font-size:0.85rem;margin-top:8px;">
-          📝 {{ order.observacoes }}
+        <div v-if="order.observacoes" class="order-obs-badge">
+          <i-lucide-pen-line style="width:14px;height:14px" /> {{ order.observacoes }}
         </div>
 
         <div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap;">
@@ -160,10 +131,10 @@
             >
               <i-lucide-loader v-if="verificandoIds.has(order.id)" class="spinning" style="width:14px;height:14px" />
               <i-lucide-search v-else style="width:14px;height:14px" />
-              {{ verificandoIds.has(order.id) ? 'Verificando...' : '🔍 Verificar Pagamento' }}
+              {{ verificandoIds.has(order.id) ? 'Verificando...' : 'Verificar Pagamento' }}
             </button>
             <button v-if="isAdmin" class="btn btn-success btn-sm" @click="confirmarPagamento(order)">
-              <i-lucide-check style="width:14px;height:14px" /> ✅ Confirmar Pagamento
+              <i-lucide-check style="width:14px;height:14px" /> Confirmar Pagamento
             </button>
           </template>
 
@@ -175,22 +146,22 @@
 
           <!-- Preparando: Pronto (admin/gerente/chef) -->
           <template v-if="order.status === 'preparando'">
-            <button v-if="order.origem === 'salao' && podeMarcarPronto" class="btn btn-primary btn-sm" @click="changeStatus(order.id, 'pronto')">✅ Pronto para Servir</button>
-            <button v-else-if="podeMarcarPronto" class="btn btn-primary btn-sm" @click="changeStatus(order.id, 'pronto_entrega')">Pronto para Entrega</button>
+            <button v-if="order.origem === 'salao' && podeMarcarPronto" class="btn btn-primary btn-sm" @click="changeStatus(order.id, 'pronto')"><i-lucide-circle-check-big style="width:14px;height:14px" /> Pronto para Servir</button>
+            <button v-else-if="podeMarcarPronto" class="btn btn-primary btn-sm" @click="changeStatus(order.id, 'pronto_entrega')"><i-lucide-circle-check-big style="width:14px;height:14px" /> Pronto para Entrega</button>
           </template>
 
           <!-- Pronto (Salão) - Finalizar Conta -->
           <template v-if="order.status === 'pronto'">
             <button v-if="podeMarcarPronto || isCaixa" class="btn btn-warning btn-sm" @click="changeStatus(order.id, 'finalizado')">
               <i-lucide-wallet style="width:14px;height:14px" />
-              💰 Finalizar Conta
+              Finalizar Conta
             </button>
           </template>
 
           <!-- Pronto para entrega -->
           <template v-if="order.status === 'pronto_entrega'">
             <template v-if="modoSemEntregador">
-              <button v-if="podeMarcarPronto" class="btn btn-success btn-sm" @click="changeStatus(order.id, 'entregue')">✅ Confirmar Entrega</button>
+              <button v-if="podeMarcarPronto" class="btn btn-success btn-sm" @click="changeStatus(order.id, 'entregue')"><i-lucide-circle-check-big style="width:14px;height:14px" /> Confirmar Entrega</button>
             </template>
             <template v-else>
               <span style="font-size:0.85rem;color:var(--text-muted);">Aguardando Entregador...</span>
@@ -215,11 +186,11 @@
 
           <!-- Cancelado / Recusado -->
           <template v-if="order.status === 'cancelado' || order.status === 'recusado'">
-            <span style="font-size:0.85rem;color:var(--error);">✕ {{ order.motivo_cancelamento || 'Sem motivo' }}</span>
+            <span style="font-size:0.85rem;color:var(--error);"><i-lucide-x style="width:14px;height:14px" /> {{ order.motivo_cancelamento || 'Sem motivo' }}</span>
           </template>
 
           <button class="btn btn-secondary btn-sm" @click="abrirDetalhes(order)">Detalhes</button>
-          <button v-if="podeEnviarMensagem && !['entregue','finalizado','cancelado','recusado'].includes(order.status)" class="btn btn-secondary btn-sm" @click="abrirMensagem(order)">💬 Mensagem</button>
+          <button v-if="podeEnviarMensagem && !['entregue','finalizado','cancelado','recusado'].includes(order.status)" class="btn btn-secondary btn-sm" @click="abrirMensagem(order)"><i-lucide-message-square style="width:14px;height:14px" /> Mensagem</button>
           <!-- Cancelar disponível durante toda jornada do pedido (antes de entregue/cancelado) -->
           <button v-if="podeCancelar && isActiveOrder(order.status) && order.status !== 'aguardando_pagamento'" class="btn btn-danger btn-sm" @click="abrirModalCancelamento(order, 'cancelado')">Cancelar</button>
         </div>
@@ -270,8 +241,7 @@
 
     <!-- Detail Modal -->
     <div v-if="selectedOrder" class="modal-overlay" @click.self="selectedOrder = null">
-      <div class="modal-content">
-        <h3>{{ selectedOrder.pedido_id }} — {{ selectedOrder.nome_cliente }}</h3>
+      <div class="modal-content">          <h3>{{ selectedOrder.pedido_id }} — {{ selectedOrder.nome_cliente }}</h3><span class="status-badge" :class="selectedOrder.status">{{ statusLabel(selectedOrder.status) }}</span>
         <p style="color:var(--text-muted);margin-bottom:1rem;">{{ formatDate(selectedOrder.criado_em) }}</p>
 
         <div class="profile-section"><div class="profile-section-title">Itens</div>
@@ -356,7 +326,7 @@
     <!-- Message Modal -->
     <div v-if="msgOrder" class="modal-overlay" @click.self="msgOrder = null">
       <div class="modal-content" style="max-width:400px;">
-        <h3>💬 Mensagem para {{ msgOrder.nome_cliente }}</h3>
+        <h3><i-lucide-message-square style="width:18px;height:18px" /> Mensagem para {{ msgOrder.nome_cliente }}</h3>
         <div class="form-group" style="margin-top:1rem;">
           <textarea v-model="mensagemTexto" rows="3" placeholder="Digite sua mensagem..." style="width:100%;padding:0.75rem;border:1.5px solid var(--border);border-radius:6px;font-family:inherit;"></textarea>
         </div>
@@ -367,12 +337,13 @@
 </template>
 
 <script setup>
-import { ref, computed, inject, onMounted, onUnmounted } from 'vue'
+import { ref, computed, inject, watch, onMounted, onUnmounted } from 'vue'
 import api from '../services/api'
 import { onEvent } from '../services/realtime'
 import { useAuthStore } from '../stores/auth'
 
 const emit = defineEmits(['changeView'])
+const filtroMesa = inject('filtroMesa', ref(''))
 const authStore = useAuthStore()
 const globalLoading = inject('globalLoading')
 const loadingMessage = inject('loadingMessage')
@@ -391,7 +362,7 @@ const resumo = ref(null)
 const selectedOrder = ref(null)
 const msgOrder = ref(null)
 const mensagemTexto = ref('')
-const dragOrder = ref(null)
+// dragOrder removido (Kanban foi eliminado)
 const verificandoIds = ref(new Set())
 const cancelModalOrder = ref(null)     // pedido alvo do cancelamento/recusa
 const cancelModalAction = ref('cancelado') // 'cancelado' | 'recusado'
@@ -477,28 +448,6 @@ const filteredOrders = computed(() => {
   return orders.value.filter(o => o.origem === filtroOrigem.value)
 })
 
-const kanbanColumns = computed(() => {
-  const cols = [
-    { status: 'aguardando_pagamento', label: '⏳ Pagamento' },
-    { status: 'pendente', label: 'Aguardando' },
-    { status: 'preparando', label: 'Preparando' },
-    { status: 'pronto_entrega', label: 'Pronto (Delivery)' },
-    { status: 'pronto', label: 'Pronto (Salão)' },
-  ]
-  // Se modo sem entregador, esconder colunas de entrega (a menos que existam pedidos lá)
-  if (modoSemEntregador.value) {
-    const hasTransito = orders.value.some(o => o.status === 'em_transito')
-    const hasDestino = orders.value.some(o => o.status === 'cheguei_destino')
-    if (hasTransito) cols.push({ status: 'em_transito', label: '📦 Em Rota' })
-    if (hasDestino) cols.push({ status: 'cheguei_destino', label: '📍 No Local' })
-  } else {
-    cols.push({ status: 'em_transito', label: 'Em Rota' })
-    cols.push({ status: 'cheguei_destino', label: 'No Local' })
-  }
-  cols.push({ status: 'entregue', label: 'Entregue' })
-  return cols
-})
-
 function formatPrice(v) { return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v) }
 
 function formatDate(d) {
@@ -530,8 +479,6 @@ const podeRecusar = computed(() => isAdmin.value)
 const podeMarcarPronto = computed(() => isAdmin.value || isChef.value)
 const podeCancelar = computed(() => isAdmin.value || isCaixa.value)
 const podeEnviarMensagem = computed(() => isAdmin.value || isChef.value)
-const podeArrastarKanban = computed(() => isAdmin.value || isChef.value)
-
 function getTimerText(order) {
   const created = new Date(order.criado_em)
   const mins = Math.floor((Date.now() - created.getTime()) / 60000)
@@ -557,6 +504,10 @@ async function loadOrders() {
     }
     if (filtroOrigem.value !== 'todos') {
       params.origem = filtroOrigem.value
+    }
+    // Filtro por mesa (vindo do MesasView)
+    if (filtroMesa.value) {
+      params.mesa = filtroMesa.value
     }
     const { data } = await api.get('/pedidos', { params })
     orders.value = data
@@ -724,6 +675,16 @@ function limparFiltros() {
   loadOrders()
 }
 
+function limparFiltroMesa() {
+  filtroMesa.value = ''
+  loadOrders()
+}
+
+// Recarregar pedidos quando o filtro de mesa mudar (vindo do MesasView)
+watch(filtroMesa, () => {
+  loadOrders()
+})
+
 // Verificar pagamento consultando Asaas diretamente
 async function verificarPagamento(order) {
   globalLoading.value = true
@@ -832,7 +793,7 @@ onUnmounted(() => {
   display: flex; align-items: center; justify-content: center; padding: 1rem;
 }
 .modal-content {
-  background: white; border-radius: 12px; padding: 1.5rem;
+  background: white; border-radius: var(--radius); padding: 1.5rem;
   width: 100%; max-width: 500px; max-height: 80vh; overflow-y: auto;
 }
 .profile-section { margin-bottom: 1rem; }
@@ -841,7 +802,7 @@ onUnmounted(() => {
   text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 0.5rem;
   padding-bottom: 0.3rem; border-bottom: 1px solid var(--border);
 }
-.order-summary { background: var(--background); padding: 1rem; border-radius: 8px; margin-top: 1rem; }
+.order-summary { background: var(--background); padding: 1rem; border-radius: var(--radius-sm); margin-top: 1rem; }
 .order-summary-row { display: flex; justify-content: space-between; font-size: 0.9rem; margin-bottom: 4px; }
 .order-summary-total { display: flex; justify-content: space-between; font-weight: 800; font-size: 1.1rem; padding-top: 8px; margin-top: 8px; border-top: 2px solid var(--border); }
 .status-badge { display: inline-flex; padding: 2px 8px; border-radius: 999px; font-size: 0.75rem; font-weight: 700; }
@@ -852,7 +813,7 @@ onUnmounted(() => {
   transform: translateX(-50%);
   z-index: 9999;
   padding: 0.75rem 1.5rem;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   font-size: 0.85rem;
   font-weight: 600;
   display: flex;
@@ -988,6 +949,17 @@ onUnmounted(() => {
 }
 
 /* Refund status indicator */
+.order-obs-badge {
+  background: var(--warning-light);
+  padding: 6px 8px;
+  border-radius: var(--radius-xs);
+  font-size: 0.85rem;
+  margin-top: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .refund-status {
   font-size: 0.8rem;
   margin-top: 4px;
@@ -998,6 +970,38 @@ onUnmounted(() => {
   gap: 4px;
 }
 .refund-status svg { width: 14px; height: 14px; }
+
+/* ── Mesa Filter Badge ── */
+.mesa-filter-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  border-radius: 8px;
+  background: #ede9fe;
+  border: 1px solid #c4b5fd;
+  color: #5b21b6;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+.mesa-filter-badge .btn-clear-filter {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(91,33,182,0.12);
+  color: #5b21b6;
+  cursor: pointer;
+  font-size: 0.7rem;
+  font-weight: 700;
+  transition: all 0.15s ease;
+}
+.mesa-filter-badge .btn-clear-filter:hover {
+  background: rgba(91,33,182,0.25);
+}
 .refund-pending {
   background: #fef3c7;
   color: #92400e;

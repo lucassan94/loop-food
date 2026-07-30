@@ -74,16 +74,29 @@ async function buscarCEP() {
   try {
     const { data: cepData } = await api.post('/cep', { cep: cepLimpo })
 
-    let freteMsg = ''
-    if (cepData.latitude && cepData.longitude) {
-      try {
-        const { data: frete } = await api.post('/pedidos/calcular-frete', {
-          latitude: cepData.latitude,
-          longitude: cepData.longitude,
-        })
-        freteMsg = ` — ${frete.distancia_km ? `~${frete.distancia_km}km, ` : ''}${frete.tempo_min}-${frete.tempo_max}min, Frete R$ ${parseFloat(frete.custo).toFixed(2)}`
-      } catch { /* Ignore */ }
+    // Sempre calcular o frete, com ou sem coordenadas
+    // O backend valida o estado mesmo sem coordenadas
+    let frete
+    try {
+      const { data: freteData } = await api.post('/pedidos/calcular-frete', {
+        latitude: cepData.latitude,
+        longitude: cepData.longitude,
+        cidade: cepData.cidade,
+        estado: cepData.estado,
+      })
+      frete = freteData
+    } catch (freteErr) {
+      // Frete rejeitou — região não atendida
+      const msgFrete = freteErr.response?.data?.error || 'Não entregamos nesta região.'
+      resultado.value = { tipo: 'error', mensagem: msgFrete }
+      addToast(msgFrete, 'error')
+      return
     }
+
+    // Frete calculado com sucesso — região atendida!
+    const freteMsg = frete.distancia_km
+      ? ` ~${frete.distancia_km}km, ${frete.tempo_min}-${frete.tempo_max}min, Frete R$ ${parseFloat(frete.custo).toFixed(2)}`
+      : ` ${frete.tempo_min}-${frete.tempo_max}min, Frete R$ ${parseFloat(frete.custo).toFixed(2)}`
 
     addToast(`Entregamos na sua região!${freteMsg}`, 'success')
 
@@ -92,7 +105,7 @@ async function buscarCEP() {
 
     resultado.value = {
       tipo: 'success',
-      mensagem: `Entregamos na sua região!${freteMsg}`,
+      mensagem: `✅ Entregamos na sua região!${freteMsg}`,
     }
 
     setTimeout(() => emit('close'), 2000)

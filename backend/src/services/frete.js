@@ -1,5 +1,6 @@
 import { query } from '../config/database.js';
 import { config } from '../config/index.js';
+import { AppError } from '../middleware/errorHandler.js';
 
 // Fórmula de Haversine para calcular distância entre coordenadas
 export function calcularDistancia(lat1, lon1, lat2, lon2) {
@@ -69,7 +70,7 @@ export async function calcularFrete(latitudeCliente, longitudeCliente, restauran
   const faixa = result.rows[0];
 
   if (!faixa) {
-    throw new Error('Desculpe, não entregamos na sua região.');
+    throw new AppError('Desculpe, não entregamos na sua região.', 400);
   }
 
   return {

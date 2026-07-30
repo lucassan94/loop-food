@@ -44,7 +44,7 @@
     </nav>
 
     <!-- Cart Bar -->
-    <div v-if="showCart" class="cart-bar">
+    <div v-if="showCart" class="cart-bar" :class="{ bump: cartBump }">
       <div class="cart-bar-left" @click="openCart">
         <i-lucide-shopping-bag style="width:20px;height:20px" />
         <span>{{ cartTotalItens }} {{ cartTotalItens === 1 ? 'item' : 'itens' }}</span>
@@ -96,7 +96,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, markRaw } from 'vue'
+import { ref, computed, provide, onMounted, onUnmounted, nextTick, markRaw } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from './stores/auth'
 import { connectRealtime, onEvent, offEvent } from './services/realtime'
@@ -182,6 +182,18 @@ const showCart = computed(() => cartItems.value.length > 0)
 const cartTotalItens = computed(() =>
   cartItems.value.reduce((acc, item) => acc + item.quantidade, 0)
 )
+const cartBump = ref(false)
+let bumpTimer = null
+
+async function triggerCartBump() {
+  if (bumpTimer) clearTimeout(bumpTimer)
+  cartBump.value = false
+  await nextTick()
+  cartBump.value = true
+  bumpTimer = setTimeout(() => {
+    cartBump.value = false
+  }, 350)
+}
 const cartTotal = computed(() =>
   cartItems.value.reduce((acc, item) => acc + (parseFloat(item.subtotal) || 0), 0)
 )
@@ -240,6 +252,7 @@ provide('cartItems', cartItems)
 provide('updateCart', updateCart)
 provide('cartTotal', cartTotal)
 provide('addToast', addToast)
+provide('triggerCartBump', triggerCartBump)
 provide('globalLoading', globalLoading)
 provide('loadingMessage', loadingMessage)
 provide('showCepModal', showCepModal)
@@ -278,11 +291,27 @@ onMounted(async () => {
     addToast('💬 Nova mensagem da cozinha!', 'warning')
   })
 
-  // Check store status
+  // Check store status & apply theme colors
   try {
     const api = (await import('./services/api')).default
     const { data } = await api.get('/restaurante')
     storeOpen.value = data.status_loja
+
+    // Aplicar cores do tema dinamicamente
+    const root = document.documentElement
+    if (data.cor_primaria) {
+      root.style.setProperty('--primary', data.cor_primaria)
+      // Calcular versão escura (para hover) e clara (para backgrounds)
+      root.style.setProperty('--primary-dark', adjustColor(data.cor_primaria, -20))
+      root.style.setProperty('--primary-light', hexToRgba(data.cor_primaria, 0.12))
+    }
+    if (data.cor_secundaria) {
+      root.style.setProperty('--secondary', data.cor_secundaria)
+    }
+    if (data.cor_terciaria) {
+      root.style.setProperty('--info', data.cor_terciaria)
+      root.style.setProperty('--info-light', hexToRgba(data.cor_terciaria, 0.12))
+    }
   } catch { /* Ignore */ }
 
     // PWA: Solicitar permissão de notificações após login
@@ -335,4 +364,22 @@ function statusLabel(status) {
 onUnmounted(() => {
   window.removeEventListener('scroll', handleScroll)
 })
+
+// ── Helpers de cor ──
+function adjustColor(hex, percent) {
+  // Escurece (percent negativo) ou clareia (percent positivo) uma cor hex
+  const num = parseInt(hex.replace('#', ''), 16)
+  const r = Math.min(255, Math.max(0, ((num >> 16) & 0xFF) + percent))
+  const g = Math.min(255, Math.max(0, ((num >> 8) & 0xFF) + percent))
+  const b = Math.min(255, Math.max(0, (num & 0xFF) + percent))
+  return '#' + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1)
+}
+
+function hexToRgba(hex, alpha) {
+  const num = parseInt(hex.replace('#', ''), 16)
+  const r = (num >> 16) & 0xFF
+  const g = (num >> 8) & 0xFF
+  const b = num & 0xFF
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`
+}
 </script>

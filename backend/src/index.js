@@ -10,7 +10,6 @@ import { buscarCEP } from './services/cep.js';
 import { errorHandler, notFound } from './middleware/errorHandler.js';
 import { pgContext } from './middleware/pgContext.js';
 import { tenantResolver } from './middleware/tenantResolver.js';
-import { restrictModule } from './middleware/auth.js';
 import { apiLimiter } from './middleware/rateLimiter.js';
 
 // Import routes
@@ -154,8 +153,8 @@ app.use('/api/restaurante', restauranteRoutes);
 app.use('/api/pagamentos', pagamentosRoutes);
 app.use('/api/push', pushRoutes);
 
-// Rotas exclusivas do módulo Admin (com restrição de módulo)
-app.use('/api/dashboard', restrictModule(), dashboardRoutes);
+// Rotas exclusivas do módulo Admin (restrição de módulo aplicada dentro de cada rota)
+app.use('/api/dashboard', dashboardRoutes);
 
 // ============================
 // TENANT DIAGNOSTIC — mostra como o tenant está sendo resolvido

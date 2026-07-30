@@ -112,8 +112,13 @@
           </div>
           <div class="form-row">
             <div class="form-group">
-              <label>Mesa (opcional)</label>
-              <input v-model="orderForm.mesa" placeholder="Nº" />
+              <label>Mesa</label>
+              <select v-model="orderForm.mesa">
+                <option value="">— Sem Mesa —</option>
+                <option v-for="m in mesas" :key="m.id" :value="m.nome" :disabled="m.status === 'inativa'">
+                  {{ m.nome }} ({{ mesaStatusLabel(m) }})
+                </option>
+              </select>
             </div>
             <div class="form-group">
               <label>Pagamento</label>
@@ -218,8 +223,9 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, inject } from 'vue'
+import { ref, computed, onMounted, onUnmounted, inject } from 'vue'
 import api from '../services/api'
+import { connectRealtime, onEvent, offEvent } from '../services/realtime'
 
 const globalLoading = inject('globalLoading')
 const loadingMessage = inject('loadingMessage')
@@ -236,6 +242,35 @@ const categories = ref([])
 const loading = ref(true)
 const searchQuery = ref('')
 const activeCategory = ref('todos')
+
+// Mesas para o dropdown
+const mesas = ref([])
+
+function mesaStatusLabel(m) {
+  if (m.status === 'inativa') return '🔴 Inativa'
+  if (mesaOcupada.value.has(m.nome)) return '🔴 Ocupada'
+  if (m.status === 'reservada') return '🟡 Reservada'
+  return '🟢 Livre'
+}
+
+const mesaOcupada = ref(new Set())
+
+async function loadMesas() {
+  try {
+    const [mesasRes, pedidosRes] = await Promise.all([
+      api.get('/restaurante/mesas'),
+      api.get('/pedidos', { params: { status: 'ativos', origem: 'salao', limit: 200 } }),
+    ])
+    mesas.value = mesasRes.data
+    // Descobrir quais mesas estão ocupadas por pedidos ativos
+    const ocupadas = new Set(
+      pedidosRes.data
+        .filter(p => p.origem === 'salao' && p.mesa)
+        .map(p => p.mesa)
+    )
+    mesaOcupada.value = ocupadas
+  } catch { /* ignore */ }
+}
 
 // Cart
 const cart = ref([])
@@ -534,11 +569,21 @@ async function createOrder() {
 }
 
 onMounted(async () => {
+  // Conectar WebSocket para atualizações em tempo real
+  connectRealtime()
+
   // Load categories
   try {
     const { data: cats } = await api.get('/produtos/categorias')
     categories.value = [{ nome: 'Todos', slug: 'todos' }, ...cats]
   } catch { /* ignore */ }
+
+  // Load mesas for dropdown
+  await loadMesas()
+
+  // Recarregar mesas quando pedidos mudarem
+  onEvent('pedido:novo', () => { loadMesas() })
+  onEvent('pedido:atualizado', () => { loadMesas() })
 
   // Load products with extras
   try {
@@ -549,6 +594,11 @@ onMounted(async () => {
   } finally {
     loading.value = false
   }
+})
+
+onUnmounted(() => {
+  offEvent('pedido:novo')
+  offEvent('pedido:atualizado')
 })
 </script>
 

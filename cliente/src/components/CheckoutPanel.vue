@@ -128,6 +128,11 @@
         {{ freteInfo.tempo_min }}-{{ freteInfo.tempo_max }}min</strong>
         <br />Frete: {{ formatPrice(freteInfo.custo) }}
       </div>
+      <div v-else-if="erroFrete" class="cep-result error">
+        <i-lucide-circle-x style="width:16px;height:16px" />
+        <strong>{{ erroFrete }}</strong>
+        <br /><span style="font-size:0.8rem;">Não é possível continuar com este CEP. Escolha outro endereço.</span>
+      </div>
 
       <div class="form-actions">
         <button class="btn btn-secondary" @click="currentStep = 1">Voltar</button>
@@ -305,6 +310,7 @@ const currentStep = ref(0)
 const buscandoCEP = ref(false)
 const submitting = ref(false)
 const freteInfo = ref(null)
+const erroFrete = ref(null)
 
 // Carregar CEP salvo do localStorage (do onboarding)
 const savedCep = localStorage.getItem('saborexpress_cep') || ''
@@ -446,13 +452,21 @@ async function buscarCEP() {
     form.cidade = data.cidade || form.cidade
     form.estado = data.estado || form.estado
 
-    // Calcular frete
-    if (data.latitude && data.longitude) {
+    // Calcular frete — sempre chama o endpoint, mesmo sem coordenadas
+    // O backend calcula o frete com coordenadas ou usa o raio padrão como fallback
+    try {
       const frete = await api.post('/pedidos/calcular-frete', {
         latitude: data.latitude,
         longitude: data.longitude,
+        cidade: data.cidade,
+        estado: data.estado,
       })
       freteInfo.value = frete.data
+      erroFrete.value = null
+    } catch (freteErr) {
+      freteInfo.value = null
+      erroFrete.value = freteErr.response?.data?.error || 'Não entregamos nesta região.'
+      addToast(freteErr.response?.data?.error || 'Não entregamos nesta região.', 'error')
     }
   } catch (err) {
     addToast(err.response?.data?.error || 'CEP não encontrado. Preencha manualmente.', 'warning')
@@ -472,6 +486,11 @@ function goToStep2() {
 function goToStep3() {
   if (!form.endereco || !form.numero || !form.bairro) {
     addToast('Preencha o endereço completo.', 'warning')
+    return
+  }
+  // Bloquear se o frete falhou (fora da área de entrega)
+  if (erroFrete.value) {
+    addToast('Corrija o endereço de entrega antes de continuar.', 'warning')
     return
   }
   currentStep.value = 3

@@ -16,7 +16,7 @@ router.get('/', async (req, res, next) => {
   try {
     const restaurantId = req.restaurantId || config.restaurantId;
     const result = await query(
-      'SELECT id, nome, endereco, cep, cidade, estado, latitude, longitude, status_loja, tempo_preparo_min, modo_sem_entregador, formas_pagamento_aceitas FROM restaurantes WHERE id = $1',
+      'SELECT id, nome, endereco, cep, cidade, estado, latitude, longitude, status_loja, tempo_preparo_min, modo_sem_entregador, formas_pagamento_aceitas, cor_primaria, cor_secundaria, cor_terciaria, features, logo_base64 FROM restaurantes WHERE id = $1',
       [restaurantId]
     );
 
@@ -63,23 +63,44 @@ router.get('/', async (req, res, next) => {
 router.put('/', authenticate, authorize('admin', 'gerente'), async (req, res, next) => {
   try {
     const restaurantId = req.restaurantId || config.restaurantId;
-    const { nome, endereco, cep, cidade, estado, latitude, longitude, tempo_preparo_min, modo_sem_entregador, formas_pagamento_aceitas } = req.body;
+    const { nome, endereco, cep, cidade, estado, latitude, longitude, tempo_preparo_min, modo_sem_entregador, formas_pagamento_aceitas, cor_primaria, cor_secundaria, cor_terciaria, features, logo_base64 } = req.body;
+
+    const fields = [];
+    const params = [];
+    let idx = 1;
+
+    if (nome !== undefined) { fields.push(`nome = $${idx++}`); params.push(nome); }
+    if (endereco !== undefined) { fields.push(`endereco = $${idx++}`); params.push(endereco); }
+    if (cep !== undefined) { fields.push(`cep = $${idx++}`); params.push(cep); }
+    if (cidade !== undefined) { fields.push(`cidade = $${idx++}`); params.push(cidade); }
+    if (estado !== undefined) { fields.push(`estado = $${idx++}`); params.push(estado); }
+    if (latitude !== undefined) { fields.push(`latitude = $${idx++}`); params.push(latitude); }
+    if (longitude !== undefined) { fields.push(`longitude = $${idx++}`); params.push(longitude); }
+    if (tempo_preparo_min !== undefined) { fields.push(`tempo_preparo_min = $${idx++}`); params.push(tempo_preparo_min); }
+    if (modo_sem_entregador !== undefined) { fields.push(`modo_sem_entregador = $${idx++}`); params.push(modo_sem_entregador); }
+    if (formas_pagamento_aceitas !== undefined) {
+      fields.push(`formas_pagamento_aceitas = $${idx++}`);
+      params.push(JSON.stringify(formas_pagamento_aceitas));
+    }
+    if (cor_primaria !== undefined) { fields.push(`cor_primaria = $${idx++}`); params.push(cor_primaria); }
+    if (cor_secundaria !== undefined) { fields.push(`cor_secundaria = $${idx++}`); params.push(cor_secundaria); }
+    if (cor_terciaria !== undefined) { fields.push(`cor_terciaria = $${idx++}`); params.push(cor_terciaria); }
+    if (features !== undefined) {
+      fields.push(`features = $${idx++}`);
+      params.push(JSON.stringify(features));
+    }
+    if (logo_base64 !== undefined) { fields.push(`logo_base64 = $${idx++}`); params.push(logo_base64); }
+
+    if (fields.length === 0) {
+      throw new AppError('Nenhum campo para atualizar.', 400);
+    }
+
+    params.push(restaurantId);
 
     const result = await query(
-      `UPDATE restaurantes SET
-        nome = COALESCE($1, nome),
-        endereco = COALESCE($2, endereco),
-        cep = COALESCE($3, cep),
-        cidade = COALESCE($4, cidade),
-        estado = COALESCE($5, estado),
-        latitude = COALESCE($6, latitude),
-        longitude = COALESCE($7, longitude),
-        tempo_preparo_min = COALESCE($8, tempo_preparo_min),
-        modo_sem_entregador = COALESCE($9, modo_sem_entregador),
-        formas_pagamento_aceitas = COALESCE($10, formas_pagamento_aceitas)
-       WHERE id = $11
+      `UPDATE restaurantes SET ${fields.join(', ')} WHERE id = $${idx}
        RETURNING *`,
-      [nome, endereco, cep, cidade, estado, latitude, longitude, tempo_preparo_min, modo_sem_entregador, formas_pagamento_aceitas ? JSON.stringify(formas_pagamento_aceitas) : null, restaurantId]
+      params
     );
 
     emitToRestaurant('restaurante:atualizado', result.rows[0], restaurantId);
@@ -305,5 +326,80 @@ router.put('/seguranca', authenticate, authorize('admin'), async (req, res, next
 import bannersRouter from './banners.js';
 
 router.use('/banners', bannersRouter);
+
+// ============================
+// MESAS (Salão) — CRUD
+// ============================
+router.get('/mesas', authenticate, async (req, res, next) => {
+  try {
+    const restaurantId = req.restaurantId || config.restaurantId;
+    const result = await query(
+      'SELECT * FROM mesas WHERE restaurant_id = $1 ORDER BY nome ASC',
+      [restaurantId]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/mesas', authenticate, authorize('admin', 'gerente'), async (req, res, next) => {
+  try {
+    const restaurantId = req.restaurantId || config.restaurantId;
+    const { nome, capacidade } = req.body;
+    if (!nome || !nome.trim()) throw new AppError('Nome da mesa é obrigatório.', 400);
+
+    const result = await query(
+      `INSERT INTO mesas (restaurant_id, nome, capacidade)
+       VALUES ($1, $2, $3)
+       RETURNING *`,
+      [restaurantId, nome.trim(), capacidade || 4]
+    );
+
+    res.status(201).json(result.rows[0]);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.put('/mesas/:id', authenticate, authorize('admin', 'gerente'), async (req, res, next) => {
+  try {
+    const restaurantId = req.restaurantId || config.restaurantId;
+    const { id } = req.params;
+    const { nome, capacidade, status } = req.body;
+
+    const fields = [];
+    const params = [id, restaurantId];
+    let paramIdx = 3;
+
+    if (nome !== undefined) { fields.push(`nome = $${paramIdx++}`); params.push(nome.trim()); }
+    if (capacidade !== undefined) { fields.push(`capacidade = $${paramIdx++}`); params.push(capacidade); }
+    if (status !== undefined) { fields.push(`status = $${paramIdx++}`); params.push(status); }
+
+    if (fields.length === 0) throw new AppError('Nenhum campo para atualizar.', 400);
+
+    const result = await query(
+      `UPDATE mesas SET ${fields.join(', ')} WHERE id = $1 AND restaurant_id = $2
+       RETURNING *`,
+      params
+    );
+
+    if (result.rows.length === 0) throw new AppError('Mesa não encontrada.', 404);
+    res.json(result.rows[0]);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.delete('/mesas/:id', authenticate, authorize('admin', 'gerente'), async (req, res, next) => {
+  try {
+    const restaurantId = req.restaurantId || config.restaurantId;
+    const { id } = req.params;
+    await query('DELETE FROM mesas WHERE id = $1 AND restaurant_id = $2', [id, restaurantId]);
+    res.json({ message: 'Mesa excluída.' });
+  } catch (err) {
+    next(err);
+  }
+});
 
 export default router;

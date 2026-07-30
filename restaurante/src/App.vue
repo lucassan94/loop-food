@@ -20,23 +20,29 @@
   </div>
 
   <div v-else class="admin-layout">      <aside class="sidebar" :class="{ collapsed: sidebarCollapsed }">
-      <div class="sidebar-brand">
-        <div class="logo"><i-lucide-crown style="width:24px;height:24px" /></div>
+      <div class="sidebar-brand" @click="sidebarCollapsed = false" style="cursor:pointer;">
+        <div class="logo">
+          <img v-if="logoUrl" :src="logoUrl" alt="Logo" class="sidebar-logo-img" />
+          <i-lucide-crown v-else style="width:24px;height:24px" />
+        </div>
         <h2>🏰 Palazzo</h2>
-        <button class="sidebar-toggle" @click="sidebarCollapsed = !sidebarCollapsed" :title="sidebarCollapsed ? 'Expandir menu' : 'Recolher menu'">
+        <button class="sidebar-toggle" @click.stop="sidebarCollapsed = !sidebarCollapsed" :title="sidebarCollapsed ? 'Expandir menu' : 'Recolher menu'">
           <i-lucide-chevron-right v-if="sidebarCollapsed" />
           <i-lucide-chevron-left v-else />
         </button>
       </div>
       <nav class="sidebar-nav">
-        <button v-for="item in menuItems" :key="item.id"
-          class="sidebar-item"
-          :class="{ active: currentView === item.id }"
-          @click="currentView = item.id"
-        >
-          <component :is="item.icon" />
-          <span>{{ item.label }}</span>
-        </button>
+        <template v-for="group in sidebarGroups" :key="group.label">
+          <div class="sidebar-group-label" :class="{ collapsed: sidebarCollapsed }">{{ group.label }}</div>
+          <button v-for="item in filterMenuItems(group.items)" :key="item.id"
+            class="sidebar-item"
+            :class="{ active: currentView === item.id }"
+            @click="currentView = item.id"
+          >
+            <component :is="item.icon" />
+            <span>{{ item.label }}</span>
+          </button>
+        </template>
       </nav>
       <div style="margin-top:auto;border-top:1px solid rgba(255,255,255,0.1);padding:1rem;">
         <button class="sidebar-item" @click="showLogoutConfirm = true">
@@ -68,6 +74,7 @@
       <KdsView v-if="currentView === 'kds'" />
       <OrdersView v-if="currentView === 'pedidos'" @change-view="currentView = $event" />
       <ProdutosView v-if="currentView === 'produtos'" />
+      <MesasView v-if="currentView === 'mesas'" @navigate="handleMesaNavigate" />
       <ClientesView v-if="currentView === 'clientes'" />
       <EntregadoresView v-if="currentView === 'entregadores'" />
       <RelatoriosView v-if="currentView === 'relatorios'" />
@@ -102,7 +109,7 @@ import { useAuthStore } from './stores/auth'
 import { connectRealtime, onEvent, offEvent } from './services/realtime'
 import api from './services/api'
 
-import { ClipboardList, Hamburger, Users, Bike, BarChart3, PieChart, ShoppingCart, CookingPot, Settings } from 'lucide-vue-next'
+import { ClipboardList, Hamburger, Users, Bike, BarChart3, PieChart, ShoppingCart, CookingPot, Settings, Table2 } from 'lucide-vue-next'
 
 import ConfirmModal from './components/ConfirmModal.vue'
 import OrdersView from './views/OrdersView.vue'
@@ -114,6 +121,7 @@ import DashboardView from './views/DashboardView.vue'
 import PdvView from './views/PdvView.vue'
 import KdsView from './views/KdsView.vue'
 import ConfigView from './views/ConfigView.vue'
+import MesasView from './views/MesasView.vue'
 
 const authStore = useAuthStore()
 const email = ref('')
@@ -124,36 +132,69 @@ const currentView = ref('pedidos')
 const storeOpen = ref(true)
 const showLogoutConfirm = ref(false)
 
+// Filtro compartilhado: mesa vindo do MesasView
+const filtroMesa = ref('')
+provide('filtroMesa', filtroMesa)
+
 // Global loading
 const globalLoading = ref(false)
 const loadingMessage = ref('Carregando...')
 
 // Sidebar toggle
 const sidebarCollapsed = ref(false)
+const features = ref({ salao: true, delivery: true })
+const logoUrl = ref('')
 
 // Menu completo com cargos permitidos para cada seção
-const allMenuItems = [
-  { id: 'pdv', label: 'PDV (Salão)', icon: markRaw(ShoppingCart), cargos: ['admin', 'gerente', 'caixa'] },
-  { id: 'kds', label: 'Cozinha (KDS)', icon: markRaw(CookingPot), cargos: ['admin', 'gerente', 'chef', 'caixa'] },
-  { id: 'pedidos', label: 'Fila de Pedidos', icon: markRaw(ClipboardList), cargos: ['admin', 'gerente', 'chef', 'caixa'] },
-  { id: 'produtos', label: 'Gerenciar Produtos', icon: markRaw(Hamburger), cargos: ['admin', 'gerente', 'chef'] },
-  { id: 'clientes', label: 'Clientes / CRM', icon: markRaw(Users), cargos: ['admin', 'gerente', 'caixa'] },
-  { id: 'entregadores', label: 'Entregadores', icon: markRaw(Bike), cargos: ['admin', 'gerente'] },
-  { id: 'relatorios', label: 'Rel. Entregas', icon: markRaw(BarChart3), cargos: ['admin', 'gerente'] },
-  { id: 'config', label: 'Configurações', icon: markRaw(Settings), cargos: ['admin', 'gerente'] },
-  { id: 'dashboard', label: 'Dashboard', icon: markRaw(PieChart), cargos: ['admin', 'gerente', 'caixa'] },
-]
+const sidebarGroups = computed(() => [
+  ...(features.value.salao ? [{
+    label: 'Salão',
+    items: [
+      { id: 'mesas', label: 'Mesas', icon: markRaw(Table2), cargos: ['admin', 'gerente', 'caixa'] },
+      { id: 'pdv', label: 'PDV', icon: markRaw(ShoppingCart), cargos: ['admin', 'gerente', 'caixa'] },
+      { id: 'kds', label: 'Cozinha (KDS)', icon: markRaw(CookingPot), cargos: ['admin', 'gerente', 'chef', 'caixa'] },
+    ]
+  }] : []),
+  ...(features.value.delivery ? [{
+    label: 'Delivery',
+    items: [
+      { id: 'pedidos', label: 'Fila de Pedidos', icon: markRaw(ClipboardList), cargos: ['admin', 'gerente', 'chef', 'caixa'] },
+      { id: 'entregadores', label: 'Entregadores', icon: markRaw(Bike), cargos: ['admin', 'gerente'] },
+      { id: 'relatorios', label: 'Rel. Entregas', icon: markRaw(BarChart3), cargos: ['admin', 'gerente'] },
+    ]
+  }] : []),
+  {
+    label: 'Geral',
+    items: [
+      { id: 'dashboard', label: 'Dashboard', icon: markRaw(PieChart), cargos: ['admin', 'gerente', 'caixa'] },
+      { id: 'produtos', label: 'Produtos', icon: markRaw(Hamburger), cargos: ['admin', 'gerente', 'chef'] },
+      { id: 'clientes', label: 'Clientes', icon: markRaw(Users), cargos: ['admin', 'gerente', 'caixa'] },
+      { id: 'config', label: 'Configurações', icon: markRaw(Settings), cargos: ['admin', 'gerente'] },
+    ]
+  },
+])
+
+// Menu completo achatado para compatibilidade
+const allMenuItems = computed(() => sidebarGroups.value.flatMap(g => g.items))
 
 // Sidebar filtrada pelo cargo do usuário logado
+// Filtro de itens por cargo do usuário
+function filterMenuItems(items) {
+  const cargo = authStore.user?.cargo
+  if (!cargo) return items
+  return items.filter(item => item.cargos.includes(cargo))
+}
+
+// Menu completo achatado e filtrado (para redirecionamento seguro)
 const menuItems = computed(() => {
   const cargo = authStore.user?.cargo
-  if (!cargo) return allMenuItems
-  return allMenuItems.filter(item => item.cargos.includes(cargo))
+  if (!cargo) return allMenuItems.value
+  return allMenuItems.value.filter(item => item.cargos.includes(cargo))
 })
 
 // Título da view atual
 const currentViewTitle = computed(() => {
-  const item = allMenuItems.find(i => i.id === currentView.value)
+  const item = allMenuItems.value.find(i => i.id === currentView.value)
   return item?.label || ''
 })
 
@@ -176,6 +217,12 @@ async function login() {
   try {
     const apiAuth = (await import('./services/api')).default
     const { data } = await apiAuth.post('/auth/restaurante/login', { email: email.value, password: password.value })
+    // Cross-login prevention: verificar se o módulo confere
+    if (data.user?.module !== 'admin') {
+      errorMsg.value = 'Acesso negado: você não tem permissão para este módulo.'
+      authStore.user = null
+      return
+    }
     authStore.user = data.user
   } catch (err) { errorMsg.value = err.response?.data?.error || 'Erro ao fazer login.' }
   finally { loading.value = false }
@@ -199,20 +246,69 @@ onMounted(async () => {
   const socket = connectRealtime()
   
   onEvent('restaurante:status_loja', (data) => { storeOpen.value = data.status_loja })
-  onEvent('restaurante:atualizado', (data) => { /* refresh */ })
+  onEvent('restaurante:atualizado', async (data) => {
+    // Recarregar features e logo quando ConfigView salvar
+    if (data.features) {
+      features.value = data.features
+    }
+    if (data.logo_base64) {
+      logoUrl.value = data.logo_base64.startsWith('data:') ? data.logo_base64 : 'data:image/png;base64,' + data.logo_base64
+    }
+  })
 
   try {
     const { data } = await api.get('/restaurante')
     storeOpen.value = data.status_loja
+    features.value = data.features || { salao: true, delivery: true }
+    // Carregar logo
+    if (data.logo_base64) {
+      logoUrl.value = detectImgSrc(data.logo_base64)
+    }
   } catch { /* ignore */ }
 
 })
+
+// Handler de navegação vindo de MesasView (irParaPedido)
+function detectImgSrc(b64) {
+  if (!b64) return ''
+  if (b64.startsWith('/9j/')) return 'data:image/jpeg;base64,' + b64
+  if (b64.startsWith('iVBORw0KGgo')) return 'data:image/png;base64,' + b64
+  if (b64.startsWith('UklGR')) return 'data:image/webp;base64,' + b64
+  return 'data:image/png;base64,' + b64
+}
+
+function handleMesaNavigate({ view, mesa }) {
+  currentView = view
+  filtroMesa.value = mesa
+}
 
 // Watch para recalcular rota se o cargo mudar
 watch(() => authStore.user?.cargo, () => {
   safeRedirect()
 })
+
+// Watch para recalcular rota se features mudarem
+watch(features, () => {
+  safeRedirect()
+}, { deep: true })
 </script>
+
+.sidebar-group-label.collapsed {
+  opacity: 0;
+  width: 0;
+  height: 0;
+  padding: 0;
+  margin: 0;
+  overflow: hidden;
+  border: none;
+}
+
+.sidebar-logo-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  border-radius: 8px;
+}
 
 <style scoped>
 .cargo-badge {

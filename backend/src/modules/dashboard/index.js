@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { query } from '../../config/database.js';
 import { config } from '../../config/index.js';
-import { authenticate, authorize } from '../../middleware/auth.js';
+import { authenticate, authorize, restrictModule } from '../../middleware/auth.js';
 
 const router = Router();
 
@@ -25,7 +25,7 @@ function buildDateClause(params, dataInicio, dataFim, tablePrefix = '') {
 // ============================
 // DASHBOARD PRINCIPAL
 // ============================
-router.get('/', authenticate, authorize('admin', 'gerente', 'caixa'), async (req, res, next) => {
+router.get('/', authenticate, restrictModule(), authorize('admin', 'gerente', 'caixa'), async (req, res, next) => {
   try {
     const restaurantId = req.restaurantId || config.restaurantId;
     const { data_inicio, data_fim } = req.query;
@@ -117,7 +117,7 @@ router.get('/', authenticate, authorize('admin', 'gerente', 'caixa'), async (req
 // ============================
 // RESUMO DO DIA (Sidebar widget)
 // ============================
-router.get('/resumo-dia', authenticate, authorize('admin', 'gerente', 'caixa'), async (req, res, next) => {
+router.get('/resumo-dia', authenticate, restrictModule(), authorize('admin', 'gerente', 'caixa'), async (req, res, next) => {
   try {
     const restaurantId = req.restaurantId || config.restaurantId;
     const result = await query(`

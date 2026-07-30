@@ -100,7 +100,7 @@ router.post('/', orderLimiter, optionalAuth, async (req, res, next) => {
           subtotal, valor_frete, total, metodo_pagamento,
           detalhes_pagamento, observacoes,
           tempo_preparo_estimado, tempo_entrega_estimado, status
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, 'pendente')
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, 'pendente')
         RETURNING *`,
           [
             restaurantId, clienteId, data.origem || 'delivery',
@@ -201,8 +201,8 @@ router.post('/pdv', authenticate, async (req, res, next) => {
         `INSERT INTO pedidos (
           restaurant_id, cliente_id, origem, mesa, nome_cliente,
           subtotal, valor_frete, total, metodo_pagamento,
-          observacoes, status
-        ) VALUES ($1, $2, 'salao', $3, $4, $5, 0, $6, $7, $8, 'pendente')
+          observacoes, aceito_em, status
+        ) VALUES ($1, $2, 'salao', $3, $4, $5, 0, $6, $7, $8, NOW(), 'preparando')
         RETURNING *`,
         [
           restaurantId, clienteId, data.mesa || null,
@@ -228,12 +228,21 @@ router.post('/pdv', authenticate, async (req, res, next) => {
         );
       }
 
-      // Registrar timeline
+      // Registrar timeline (já vai direto para preparando)
       await client.query(
         `INSERT INTO pedido_timeline (pedido_id, status_novo, usuario_tipo, notas)
-         VALUES ($1, 'pendente', 'restaurante', 'Pedido criado via PDV (Salão)')`,
+         VALUES ($1, 'preparando', 'restaurante', 'Pedido criado via PDV (Salão)')`,
         [pedidoCriado.id]
       );
+
+      // Se o pedido tem uma mesa, marcar como ocupada
+      if (data.mesa) {
+        await client.query(
+          `UPDATE mesas SET status = 'ocupada', atualizado_em = NOW()
+           WHERE restaurant_id = $1 AND nome = $2`,
+          [restaurantId, data.mesa]
+        );
+      }
 
       return pedidoCriado;
     });
@@ -250,7 +259,7 @@ router.post('/pdv', authenticate, async (req, res, next) => {
 // ============================
 router.get('/', authenticate, async (req, res, next) => {
   try {
-    const { status, data_inicio, data_fim, limit = 50, offset = 0 } = req.query;
+    const { status, data_inicio, data_fim, limit = 50, offset = 0, mesa, origem } = req.query;
     const { id, role } = req.user;
 
     let sql = `
@@ -299,6 +308,18 @@ router.get('/', authenticate, async (req, res, next) => {
         sql += ' AND p.status = $' + (params.length + 1);
         params.push(status);
       }
+    }
+
+    // Filtro por nome da mesa (salão) — p.mesa armazena o nome, ex: 'Mesa 5'
+    if (mesa) {
+      sql += ' AND p.mesa = $' + (params.length + 1);
+      params.push(String(mesa));
+    }
+
+    // Filtro por origem (salao/delivery)
+    if (origem) {
+      sql += ' AND p.origem = $' + (params.length + 1);
+      params.push(origem);
     }
 
     // Filtro por data
@@ -384,11 +405,12 @@ router.patch('/:id/status', authenticate, async (req, res, next) => {
 
     const statusSchema = z.object({
       status: z.enum(['aguardando_pagamento', 'pendente', 'preparando', 'pronto_entrega', 'pronto', 'em_transito', 'cheguei_destino', 'entregue', 'finalizado', 'cancelado', 'recusado']),
+      metodo_pagamento: z.string().optional(),
       motivo: z.string().optional(),
       entregador_id: z.number().optional(),
     });
 
-    const data = statusSchema.parse({ status, motivo, entregador_id });
+    const data = statusSchema.parse({ status, metodo_pagamento, motivo, entregador_id });
 
     // ─── PERMISSÕES POR CARGO ───
     // Cada cargo/role só pode fazer as transições permitidas
@@ -488,6 +510,12 @@ router.patch('/:id/status', authenticate, async (req, res, next) => {
         paramIdx++;
       }
 
+      if (data.metodo_pagamento) {
+        updates.push(`metodo_pagamento = $${paramIdx}`);
+        params.push(data.metodo_pagamento);
+        paramIdx++;
+      }
+
       if (data.entregador_id) {
         updates.push(`entregador_id = $${paramIdx}`);
         params.push(data.entregador_id);
@@ -522,6 +550,28 @@ router.patch('/:id/status', authenticate, async (req, res, next) => {
            WHERE id = $2`,
           [pedidoAtual.valor_frete, pedidoAtual.entregador_id]
         );
+      }
+
+      // Se o pedido for de salão com mesa, atualizar status da mesa
+      const isSalaoStatusFinal = ['finalizado', 'cancelado', 'recusado'].includes(data.status);
+      if (isSalaoStatusFinal && pedidoAtual.origem === 'salao' && pedidoAtual.mesa) {
+        // Verificar se ainda existem outros pedidos ATIVOS na mesma mesa
+        const outrosAtivos = await client.query(
+          `SELECT COUNT(*) as count FROM pedidos
+           WHERE restaurant_id = $1 AND mesa = $2 AND origem = 'salao'
+             AND id != $3
+             AND status NOT IN ('entregue', 'finalizado', 'cancelado', 'recusado')`,
+          [pedidoAtual.restaurant_id, pedidoAtual.mesa, id]
+        );
+
+        // Se não houver outros pedidos ativos, liberar a mesa
+        if (parseInt(outrosAtivos.rows[0].count) === 0) {
+          await client.query(
+            `UPDATE mesas SET status = 'livre', atualizado_em = NOW()
+             WHERE restaurant_id = $1 AND nome = $2`,
+            [pedidoAtual.restaurant_id, pedidoAtual.mesa]
+          );
+        }
       }
 
       // Buscar pedido atualizado
@@ -609,27 +659,48 @@ router.patch('/:id/status', authenticate, async (req, res, next) => {
 router.post('/calcular-frete', async (req, res, next) => {
   try {
     const restaurantId = req.restaurantId || config.restaurantId;
-    const { latitude, longitude } = req.body;
+    const { latitude, longitude, cidade, estado } = req.body;
 
-    if (!latitude || !longitude) {
-      // Calcular frete fixo se não houver coordenadas
-      const result = await query(
-        'SELECT raio_km, tempo_min, tempo_max, custo FROM raios_entrega WHERE restaurant_id = $1 ORDER BY raio_km ASC LIMIT 1',
-        [restaurantId]
-      );
-      const faixa = result.rows[0] || { raio_km: 1, tempo_min: 15, tempo_max: 25, custo: 5.00 };
-      return res.json({
-        distancia_km: null,
-        faixa_raio: faixa.raio_km,
-        tempo_min: faixa.tempo_min,
-        tempo_max: faixa.tempo_max,
-        custo: parseFloat(faixa.custo),
-        tempo_preparo: 20,
-      });
+    // Se tem coordenadas, calcula distância real
+    if (latitude && longitude) {
+      const frete = await calcularFrete(latitude, longitude, restaurantId);
+      return res.json(frete);
     }
 
-    const frete = await calcularFrete(latitude, longitude, restaurantId);
-    res.json(frete);
+    // ── SEM COORDENADAS: validar estado antes de usar fallback ──
+    // Buscar dados do restaurante para saber em qual estado ele está
+    const restaurante = await query(
+      'SELECT estado, tempo_preparo_min FROM restaurantes WHERE id = $1',
+      [restaurantId]
+    );
+
+    const restEstado = restaurante.rows[0]?.estado;
+    const tempoPreparo = restaurante.rows[0]?.tempo_preparo_min || 20;
+
+    // Se o cliente informou o estado e o restaurante tem estado cadastrado
+    if (estado && restEstado && estado.toUpperCase() !== restEstado.toUpperCase()) {
+      // Estados diferentes — rejeitar entrega
+      throw new AppError(
+        `Desculpe, não entregamos em ${estado.toUpperCase()}. Nosso raio de entrega abrange apenas ${restEstado.toUpperCase()}.`,
+        400
+      );
+    }
+
+    // Fallback: frete padrão (primeiro raio) para entregas dentro do estado
+    const result = await query(
+      'SELECT raio_km, tempo_min, tempo_max, custo FROM raios_entrega WHERE restaurant_id = $1 ORDER BY raio_km ASC LIMIT 1',
+      [restaurantId]
+    );
+    const faixa = result.rows[0] || { raio_km: 1, tempo_min: 15, tempo_max: 25, custo: 5.00 };
+
+    return res.json({
+      distancia_km: null,
+      faixa_raio: faixa.raio_km,
+      tempo_min: faixa.tempo_min,
+      tempo_max: faixa.tempo_max,
+      custo: parseFloat(faixa.custo),
+      tempo_preparo: tempoPreparo,
+    });
   } catch (err) {
     next(err);
   }
