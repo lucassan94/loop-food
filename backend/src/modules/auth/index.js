@@ -178,8 +178,8 @@ router.post('/cliente/signup', signupLimiter, async (req, res, next) => {
     // Verificar se telefone já existe
     const digits = data.telefone.replace(/\D/g, '');
     const existing = await query(
-      'SELECT id FROM clientes WHERE restaurant_id = $1 AND REPLACE(REPLACE(REPLACE(telefone, $$($$), $$)$$), $$ $$, $$\'$$) = $2',
-      [restaurantId, `%${digits}`]
+      "SELECT id FROM clientes WHERE restaurant_id = $1 AND REPLACE(REPLACE(REPLACE(telefone, '(', ''), ')', ''), ' ', '') = $2",
+      [restaurantId, digits]
     );
     if (existing.rows.length > 0) {
       throw new AppError('Este telefone já está cadastrado.', 409);
