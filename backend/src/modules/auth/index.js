@@ -13,15 +13,30 @@ const router = Router();
 
 // Schemas de validação
 const loginSchema = z.object({
-  email: z.string().email('E-mail inválido.'),
+  email: z.string().optional(),
+  password: z.string().min(8, 'Senha deve ter no mínimo 8 caracteres.'),
+});
+
+const loginClienteSchema = z.object({
+  telefone: z.string().min(1, 'Telefone é obrigatório.'),
+  password: z.string().min(8, 'Senha deve ter no mínimo 8 caracteres.'),
+});
+
+const loginEntregadorSchema = z.object({
+  telefone: z.string().min(1, 'Telefone é obrigatório.'),
+  password: z.string().min(8, 'Senha deve ter no mínimo 8 caracteres.'),
+});
+
+const loginStaffSchema = z.object({
+  apelido: z.string().min(2, 'Apelido deve ter no mínimo 2 caracteres.'),
   password: z.string().min(8, 'Senha deve ter no mínimo 8 caracteres.'),
 });
 
 const signupClienteSchema = z.object({
   nome: z.string().min(2, 'Nome deve ter no mínimo 2 caracteres.'),
   sobrenome: z.string().optional(),
-  email: z.string().email('E-mail inválido.'),
-  telefone: z.string().refine((v) => !v || validarTelefone(v).valido, { message: 'Telefone inválido. Use (XX) XXXXX-XXXX.' }).optional(),
+  email: z.string().email('E-mail inválido.').optional().or(z.literal('')),
+  telefone: z.string().refine((v) => validarTelefone(v).valido, { message: 'Telefone inválido. Use (XX) XXXXX-XXXX.' }),
   cpf: z.string().refine((v) => !v || validarCPF(v).valido, { message: 'CPF inválido.' }).optional(),
   password: z.string().min(8, 'Senha deve ter no mínimo 8 caracteres.'),
 });
@@ -100,25 +115,28 @@ function setTokenCookies(req, res, tokens) {
 }
 
 // ============================
-// CLIENTE - Login
+// CLIENTE - Login (por telefone)
 // ============================
 router.post('/cliente/login', loginLimiter, async (req, res, next) => {
   try {
     const restaurantId = req.restaurantId || config.restaurantId;
-    const { email, password } = loginSchema.parse(req.body);
+    const { telefone, password } = loginClienteSchema.parse(req.body);
+
+    // Normalizar telefone: remover máscara
+    const digits = telefone.replace(/\D/g, '');
 
     const result = await query(
       `SELECT id, nome, sobrenome, email, telefone, endereco, numero, bairro, complemento, cidade, estado, cep, cpf_cnpj, senha_hash
        FROM clientes
-       WHERE email = $1 AND ativo = true`,
-      [email]
+       WHERE restaurant_id = $1 AND REPLACE(REPLACE(REPLACE(telefone, '(', ''), ')', ''), ' ', '') LIKE $2 AND ativo = true`,
+      [restaurantId, `%${digits}`]
     );
 
     const user = result.rows[0];
-    if (!user) throw new AppError('E-mail ou senha inválidos.', 401);
+    if (!user) throw new AppError('Telefone ou senha inválidos.', 401);
 
     const senhaValida = await bcrypt.compare(password, user.senha_hash);
-    if (!senhaValida) throw new AppError('E-mail ou senha inválidos.', 401);
+    if (!senhaValida) throw new AppError('Telefone ou senha inválidos.', 401);
 
     const tokens = await gerarTokens({ ...user, role: 'cliente' }, restaurantId);
     setTokenCookies(req, res, tokens);
@@ -157,10 +175,25 @@ router.post('/cliente/signup', signupLimiter, async (req, res, next) => {
     const restaurantId = req.restaurantId || config.restaurantId;
     const data = signupClienteSchema.parse(req.body);
 
-    // Verificar se email já existe
-    const existing = await query('SELECT id FROM clientes WHERE email = $1', [data.email]);
+    // Verificar se telefone já existe
+    const digits = data.telefone.replace(/\D/g, '');
+    const existing = await query(
+      'SELECT id FROM clientes WHERE restaurant_id = $1 AND REPLACE(REPLACE(REPLACE(telefone, $$($$), $$)$$), $$ $$, $$\'$$) = $2',
+      [restaurantId, `%${digits}`]
+    );
     if (existing.rows.length > 0) {
-      throw new AppError('Este e-mail já está cadastrado.', 409);
+      throw new AppError('Este telefone já está cadastrado.', 409);
+    }
+
+    // Verificar se email já existe (se fornecido)
+    if (data.email) {
+      const existingEmail = await query(
+        'SELECT id FROM clientes WHERE email = $1 AND restaurant_id = $2',
+        [data.email, restaurantId]
+      );
+      if (existingEmail.rows.length > 0) {
+        throw new AppError('Este e-mail já está cadastrado.', 409);
+      }
     }
 
     const senhaHash = await bcrypt.hash(data.password, 12);
@@ -170,7 +203,7 @@ router.post('/cliente/signup', signupLimiter, async (req, res, next) => {
         `INSERT INTO clientes (restaurant_id, nome, sobrenome, email, telefone, cpf_cnpj, senha_hash)
          VALUES ($1, $2, $3, $4, $5, $6, $7)
          RETURNING id, nome, sobrenome, email, telefone, cpf_cnpj`,
-        [restaurantId, data.nome, data.sobrenome || '', data.email, data.telefone || '', data.cpf?.replace(/\D/g, '') || '', senhaHash]
+        [restaurantId, data.nome, data.sobrenome || '', data.email || '', data.telefone, data.cpf?.replace(/\D/g, '') || '', senhaHash]
       );
       return r.rows[0];
     });
@@ -189,29 +222,31 @@ router.post('/cliente/signup', signupLimiter, async (req, res, next) => {
 });
 
 // ============================
-// ENTREGADOR - Login
+// ENTREGADOR - Login (por telefone)
 // ============================
 router.post('/entregador/login', loginLimiter, async (req, res, next) => {
   try {
     const restaurantId = req.restaurantId || config.restaurantId;
-    const { email, password } = loginSchema.parse(req.body);
+    const { telefone, password } = loginEntregadorSchema.parse(req.body);
+
+    const digits = telefone.replace(/\D/g, '');
 
     const result = await query(
       `SELECT id, nome, email, telefone, senha_hash, status, entregas_total, frete_total_recebido
        FROM entregadores
-       WHERE email = $1 AND restaurant_id = $2`,
-      [email, restaurantId]
+       WHERE restaurant_id = $1 AND REPLACE(REPLACE(REPLACE(telefone, '(', ''), ')', ''), ' ', '') LIKE $2`,
+      [restaurantId, `%${digits}`]
     );
 
     const user = result.rows[0];
-    if (!user) throw new AppError('E-mail ou senha inválidos.', 401);
+    if (!user) throw new AppError('Telefone ou senha inválidos.', 401);
 
     if (user.status === 'bloqueado') {
       throw new AppError('Seu acesso foi bloqueado. Entre em contato com o restaurante.', 403);
     }
 
     const senhaValida = await bcrypt.compare(password, user.senha_hash);
-    if (!senhaValida) throw new AppError('E-mail ou senha inválidos.', 401);
+    if (!senhaValida) throw new AppError('Telefone ou senha inválidos.', 401);
 
     const tokens = await gerarTokens({ ...user, role: 'entregador' }, restaurantId);
     setTokenCookies(req, res, tokens);
@@ -237,23 +272,22 @@ router.post('/entregador/login', loginLimiter, async (req, res, next) => {
 });
 
 // ============================
-// RESTAURANTE (Admin) - Login
+// RESTAURANTE (Staff) - Login (por apelido)
 // ============================
 router.post('/restaurante/login', loginLimiter, async (req, res, next) => {
   try {
     const restaurantId = req.restaurantId || config.restaurantId;
-    const { email, password } = loginSchema.parse(req.body);
+    const { apelido, password } = loginStaffSchema.parse(req.body);
 
     const result = await query(
-      `SELECT id, nome, email, senha_hash, cargo, ativo
+      `SELECT id, nome, email, apelido, senha_hash, cargo, ativo
        FROM restaurante_users
-       WHERE email = $1 AND restaurant_id = $2 AND ativo = true`,
-      [email, restaurantId]
+       WHERE apelido = $1 AND restaurant_id = $2 AND ativo = true`,
+      [apelido.toLowerCase(), restaurantId]
     );
 
     const user = result.rows[0];
-    if (!user) throw new AppError('E-mail ou senha inválidos.', 401);
-
+    if (!user) throw new AppError('Apelido ou senha inválidos.', 401);
     const senhaValida = await bcrypt.compare(password, user.senha_hash);
     if (!senhaValida) throw new AppError('E-mail ou senha inválidos.', 401);
 
@@ -269,6 +303,7 @@ router.post('/restaurante/login', loginLimiter, async (req, res, next) => {
         id: user.id,
         nome: user.nome,
         email: user.email,
+        apelido: user.apelido,
         cargo: user.cargo,
         role: 'restaurante',
         module: 'admin',
@@ -368,7 +403,7 @@ router.get('/me', authenticate, async (req, res, next) => {
 
     if (role === 'restaurante') {
       const result = await query(
-        'SELECT id, nome, email, cargo FROM restaurante_users WHERE id = $1',
+        'SELECT id, nome, email, apelido, cargo FROM restaurante_users WHERE id = $1',
         [id]
       );
       if (!result.rows[0]) throw new AppError('Usuário não encontrado.', 404);

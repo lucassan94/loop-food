@@ -79,6 +79,7 @@
     .tag-no-asaas{background:var(--surface-2);color:var(--text-2)}
     .tag-jwt{background:rgba(34,197,94,0.1);color:var(--success)}
     .tag-no-jwt{background:var(--warning-bg);color:var(--warning)}
+    .tag-warning{background:var(--warning-bg);color:var(--warning)}
     .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);display:none;align-items:center;justify-content:center;z-index:1000;backdrop-filter:blur(4px);padding:20px;animation:fadeIn .15s ease}
     .modal-overlay.active{display:flex}
     @keyframes fadeIn{from{opacity:0}to{opacity:1}}
@@ -227,6 +228,12 @@
       <button class="tab" data-tab="cardapio" onclick="switchTab('cardapio')">🍽️ Cardápio</button>
       <button class="tab" data-tab="pagamentos" onclick="switchTab('pagamentos')">💳 Pagamentos</button>
       <button class="tab" data-tab="entregadores" onclick="switchTab('entregadores')">🛵 Entregadores</button>
+      <button class="tab" data-tab="clientes" onclick="switchTab('clientes')">👤 Clientes</button>
+      <button class="tab" data-tab="raios" onclick="switchTab('raios')">📍 Raios</button>
+      <button class="tab" data-tab="banners" onclick="switchTab('banners')">🖼️ Banners</button>
+      <button class="tab" data-tab="mesas" onclick="switchTab('mesas')">🪑 Mesas</button>
+      <button class="tab" data-tab="pedidos" onclick="switchTab('pedidos')">📦 Pedidos</button>
+      <button class="tab" data-tab="asaas" onclick="switchTab('asaas')">💰 Asaas</button>
     </div>
 
     <!-- TAB: Dados -->
@@ -431,6 +438,156 @@
         </div>
       </div>
     </div>
+
+    <!-- TAB: Clientes -->
+    <div class="tab-section" id="tab-clientes">
+      <div class="section-card">
+        <div class="section-card-header">
+          <span>👤 Clientes</span>
+          <button class="btn btn-sm btn-primary" onclick="showClienteForm()">+ Novo</button>
+        </div>
+        <div class="section-card-body">
+          <table>
+            <thead><tr><th>Nome</th><th>Email</th><th>Telefone</th><th>Gasto Total</th><th>Pedidos</th><th style="width:80px"></th></tr></thead>
+            <tbody id="clientesTableBody"><tr><td colspan="6" class="empty-state"><div class="spinner"></div></td></tr></tbody>
+          </table>
+          <div id="clienteForm" style="display:none;margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
+            <h4 id="clienteFormTitle" style="font-size:14px;margin-bottom:8px">👤 Novo Cliente</h4>
+            <div class="inline-form">
+              <input type="text" id="cif_nome" placeholder="Nome*" style="width:140px">
+              <input type="text" id="cif_sobrenome" placeholder="Sobrenome" style="width:140px">
+              <input type="email" id="cif_email" placeholder="Email*" style="width:180px">
+              <input type="text" id="cif_telefone" placeholder="Telefone" style="width:120px">
+              <input type="password" id="cif_password" placeholder="Senha*" style="width:120px">
+              <button class="btn btn-sm btn-success" onclick="saveCliente()">Salvar</button>
+              <button class="btn btn-sm btn-outline" onclick="hideClienteForm()">Cancelar</button>
+            </div>
+            <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">
+              <input type="text" id="cif_endereco" placeholder="Endereço" style="width:200px;padding:7px 10px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px">
+              <input type="text" id="cif_cep" placeholder="CEP" style="width:100px;padding:7px 10px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px">
+              <input type="text" id="cif_cidade" placeholder="Cidade" style="width:130px;padding:7px 10px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px">
+              <input type="text" id="cif_estado" placeholder="UF" maxlength="2" style="width:50px;padding:7px 10px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px">
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB: Raios de Entrega -->
+    <div class="tab-section" id="tab-raios">
+      <div class="section-card">
+        <div class="section-card-header">
+          <span>📍 Raios de Entrega</span>
+          <button class="btn btn-sm btn-primary" onclick="showRaioForm()">+ Novo</button>
+        </div>
+        <div class="section-card-body">
+          <table>
+            <thead><tr><th>Raio (km)</th><th>Tempo Mín (min)</th><th>Tempo Máx (min)</th><th>Custo (R$)</th><th style="width:80px"></th></tr></thead>
+            <tbody id="raiosTableBody"><tr><td colspan="5" class="empty-state"><div class="spinner"></div></td></tr></tbody>
+          </table>
+          <div id="raioForm" style="display:none;margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
+            <h4 style="font-size:14px;margin-bottom:8px">📍 Novo Raio de Entrega</h4>
+            <div class="inline-form">
+              <input type="number" id="rf_raio" placeholder="Raio (km)*" style="width:100px">
+              <input type="number" id="rf_tmin" placeholder="Tempo mín*" style="width:120px">
+              <input type="number" id="rf_tmax" placeholder="Tempo máx*" style="width:120px">
+              <input type="number" step="0.01" id="rf_custo" placeholder="Custo R$*" style="width:110px">
+              <button class="btn btn-sm btn-success" onclick="saveRaio()">Salvar</button>
+              <button class="btn btn-sm btn-outline" onclick="hideRaioForm()">Cancelar</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB: Banners -->
+    <div class="tab-section" id="tab-banners">
+      <div class="section-card">
+        <div class="section-card-header">
+          <span>🖼️ Banners do Cardápio</span>
+          <button class="btn btn-sm btn-primary" onclick="showBannerForm()">+ Novo</button>
+        </div>
+        <div class="section-card-body">
+          <table>
+            <thead><tr><th>Título</th><th>Ordem</th><th>Ativo</th><th style="width:80px"></th></tr></thead>
+            <tbody id="bannersTableBody"><tr><td colspan="4" class="empty-state"><div class="spinner"></div></td></tr></tbody>
+          </table>
+          <div id="bannerForm" style="display:none;margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
+            <h4 id="bannerFormTitle" style="font-size:14px;margin-bottom:8px">🖼️ Novo Banner</h4>
+            <div class="inline-form">
+              <input type="text" id="bf_titulo" placeholder="Título" style="width:180px">
+              <input type="text" id="bf_subtitulo" placeholder="Subtítulo" style="width:200px">
+              <input type="number" id="bf_ordem" placeholder="Ordem" style="width:80px">
+              <label style="font-size:12px;color:var(--text-2);display:flex;align-items:center;gap:4px"><input type="checkbox" id="bf_ativo" checked style="width:16px;height:16px;accent-color:var(--accent)"> Ativo</label>
+              <button class="btn btn-sm btn-success" onclick="saveBanner()">Salvar</button>
+              <button class="btn btn-sm btn-outline" onclick="hideBannerForm()">Cancelar</button>
+            </div>
+            <div style="margin-top:8px">
+              <input type="url" id="bf_imagem_url" placeholder="URL da imagem (opcional)" style="width:400px;padding:7px 10px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;outline:none;font-family:inherit">
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB: Mesas -->
+    <div class="tab-section" id="tab-mesas">
+      <div class="section-card">
+        <div class="section-card-header">
+          <span>🪑 Mesas (Salão)</span>
+          <button class="btn btn-sm btn-primary" onclick="showMesaForm()">+ Nova</button>
+        </div>
+        <div class="section-card-body">
+          <table>
+            <thead><tr><th>Nome</th><th>Capacidade</th><th>Status</th><th style="width:80px"></th></tr></thead>
+            <tbody id="mesasTableBody"><tr><td colspan="4" class="empty-state"><div class="spinner"></div></td></tr></tbody>
+          </table>
+          <div id="mesaForm" style="display:none;margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
+            <h4 id="mesaFormTitle" style="font-size:14px;margin-bottom:8px">🪑 Nova Mesa</h4>
+            <div class="inline-form">
+              <input type="text" id="mf_nome" placeholder="Nome*" style="width:140px">
+              <input type="number" id="mf_capacidade" placeholder="Capacidade" style="width:120px" value="4">
+              <select id="mf_status" style="padding:7px 10px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px">
+                <option value="livre">Livre</option><option value="ocupada">Ocupada</option><option value="reservada">Reservada</option><option value="inativa">Inativa</option>
+              </select>
+              <button class="btn btn-sm btn-success" onclick="saveMesa()">Salvar</button>
+              <button class="btn btn-sm btn-outline" onclick="hideMesaForm()">Cancelar</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB: Pedidos -->
+    <div class="tab-section" id="tab-pedidos">
+      <div class="section-card">
+        <div class="section-card-header">📦 Pedidos</div>
+        <div class="section-card-body">
+          <table>
+            <thead><tr><th>#</th><th>Cliente</th><th>Status</th><th>Total</th><th>Pagamento</th><th>Data</th><th style="width:80px"></th></tr></thead>
+            <tbody id="pedidosTableBody"><tr><td colspan="7" class="empty-state"><div class="spinner"></div></td></tr></tbody>
+          </table>
+          <div id="pedidoDetail" style="display:none;margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
+            <h4 style="font-size:14px;margin-bottom:8px">📄 Detalhes do Pedido <span id="pedidoDetailRef" style="color:var(--accent)"></span></h4>
+            <div id="pedidoDetailContent" style="font-size:13px;color:var(--text-2)"></div>
+            <div style="margin-top:8px"><button class="btn btn-sm btn-danger" onclick="deletePedido()">Excluir Pedido</button></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB: Asaas Pagamentos -->
+    <div class="tab-section" id="tab-asaas">
+      <div class="section-card">
+        <div class="section-card-header">💰 Transações Asaas</div>
+        <div class="section-card-body">
+          <table>
+            <thead><tr><th>ID</th><th>Pedido</th><th>Tipo</th><th>Status</th><th>Valor Bruto</th><th>Taxa</th><th>Data</th><th style="width:60px"></th></tr></thead>
+            <tbody id="asaasTableBody"><tr><td colspan="8" class="empty-state"><div class="spinner"></div></td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
   </main>
 
   <!-- CREATE TENANT MODAL -->
@@ -626,15 +783,26 @@
       await loadCardapio();
       await loadPagamentos();
       await loadDrivers();
+      await loadClientes();
+      await loadRaios();
+      await loadBanners();
+      await loadMesas();
+      await loadPedidos();
+      await loadAsaas();
     }
 
     function closeManagement() {
       currentTenantId = null;
-      editingUserId = null; editingCatId = null; editingProdId = null; editingDriverId = null;
+      editingUserId = null; editingCatId = null; editingProdId = null; editingDriverId = null; editingClienteId = null; editingRaioId = null; editingBannerId = null; editingMesaId = null; viewingPedido = null;
       document.getElementById('userForm').style.display = 'none';
       document.getElementById('catForm').style.display = 'none';
       document.getElementById('prodForm').style.display = 'none';
-      document.getElementById('driverForm').style.display = 'none';
+      document.getElementById(.driverForm.).style.display = .none.;
+      document.getElementById(.clienteForm.).style.display = .none.;
+      document.getElementById(.raioForm.).style.display = .none.;
+      document.getElementById(.bannerForm.).style.display = .none.;
+      document.getElementById(.mesaForm.).style.display = .none.;
+      document.getElementById(.pedidoDetail.).style.display = .none.;
       document.getElementById('managementView').classList.remove('active');
       document.getElementById('mainView').style.display = 'block';
       loadTenants();
@@ -1105,7 +1273,12 @@
       document.getElementById('df_password').value = '';
       document.getElementById('df_password').placeholder = data ? 'Nova senha (opcional)' : 'Senha';
     }
-    function hideDriverForm() { document.getElementById('driverForm').style.display = 'none'; editingDriverId = null; }
+    function hideDriverForm() { document.getElementById(.driverForm.).style.display = .none.;
+      document.getElementById(.clienteForm.).style.display = .none.;
+      document.getElementById(.raioForm.).style.display = .none.;
+      document.getElementById(.bannerForm.).style.display = .none.;
+      document.getElementById(.mesaForm.).style.display = .none.;
+      document.getElementById(.pedidoDetail.).style.display = .none.; editingDriverId = null; }
     async function saveDriver() {
       const data = {
         nome: document.getElementById('df_nome').value,
@@ -1131,6 +1304,353 @@
       try { const r = await fetch(`${API}/${currentTenantId}/drivers/${id}`, { method:'DELETE' });
         if (!r.ok) { const err = await r.json(); throw new Error(err.error); }
         const result = await r.json(); toast(`🗑️ ${result.message}`, 'info'); loadDrivers();
+      } catch (err) { toast(`❌ ${err.message}`, 'error'); }
+    }
+
+    // ─── TAB: Clientes ────────
+    let clientes = []; let editingClienteId = null;
+    async function loadClientes() {
+      try {
+        const r = await fetch(`${API}/${currentTenantId}/clientes`);
+        if (!r.ok) return;
+        clientes = await r.json();
+        const tbody = document.getElementById('clientesTableBody');
+        if (!clientes.length) { tbody.innerHTML = '<tr><td colspan="6" class="empty-state"><div class="emoji">👤</div><h3>Nenhum cliente</h3></td></tr>'; return; }
+        tbody.innerHTML = clientes.map(c => `<tr>
+          <td><strong>${esc(c.nome)}${c.sobrenome?' '+esc(c.sobrenome):''}</strong></td>
+          <td>${esc(c.email)}</td>
+          <td>${esc(c.telefone||'—')}</td>
+          <td style="color:var(--accent)">R$ ${parseFloat(c.total_gasto||0).toFixed(2)}</td>
+          <td>${c.pedidos_total||0}</td>
+          <td style="text-align:right">
+            <button class="btn btn-ghost btn-xs" onclick="editCliente(${c.id})">✎</button>
+            <button class="btn btn-ghost btn-xs" style="color:var(--danger)" onclick="deleteCliente(${c.id},'${esc(c.nome)}')">✕</button>
+          </td>
+        </tr>`).join('');
+      } catch (err) { toast('Erro ao carregar clientes', 'error'); }
+    }
+
+    function showClienteForm(data) {
+      editingClienteId = data ? data.id : null;
+      document.getElementById('clienteForm').style.display = 'block';
+      document.getElementById('clienteFormTitle').textContent = data ? '✎ Editar Cliente' : '👤 Novo Cliente';
+      document.getElementById('cif_nome').value = data ? data.nome : '';
+      document.getElementById('cif_sobrenome').value = data ? data.sobrenome||'' : '';
+      document.getElementById('cif_email').value = data ? data.email : '';
+      document.getElementById('cif_telefone').value = data ? data.telefone||'' : '';
+      document.getElementById('cif_password').value = '';
+      document.getElementById('cif_password').placeholder = data ? 'Nova senha (opcional)' : 'Senha*';
+      document.getElementById('cif_endereco').value = data ? data.endereco||'' : '';
+      document.getElementById('cif_cep').value = data ? data.cep||'' : '';
+      document.getElementById('cif_cidade').value = data ? data.cidade||'' : '';
+      document.getElementById('cif_estado').value = data ? data.estado||'' : '';
+    }
+    function hideClienteForm() { document.getElementById('clienteForm').style.display = 'none'; editingClienteId = null; }
+    async function saveCliente() {
+      const data = {
+        nome: document.getElementById('cif_nome').value,
+        sobrenome: document.getElementById('cif_sobrenome').value,
+        email: document.getElementById('cif_email').value,
+        telefone: document.getElementById('cif_telefone').value,
+        password: document.getElementById('cif_password').value,
+        endereco: document.getElementById('cif_endereco').value,
+        cep: document.getElementById('cif_cep').value,
+        cidade: document.getElementById('cif_cidade').value,
+        estado: document.getElementById('cif_estado').value,
+      };
+      if (!data.nome || !data.email || (!editingClienteId && !data.password)) return toast('Nome, email e senha são obrigatórios.', 'error');
+      try {
+        const url = editingClienteId ? `${API}/${currentTenantId}/clientes/${editingClienteId}` : `${API}/${currentTenantId}/clientes`;
+        const method = editingClienteId ? 'PUT' : 'POST';
+        const body = editingClienteId ? { ...data, password: data.password || undefined } : data;
+        const r = await fetch(url, { method, headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) });
+        if (!r.ok) { const err = await r.json(); throw new Error(err.error); }
+        toast(editingClienteId ? '✅ Cliente atualizado!' : '✅ Cliente criado!', 'success');
+        hideClienteForm(); loadClientes();
+      } catch (err) { toast(`❌ ${err.message}`, 'error'); }
+    }
+    function editCliente(id) { showClienteForm(clientes.find(c => c.id === id)); }
+    async function deleteCliente(id, nome) {
+      if (!confirm(`Excluir cliente "${nome}"?`)) return;
+      try { const r = await fetch(`${API}/${currentTenantId}/clientes/${id}`, { method:'DELETE' });
+        if (!r.ok) { const err = await r.json(); throw new Error(err.error); }
+        toast(`🗑️ "${nome}" excluído.`, 'info'); loadClientes();
+      } catch (err) { toast(`❌ ${err.message}`, 'error'); }
+    }
+
+    // ─── TAB: Raios de Entrega ─
+    let raios = []; let editingRaioId = null;
+    async function loadRaios() {
+      try {
+        const r = await fetch(`${API}/${currentTenantId}/raios`);
+        if (!r.ok) return;
+        raios = await r.json();
+        const tbody = document.getElementById('raiosTableBody');
+        if (!raios.length) { tbody.innerHTML = '<tr><td colspan="5" class="empty-state"><div class="emoji">📍</div><h3>Nenhum raio de entrega</h3></td></tr>'; return; }
+        tbody.innerHTML = raios.map(r => `<tr>
+          <td><strong>${r.raio_km} km</strong></td>
+          <td>${r.tempo_min} min</td>
+          <td>${r.tempo_max} min</td>
+          <td style="color:var(--accent)">R$ ${parseFloat(r.custo).toFixed(2)}</td>
+          <td style="text-align:right">
+            <button class="btn btn-ghost btn-xs" onclick="editRaio(${r.id})">✎</button>
+            <button class="btn btn-ghost btn-xs" style="color:var(--danger)" onclick="deleteRaio(${r.id})">✕</button>
+          </td>
+        </tr>`).join('');
+      } catch (err) { toast('Erro ao carregar raios', 'error'); }
+    }
+    function showRaioForm(data) {
+      editingRaioId = data ? data.id : null;
+      document.getElementById('raioForm').style.display = 'block';
+      document.getElementById('rf_raio').value = data ? data.raio_km : '';
+      document.getElementById('rf_tmin').value = data ? data.tempo_min : '';
+      document.getElementById('rf_tmax').value = data ? data.tempo_max : '';
+      document.getElementById('rf_custo').value = data ? data.custo : '';
+    }
+    function hideRaioForm() { document.getElementById('raioForm').style.display = 'none'; editingRaioId = null; }
+    async function saveRaio() {
+      const data = {
+        raio_km: parseInt(document.getElementById('rf_raio').value),
+        tempo_min: parseInt(document.getElementById('rf_tmin').value),
+        tempo_max: parseInt(document.getElementById('rf_tmax').value),
+        custo: parseFloat(document.getElementById('rf_custo').value),
+      };
+      if (!data.raio_km || !data.tempo_min || !data.tempo_max || isNaN(data.custo)) return toast('Todos os campos são obrigatórios.', 'error');
+      try {
+        const url = editingRaioId ? `${API}/${currentTenantId}/raios/${editingRaioId}` : `${API}/${currentTenantId}/raios`;
+        const method = editingRaioId ? 'PUT' : 'POST';
+        const r = await fetch(url, { method, headers:{'Content-Type':'application/json'}, body:JSON.stringify(data) });
+        if (!r.ok) { const err = await r.json(); throw new Error(err.error); }
+        toast(editingRaioId ? '✅ Raio atualizado!' : '✅ Raio criado!', 'success');
+        hideRaioForm(); loadRaios();
+      } catch (err) { toast(`❌ ${err.message}`, 'error'); }
+    }
+    function editRaio(id) { showRaioForm(raios.find(r => r.id === id)); }
+    async function deleteRaio(id) {
+      if (!confirm('Excluir este raio de entrega?')) return;
+      try { const r = await fetch(`${API}/${currentTenantId}/raios/${id}`, { method:'DELETE' });
+        if (!r.ok) { const err = await r.json(); throw new Error(err.error); }
+        const result = await r.json(); toast(`🗑️ ${result.message}`, 'info'); loadRaios();
+      } catch (err) { toast(`❌ ${err.message}`, 'error'); }
+    }
+
+    // ─── TAB: Banners ──────────
+    let banners = []; let editingBannerId = null;
+    async function loadBanners() {
+      try {
+        const r = await fetch(`${API}/${currentTenantId}/banners`);
+        if (!r.ok) return;
+        banners = await r.json();
+        const tbody = document.getElementById('bannersTableBody');
+        if (!banners.length) { tbody.innerHTML = '<tr><td colspan="4" class="empty-state"><div class="emoji">🖼️</div><h3>Nenhum banner</h3></td></tr>'; return; }
+        tbody.innerHTML = banners.map(b => `<tr>
+          <td><strong>${esc(b.titulo||'—')}</strong>${b.subtitulo?'<br><span style="font-size:11px;color:var(--text-2)">'+esc(b.subtitulo)+'</span>':''}</td>
+          <td>${b.ordem||0}</td>
+          <td><span class="tag ${b.ativo?'tag-on':'tag-off'}">${b.ativo?'Ativo':'Inativo'}</span></td>
+          <td style="text-align:right">
+            <button class="btn btn-ghost btn-xs" onclick="editBanner(${b.id})">✎</button>
+            <button class="btn btn-ghost btn-xs" style="color:var(--danger)" onclick="deleteBanner(${b.id},'${esc(b.titulo)}')">✕</button>
+          </td>
+        </tr>`).join('');
+      } catch (err) { toast('Erro ao carregar banners', 'error'); }
+    }
+    function showBannerForm(data) {
+      editingBannerId = data ? data.id : null;
+      document.getElementById('bannerForm').style.display = 'block';
+      document.getElementById('bannerFormTitle').textContent = data ? '✎ Editar Banner' : '🖼️ Novo Banner';
+      document.getElementById('bf_titulo').value = data ? data.titulo||'' : '';
+      document.getElementById('bf_subtitulo').value = data ? data.subtitulo||'' : '';
+      document.getElementById('bf_ordem').value = data ? data.ordem||0 : 0;
+      document.getElementById('bf_ativo').checked = data ? !!data.ativo : true;
+      document.getElementById('bf_imagem_url').value = data ? data.imagem_url||'' : '';
+    }
+    function hideBannerForm() { document.getElementById('bannerForm').style.display = 'none'; editingBannerId = null; }
+    async function saveBanner() {
+      const data = {
+        titulo: document.getElementById('bf_titulo').value,
+        subtitulo: document.getElementById('bf_subtitulo').value,
+        ordem: parseInt(document.getElementById('bf_ordem').value) || 0,
+        ativo: document.getElementById('bf_ativo').checked,
+        imagem_url: document.getElementById('bf_imagem_url').value || null,
+      };
+      try {
+        const url = editingBannerId ? `${API}/${currentTenantId}/banners/${editingBannerId}` : `${API}/${currentTenantId}/banners`;
+        const method = editingBannerId ? 'PUT' : 'POST';
+        const r = await fetch(url, { method, headers:{'Content-Type':'application/json'}, body:JSON.stringify(data) });
+        if (!r.ok) { const err = await r.json(); throw new Error(err.error); }
+        toast(editingBannerId ? '✅ Banner atualizado!' : '✅ Banner criado!', 'success');
+        hideBannerForm(); loadBanners();
+      } catch (err) { toast(`❌ ${err.message}`, 'error'); }
+    }
+    function editBanner(id) { showBannerForm(banners.find(b => b.id === id)); }
+    async function deleteBanner(id, titulo) {
+      if (!confirm(`Excluir banner "${titulo||'sem título'}"?`)) return;
+      try { const r = await fetch(`${API}/${currentTenantId}/banners/${id}`, { method:'DELETE' });
+        if (!r.ok) { const err = await r.json(); throw new Error(err.error); }
+        toast(`🗑️ Banner excluído.`, 'info'); loadBanners();
+      } catch (err) { toast(`❌ ${err.message}`, 'error'); }
+    }
+
+    // ─── TAB: Mesas ────────────
+    let mesas = []; let editingMesaId = null;
+    async function loadMesas() {
+      try {
+        const r = await fetch(`${API}/${currentTenantId}/mesas`);
+        if (!r.ok) return;
+        mesas = await r.json();
+        const tbody = document.getElementById('mesasTableBody');
+        if (!mesas.length) { tbody.innerHTML = '<tr><td colspan="4" class="empty-state"><div class="emoji">🪑</div><h3>Nenhuma mesa</h3></td></tr>'; return; }
+        tbody.innerHTML = mesas.map(m => `<tr>
+          <td><strong>${esc(m.nome)}</strong></td>
+          <td>${m.capacidade} pessoas</td>
+          <td><span class="tag ${m.status==='livre'?'tag-on':m.status==='ocupada'?'tag-warning':'tag-off'}">${m.status||'—'}</span></td>
+          <td style="text-align:right">
+            <button class="btn btn-ghost btn-xs" onclick="editMesa(${m.id})">✎</button>
+            <button class="btn btn-ghost btn-xs" style="color:var(--danger)" onclick="deleteMesa(${m.id},'${esc(m.nome)}')">✕</button>
+          </td>
+        </tr>`).join('');
+      } catch (err) { toast('Erro ao carregar mesas', 'error'); }
+    }
+    function showMesaForm(data) {
+      editingMesaId = data ? data.id : null;
+      document.getElementById('mesaForm').style.display = 'block';
+      document.getElementById('mesaFormTitle').textContent = data ? '✎ Editar Mesa' : '🪑 Nova Mesa';
+      document.getElementById('mf_nome').value = data ? data.nome : '';
+      document.getElementById('mf_capacidade').value = data ? data.capacidade : 4;
+      document.getElementById('mf_status').value = data ? data.status : 'livre';
+    }
+    function hideMesaForm() { document.getElementById('mesaForm').style.display = 'none'; editingMesaId = null; }
+    async function saveMesa() {
+      const data = {
+        nome: document.getElementById('mf_nome').value,
+        capacidade: parseInt(document.getElementById('mf_capacidade').value) || 4,
+        status: document.getElementById('mf_status').value,
+      };
+      if (!data.nome) return toast('Nome é obrigatório.', 'error');
+      try {
+        const url = editingMesaId ? `${API}/${currentTenantId}/mesas/${editingMesaId}` : `${API}/${currentTenantId}/mesas`;
+        const method = editingMesaId ? 'PUT' : 'POST';
+        const r = await fetch(url, { method, headers:{'Content-Type':'application/json'}, body:JSON.stringify(data) });
+        if (!r.ok) { const err = await r.json(); throw new Error(err.error); }
+        toast(editingMesaId ? '✅ Mesa atualizada!' : '✅ Mesa criada!', 'success');
+        hideMesaForm(); loadMesas();
+      } catch (err) { toast(`❌ ${err.message}`, 'error'); }
+    }
+    function editMesa(id) { showMesaForm(mesas.find(m => m.id === id)); }
+    async function deleteMesa(id, nome) {
+      if (!confirm(`Excluir mesa "${nome}"?`)) return;
+      try { const r = await fetch(`${API}/${currentTenantId}/mesas/${id}`, { method:'DELETE' });
+        if (!r.ok) { const err = await r.json(); throw new Error(err.error); }
+        toast(`🗑️ "${nome}" excluída.`, 'info'); loadMesas();
+      } catch (err) { toast(`❌ ${err.message}`, 'error'); }
+    }
+
+    // ─── TAB: Pedidos ──────────
+    let pedidos = []; let viewingPedido = null;
+    async function loadPedidos() {
+      try {
+        const r = await fetch(`${API}/${currentTenantId}/pedidos`);
+        if (!r.ok) return;
+        pedidos = await r.json();
+        const tbody = document.getElementById('pedidosTableBody');
+        if (!pedidos.length) { tbody.innerHTML = '<tr><td colspan="7" class="empty-state"><div class="emoji">📦</div><h3>Nenhum pedido</h3></td></tr>'; return; }
+        tbody.innerHTML = pedidos.map(p => `<tr onclick="viewPedido(${p.id})" style="cursor:pointer">
+          <td style="color:var(--accent);font-weight:600">${esc(p.pedido_id)}</td>
+          <td><strong>${esc(p.cliente_nome||'—')}</strong></td>
+          <td><span class="tag ${p.status==='entregue'||p.status==='recebido'?'tag-on':p.status==='cancelado'?'tag-off':'tag-asaas'}">${p.status||'—'}</span></td>
+          <td style="color:var(--accent);font-weight:600">R$ ${parseFloat(p.total||0).toFixed(2)}</td>
+          <td>${esc(p.metodo_pagamento||'—')}</td>
+          <td style="font-size:12px;color:var(--text-2)">${new Date(p.criado_em).toLocaleString('pt-BR')}</td>
+          <td style="text-align:right" onclick="event.stopPropagation()">
+            <button class="btn btn-ghost btn-xs" style="color:var(--danger)" onclick="if(confirm('Excluir ${esc(p.pedido_id)}?'))deletePedidoById(${p.id},'${esc(p.pedido_id)}')">✕</button>
+          </td>
+        </tr>`).join('');
+      } catch (err) { toast('Erro ao carregar pedidos', 'error'); }
+    }
+    async function viewPedido(id) {
+      try {
+        const r = await fetch(`${API}/${currentTenantId}/pedidos/${id}`);
+        if (!r.ok) return;
+        const p = await r.json();
+        viewingPedido = p;
+        document.getElementById('pedidoDetail').style.display = 'block';
+        document.getElementById('pedidoDetailRef').textContent = p.pedido_id;
+        let html = `<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">`;
+        html += `<div><strong>Cliente:</strong> ${esc(p.cliente_nome||'—')}</div>`;
+        html += `<div><strong>Status:</strong> ${p.status}</div>`;
+        html += `<div><strong>Total:</strong> R$ ${parseFloat(p.total||0).toFixed(2)}</div>`;
+        html += `<div><strong>Pagamento:</strong> ${esc(p.metodo_pagamento||'—')}</div>`;
+        html += `<div><strong>Endereço:</strong> ${esc(p.endereco_cliente||'')}${p.numero_cliente?', '+esc(p.numero_cliente):''}</div>`;
+        html += `<div><strong>Bairro:</strong> ${esc(p.bairro_cliente||'—')}</div>`;
+        html += `</div>`;
+        if (p.itens && p.itens.length) {
+          html += `<h5 style="margin-top:12px;font-size:12px;color:var(--text-2);text-transform:uppercase">Itens</h5>`;
+          p.itens.forEach(i => {
+            html += `<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border);font-size:12px">
+              <span>${i.quantidade}x ${esc(i.nome_produto)}</span>
+              <span style="color:var(--accent)">R$ ${parseFloat(i.subtotal).toFixed(2)}</span>
+            </div>`;
+          });
+        }
+        if (p.timeline && p.timeline.length) {
+          html += `<h5 style="margin-top:12px;font-size:12px;color:var(--text-2);text-transform:uppercase">Timeline</h5>`;
+          p.timeline.forEach(t => {
+            html += `<div style="font-size:11px;color:var(--text-2);padding:2px 0">${t.status_anterior||'—'} → ${t.status_novo} <span style="float:right">${new Date(t.mudado_em).toLocaleString('pt-BR')}</span></div>`;
+          });
+        }
+        if (p.pagamento) {
+          html += `<h5 style="margin-top:12px;font-size:12px;color:var(--text-2);text-transform:uppercase">Pagamento Asaas</h5>`;
+          html += `<div style="font-size:12px">ID: ${esc(p.pagamento.payment_id)} | Status: ${p.pagamento.status} | Tipo: ${p.pagamento.billing_type}</div>`;
+        }
+        document.getElementById('pedidoDetailContent').innerHTML = html;
+      } catch (err) { toast('Erro ao carregar detalhes', 'error'); }
+    }
+    async function deletePedido() {
+      if (!viewingPedido || !confirm(`Excluir ${viewingPedido.pedido_id}?`)) return;
+      try {
+        const r = await fetch(`${API}/${currentTenantId}/pedidos/${viewingPedido.id}`, { method:'DELETE' });
+        if (!r.ok) { const err = await r.json(); throw new Error(err.error); }
+        toast(`🗑️ ${viewingPedido.pedido_id} excluído.`, 'info');
+        document.getElementById('pedidoDetail').style.display = 'none';
+        viewingPedido = null;
+        loadPedidos();
+      } catch (err) { toast(`❌ ${err.message}`, 'error'); }
+    }
+    async function deletePedidoById(id, ref) {
+      try {
+        const r = await fetch(`${API}/${currentTenantId}/pedidos/${id}`, { method:'DELETE' });
+        if (!r.ok) { const err = await r.json(); throw new Error(err.error); }
+        toast(`🗑️ ${ref} excluído.`, 'info');
+        loadPedidos();
+      } catch (err) { toast(`❌ ${err.message}`, 'error'); }
+    }
+
+    // ─── TAB: Asaas Pagamentos ─
+    async function loadAsaas() {
+      try {
+        const r = await fetch(`${API}/${currentTenantId}/pagamentos/transacoes`);
+        if (!r.ok) return;
+        const pagamentos = await r.json();
+        const tbody = document.getElementById('asaasTableBody');
+        if (!pagamentos.length) { tbody.innerHTML = '<tr><td colspan="8" class="empty-state"><div class="emoji">💰</div><h3>Nenhuma transação</h3></td></tr>'; return; }
+        tbody.innerHTML = pagamentos.map(p => `<tr>
+          <td style="font-size:11px;font-family:monospace">${esc(p.payment_id||'—')}</td>
+          <td>${esc(p.pedido_ref||'—')}</td>
+          <td><span class="tag" style="background:var(--surface-2)">${p.billing_type||'—'}</span></td>
+          <td><span class="tag ${p.status==='RECEIVED'||p.status==='CONFIRMED'?'tag-on':p.status==='OVERDUE'||p.status==='REFUNDED'?'tag-off':'tag-asaas'}">${p.status||'—'}</span></td>
+          <td>R$ ${parseFloat(p.valor_bruto||0).toFixed(2)}</td>
+          <td>${p.taxa ? 'R$ '+parseFloat(p.taxa).toFixed(2) : '—'}</td>
+          <td style="font-size:12px;color:var(--text-2)">${new Date(p.criado_em).toLocaleString('pt-BR')}</td>
+          <td style="text-align:right">
+            <button class="btn btn-ghost btn-xs" style="color:var(--danger)" onclick="if(confirm('Excluir transação ${esc(p.payment_id)}?'))deleteTransacao(${p.id})">✕</button>
+          </td>
+        </tr>`).join('');
+      } catch (err) { toast('Erro ao carregar transações', 'error'); }
+    }
+    async function deleteTransacao(id) {
+      try { const r = await fetch(`${API}/${currentTenantId}/pagamentos/transacoes/${id}`, { method:'DELETE' });
+        if (!r.ok) { const err = await r.json(); throw new Error(err.error); }
+        toast('🗑️ Transação excluída.', 'info'); loadAsaas();
       } catch (err) { toast(`❌ ${err.message}`, 'error'); }
     }
 

@@ -14,8 +14,8 @@
 
         <form @submit.prevent="doLogin">
           <div class="form-group text-left">
-            <label>E-mail</label>
-            <input v-model="email" type="email" placeholder="seu@email.com" required />
+            <label>Telefone</label>
+            <input v-model="telefone" type="tel" placeholder="(11) 99999-9999" required @input="telefone = maskTelefone(telefone)" />
           </div>
           <div class="form-group text-left">
             <label>Senha</label>
@@ -53,12 +53,12 @@
 
           <div class="form-group text-left">
             <label>Telefone</label>
-            <input v-model="regTelefone" type="tel" placeholder="(11) 99999-9999" />
+            <input v-model="regTelefone" type="tel" placeholder="(11) 99999-9999" required @input="regTelefone = maskTelefone(regTelefone)" />
           </div>
 
           <div class="form-group text-left">
-            <label>E-mail</label>
-            <input v-model="regEmail" type="email" placeholder="seu@email.com" required />
+            <label>E-mail (opcional)</label>
+            <input v-model="regEmail" type="email" placeholder="seu@email.com" />
           </div>
 
           <div class="form-group text-left">
@@ -83,6 +83,7 @@
 import { ref, inject } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
+import { maskTelefone } from '../utils/validators'
 
 const router = useRouter()
 const route = useRoute()
@@ -94,7 +95,7 @@ const loading = ref(false)
 const errorMsg = ref('')
 
 // Login fields
-const email = ref('')
+const telefone = ref('')
 const password = ref('')
 
 // Register fields
@@ -108,7 +109,7 @@ async function doLogin() {
   loading.value = true
   errorMsg.value = ''
   try {
-    const data = await authStore.login(email.value, password.value)
+    const data = await authStore.login(telefone.value, password.value)
     // Carrinho já é restaurado automaticamente pelo App.vue via localStorage
     addToast(`Bem-vindo(a), ${data.user?.nome || ''}!`, 'success')
     router.push('/')
@@ -124,7 +125,7 @@ async function doSignup() {
   loading.value = true
   errorMsg.value = ''
   try {
-    const data = await authStore.signup(regNome.value, regSobrenome.value, regEmail.value, regTelefone.value, regPassword.value)
+    const data = await authStore.signup(regNome.value, regSobrenome.value, regTelefone.value, regEmail.value, regPassword.value)
     addToast(`Conta criada com sucesso! Bem-vindo(a), ${data.user?.nome || ''}!`, 'success')
     router.push('/')
   } catch (err) {

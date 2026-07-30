@@ -20,11 +20,11 @@ export const useAuthStore = defineStore('auth', () => {
     return (user.value.nome?.[0] || '') + (user.value.sobrenome?.[0] || '')
   })
 
-  async function login(email, password) {
+  async function login(telefone, password) {
     loading.value = true
     error.value = null
     try {
-      const { data } = await api.post('/auth/cliente/login', { email, password })
+      const { data } = await api.post('/auth/cliente/login', { telefone, password })
       user.value = data.user
       return data
     } catch (err) {
@@ -35,12 +35,12 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  async function signup(nome, sobrenome, email, telefone, password) {
+  async function signup(nome, sobrenome, telefone, email, password) {
     loading.value = true
     error.value = null
     try {
       const { data } = await api.post('/auth/cliente/signup', {
-        nome, sobrenome, email, telefone, password,
+        nome, sobrenome, telefone, email, password,
       })
       user.value = data.user
       return data

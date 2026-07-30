@@ -212,13 +212,456 @@ app.post('/api/tenants/:id/regenerate-jwt', async (req, res) => {
 });
 
 // ============================================================================
+// CLIENTES
+// ============================================================================
+
+app.get('/api/tenants/:tid/clientes', async (req, res) => {
+  try {
+    const { tid } = req.params;
+    const result = await pool.query(
+      `SELECT id, nome, sobrenome, email, telefone, cep, cidade, estado,
+              total_gasto, pedidos_total, ativo, criado_em
+       FROM clientes WHERE restaurant_id = $1 ORDER BY nome`,
+      [tid]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error('[God] Erro:', err);
+    res.status(500).json({ error: 'Erro interno do servidor.' });
+  }
+});
+
+app.get('/api/tenants/:tid/clientes/:cid', async (req, res) => {
+  try {
+    const { tid, cid } = req.params;
+    const result = await pool.query(
+      `SELECT * FROM clientes WHERE id = $1 AND restaurant_id = $2`,
+      [cid, tid]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Cliente não encontrado.' });
+    delete result.rows[0].senha_hash;
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error('[God] Erro:', err);
+    res.status(500).json({ error: 'Erro interno do servidor.' });
+  }
+});
+
+app.post('/api/tenants/:tid/clientes', async (req, res) => {
+  try {
+    const { tid } = req.params;
+    const { nome, sobrenome, email, telefone, cep, endereco, numero, bairro, complemento, cidade, estado, password } = req.body;
+    if (!nome || !email || !password) return res.status(400).json({ error: 'nome, email e password são obrigatórios.' });
+    const bcrypt = (await import('bcrypt')).default;
+    const hash = await bcrypt.hash(password, 12);
+    const result = await pool.query(
+      `INSERT INTO clientes (restaurant_id, nome, sobrenome, email, telefone, senha_hash,
+        cep, endereco, numero, bairro, complemento, cidade, estado)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+       RETURNING id, nome, email, telefone, criado_em`,
+      [tid, nome, sobrenome||'', email, telefone||'', hash,
+       cep||'', endereco||'', numero||'', bairro||'', complemento||'', cidade||'', estado||'']
+    );
+    res.status(201).json(result.rows[0]);
+  } catch (err) {
+    if (err.code === '23505') return res.status(409).json({ error: 'Email já existe para este tenant.' });
+    console.error('[God] Erro:', err);
+    res.status(500).json({ error: 'Erro interno do servidor.' });
+  }
+});
+
+app.put('/api/tenants/:tid/clientes/:cid', async (req, res) => {
+  try {
+    const { tid, cid } = req.params;
+    const allowed = ['nome','sobrenome','email','telefone','cep','endereco','numero','bairro','complemento','cidade','estado','ativo'];
+    const fields = []; const params = [cid, tid]; let idx = 3;
+    for (const key of allowed) {
+      if (req.body[key] !== undefined) { fields.push(`${key} = $${idx++}`); params.push(req.body[key]); }
+    }
+    if (req.body.password) {
+      const bcrypt = (await import('bcrypt')).default;
+      const hash = await bcrypt.hash(req.body.password, 12);
+      fields.push(`senha_hash = $${idx++}`); params.push(hash);
+    }
+    if (fields.length === 0) return res.status(400).json({ error: 'Nenhum campo.' });
+    const result = await pool.query(
+      `UPDATE clientes SET ${fields.join(', ')} WHERE id = $1 AND restaurant_id = $2 RETURNING id, nome, email, telefone`,
+      params
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Cliente não encontrado.' });
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error('[God] Erro:', err);
+    res.status(500).json({ error: 'Erro interno do servidor.' });
+  }
+});
+
+app.delete('/api/tenants/:tid/clientes/:cid', async (req, res) => {
+  try {
+    const result = await pool.query(
+      'DELETE FROM clientes WHERE id = $1 AND restaurant_id = $2 RETURNING id, nome',
+      [req.params.cid, req.params.tid]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Cliente não encontrado.' });
+    res.json({ message: `"${result.rows[0].nome}" excluído.` });
+  } catch (err) {
+    console.error('[God] Erro:', err);
+    res.status(500).json({ error: 'Erro interno do servidor.' });
+  }
+});
+
+// ============================================================================
+// RAIOS DE ENTREGA
+// ============================================================================
+
+app.get('/api/tenants/:tid/raios', async (req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT * FROM raios_entrega WHERE restaurant_id = $1 ORDER BY raio_km ASC',
+      [req.params.tid]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error('[God] Erro:', err);
+    res.status(500).json({ error: 'Erro interno do servidor.' });
+  }
+});
+
+app.post('/api/tenants/:tid/raios', async (req, res) => {
+  try {
+    const { tid } = req.params;
+    const { raio_km, tempo_min, tempo_max, custo } = req.body;
+    if (!raio_km || !tempo_min || !tempo_max || custo === undefined)
+      return res.status(400).json({ error: 'raio_km, tempo_min, tempo_max e custo são obrigatórios.' });
+    const result = await pool.query(
+      `INSERT INTO raios_entrega (restaurant_id, raio_km, tempo_min, tempo_max, custo)
+       VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+      [tid, raio_km, tempo_min, tempo_max, custo]
+    );
+    res.status(201).json(result.rows[0]);
+  } catch (err) {
+    if (err.code === '23505') return res.status(409).json({ error: 'Raio já cadastrado para este tenant.' });
+    console.error('[God] Erro:', err);
+    res.status(500).json({ error: 'Erro interno do servidor.' });
+  }
+});
+
+app.put('/api/tenants/:tid/raios/:rid', async (req, res) => {
+  try {
+    const { tid, rid } = req.params;
+    const allowed = ['raio_km','tempo_min','tempo_max','custo'];
+    const fields = []; const params = [rid, tid]; let idx = 3;
+    for (const key of allowed) {
+      if (req.body[key] !== undefined) { fields.push(`${key} = $${idx++}`); params.push(req.body[key]); }
+    }
+    if (fields.length === 0) return res.status(400).json({ error: 'Nenhum campo.' });
+    const result = await pool.query(
+      `UPDATE raios_entrega SET ${fields.join(', ')} WHERE id = $1 AND restaurant_id = $2 RETURNING *`,
+      params
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Raio não encontrado.' });
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error('[God] Erro:', err);
+    res.status(500).json({ error: 'Erro interno do servidor.' });
+  }
+});
+
+app.delete('/api/tenants/:tid/raios/:rid', async (req, res) => {
+  try {
+    const result = await pool.query(
+      'DELETE FROM raios_entrega WHERE id = $1 AND restaurant_id = $2 RETURNING id, raio_km',
+      [req.params.rid, req.params.tid]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Raio não encontrado.' });
+    res.json({ message: `Raio de ${result.rows[0].raio_km}km excluído.` });
+  } catch (err) {
+    console.error('[God] Erro:', err);
+    res.status(500).json({ error: 'Erro interno do servidor.' });
+  }
+});
+
+// ============================================================================
+// BANNERS
+// ============================================================================
+
+app.get('/api/tenants/:tid/banners', async (req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT * FROM banners WHERE restaurant_id = $1 ORDER BY ordem ASC, criado_em DESC',
+      [req.params.tid]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error('[God] Erro:', err);
+    res.status(500).json({ error: 'Erro interno do servidor.' });
+  }
+});
+
+app.post('/api/tenants/:tid/banners', async (req, res) => {
+  try {
+    const { tid } = req.params;
+    const { titulo, subtitulo, imagem_url, imagem_base64, ordem, ativo } = req.body;
+    const result = await pool.query(
+      `INSERT INTO banners (restaurant_id, titulo, subtitulo, imagem_url, imagem_base64, ordem, ativo)
+       VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
+      [tid, titulo||'', subtitulo||'', imagem_url||null, imagem_base64||null, ordem??0, ativo??true]
+    );
+    res.status(201).json(result.rows[0]);
+  } catch (err) {
+    console.error('[God] Erro:', err);
+    res.status(500).json({ error: 'Erro interno do servidor.' });
+  }
+});
+
+app.put('/api/tenants/:tid/banners/:bid', async (req, res) => {
+  try {
+    const { tid, bid } = req.params;
+    const allowed = ['titulo','subtitulo','imagem_url','imagem_base64','ordem','ativo'];
+    const fields = []; const params = [bid, tid]; let idx = 3;
+    for (const key of allowed) {
+      if (req.body[key] !== undefined) { fields.push(`${key} = $${idx++}`); params.push(req.body[key]); }
+    }
+    if (fields.length === 0) return res.status(400).json({ error: 'Nenhum campo.' });
+    const result = await pool.query(
+      `UPDATE banners SET ${fields.join(', ')} WHERE id = $1 AND restaurant_id = $2 RETURNING *`,
+      params
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Banner não encontrado.' });
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error('[God] Erro:', err);
+    res.status(500).json({ error: 'Erro interno do servidor.' });
+  }
+});
+
+app.delete('/api/tenants/:tid/banners/:bid', async (req, res) => {
+  try {
+    const result = await pool.query(
+      'DELETE FROM banners WHERE id = $1 AND restaurant_id = $2 RETURNING id, titulo',
+      [req.params.bid, req.params.tid]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Banner não encontrado.' });
+    res.json({ message: `"${result.rows[0].titulo}" excluído.` });
+  } catch (err) {
+    console.error('[God] Erro:', err);
+    res.status(500).json({ error: 'Erro interno do servidor.' });
+  }
+});
+
+// ============================================================================
+// MESAS
+// ============================================================================
+
+app.get('/api/tenants/:tid/mesas', async (req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT * FROM mesas WHERE restaurant_id = $1 ORDER BY nome ASC',
+      [req.params.tid]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error('[God] Erro:', err);
+    res.status(500).json({ error: 'Erro interno do servidor.' });
+  }
+});
+
+app.post('/api/tenants/:tid/mesas', async (req, res) => {
+  try {
+    const { tid } = req.params;
+    const { nome, capacidade, status } = req.body;
+    if (!nome) return res.status(400).json({ error: 'nome é obrigatório.' });
+    const result = await pool.query(
+      `INSERT INTO mesas (restaurant_id, nome, capacidade, status)
+       VALUES ($1, $2, $3, $4) RETURNING *`,
+      [tid, nome, capacidade||4, status||'livre']
+    );
+    res.status(201).json(result.rows[0]);
+  } catch (err) {
+    console.error('[God] Erro:', err);
+    res.status(500).json({ error: 'Erro interno do servidor.' });
+  }
+});
+
+app.put('/api/tenants/:tid/mesas/:mid', async (req, res) => {
+  try {
+    const { tid, mid } = req.params;
+    const allowed = ['nome','capacidade','status'];
+    const fields = []; const params = [mid, tid]; let idx = 3;
+    for (const key of allowed) {
+      if (req.body[key] !== undefined) { fields.push(`${key} = $${idx++}`); params.push(req.body[key]); }
+    }
+    if (fields.length === 0) return res.status(400).json({ error: 'Nenhum campo.' });
+    const result = await pool.query(
+      `UPDATE mesas SET ${fields.join(', ')} WHERE id = $1 AND restaurant_id = $2 RETURNING *`,
+      params
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Mesa não encontrada.' });
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error('[God] Erro:', err);
+    res.status(500).json({ error: 'Erro interno do servidor.' });
+  }
+});
+
+app.delete('/api/tenants/:tid/mesas/:mid', async (req, res) => {
+  try {
+    const result = await pool.query(
+      'DELETE FROM mesas WHERE id = $1 AND restaurant_id = $2 RETURNING id, nome',
+      [req.params.mid, req.params.tid]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Mesa não encontrada.' });
+    res.json({ message: `"${result.rows[0].nome}" excluída.` });
+  } catch (err) {
+    console.error('[God] Erro:', err);
+    res.status(500).json({ error: 'Erro interno do servidor.' });
+  }
+});
+
+// ============================================================================
+// PEDIDOS (READ + DELETE)
+// ============================================================================
+
+app.get('/api/tenants/:tid/pedidos', async (req, res) => {
+  try {
+    const { tid } = req.params;
+    const result = await pool.query(
+      `SELECT p.*,
+              COALESCE(c.nome, p.nome_cliente) as cliente_nome,
+              (SELECT COUNT(*) FROM pedido_itens WHERE pedido_id = p.id) as total_itens
+       FROM pedidos p
+       LEFT JOIN clientes c ON p.cliente_id = c.id
+       WHERE p.restaurant_id = $1
+       ORDER BY p.criado_em DESC
+       LIMIT 100`,
+      [tid]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error('[God] Erro:', err);
+    res.status(500).json({ error: 'Erro interno do servidor.' });
+  }
+});
+
+app.get('/api/tenants/:tid/pedidos/:pid', async (req, res) => {
+  try {
+    const { tid, pid } = req.params;
+    const pedido = await pool.query(
+      'SELECT * FROM pedidos WHERE id = $1 AND restaurant_id = $2',
+      [pid, tid]
+    );
+    if (pedido.rows.length === 0) return res.status(404).json({ error: 'Pedido não encontrado.' });
+    const itens = await pool.query(
+      'SELECT * FROM pedido_itens WHERE pedido_id = $1 ORDER BY id',
+      [pid]
+    );
+    const timeline = await pool.query(
+      'SELECT * FROM pedido_timeline WHERE pedido_id = $1 ORDER BY mudado_em DESC',
+      [pid]
+    );
+    const pagamento = await pool.query(
+      'SELECT * FROM pagamentos WHERE pedido_id = $1 ORDER BY criado_em DESC',
+      [pid]
+    );
+    res.json({ ...pedido.rows[0], itens: itens.rows, timeline: timeline.rows, pagamento: pagamento.rows[0]||null });
+  } catch (err) {
+    console.error('[God] Erro:', err);
+    res.status(500).json({ error: 'Erro interno do servidor.' });
+  }
+});
+
+app.delete('/api/tenants/:tid/pedidos/:pid', async (req, res) => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const pedido = await client.query(
+      'SELECT id, pedido_id FROM pedidos WHERE id = $1 AND restaurant_id = $2',
+      [req.params.pid, req.params.tid]
+    );
+    if (pedido.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Pedido não encontrado.' });
+    }
+    // Delete related records (CASCADE handles most, but explicit for safety)
+    await client.query('DELETE FROM pedido_timeline WHERE pedido_id = $1', [req.params.pid]);
+    await client.query('DELETE FROM pedido_itens WHERE pedido_id = $1', [req.params.pid]);
+    await client.query('DELETE FROM pagamentos WHERE pedido_id = $1', [req.params.pid]);
+    await client.query('DELETE FROM mensagens_pedido WHERE pedido_id = $1', [req.params.pid]);
+    await client.query('DELETE FROM pedidos WHERE id = $1', [req.params.pid]);
+    await client.query('COMMIT');
+    res.json({ message: `Pedido ${pedido.rows[0].pedido_id} excluído.` });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('[God] Erro:', err);
+    res.status(500).json({ error: 'Erro interno do servidor.' });
+  } finally {
+    client.release();
+  }
+});
+
+// ============================================================================
+// PAGAMENTOS / TRANSAÇÕES ASAAS
+// ============================================================================
+
+app.get('/api/tenants/:tid/pagamentos/transacoes', async (req, res) => {
+  try {
+    const { tid } = req.params;
+    const result = await pool.query(
+      `SELECT pg.*, p.pedido_id as pedido_ref, p.total as pedido_total
+       FROM pagamentos pg
+       JOIN pedidos p ON pg.pedido_id = p.id
+       WHERE p.restaurant_id = $1
+       ORDER BY pg.criado_em DESC
+       LIMIT 100`,
+      [tid]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error('[God] Erro:', err);
+    res.status(500).json({ error: 'Erro interno do servidor.' });
+  }
+});
+
+app.get('/api/tenants/:tid/pagamentos/transacoes/:paid', async (req, res) => {
+  try {
+    const { paid } = req.params;
+    const result = await pool.query(
+      `SELECT pg.*, p.pedido_id as pedido_ref, p.total as pedido_total
+       FROM pagamentos pg
+       JOIN pedidos p ON pg.pedido_id = p.id
+       WHERE pg.id = $1`,
+      [paid]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Pagamento não encontrado.' });
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error('[God] Erro:', err);
+    res.status(500).json({ error: 'Erro interno do servidor.' });
+  }
+});
+
+app.delete('/api/tenants/:tid/pagamentos/transacoes/:paid', async (req, res) => {
+  try {
+    const result = await pool.query(
+      'DELETE FROM pagamentos WHERE id = $1 RETURNING id, payment_id',
+      [req.params.paid]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Pagamento não encontrado.' });
+    res.json({ message: `Pagamento ${result.rows[0].payment_id} excluído.` });
+  } catch (err) {
+    console.error('[God] Erro:', err);
+    res.status(500).json({ error: 'Erro interno do servidor.' });
+  }
+});
+
+// ============================================================================
 // USUÁRIOS (Staff do tenant)
 // ============================================================================
 
 app.get('/api/tenants/:tid/users', async (req, res) => {
   try {
     const result = await pool.query(
-      'SELECT id, nome, email, cargo, ativo, ultimo_acesso, criado_em FROM restaurante_users WHERE restaurant_id = $1 ORDER BY nome',
+      'SELECT id, nome, email, apelido, cargo, ativo, ultimo_acesso, criado_em FROM restaurante_users WHERE restaurant_id = $1 ORDER BY nome',
       [req.params.tid]
     );
     res.json(result.rows);
@@ -231,18 +674,18 @@ app.get('/api/tenants/:tid/users', async (req, res) => {
 app.post('/api/tenants/:tid/users', async (req, res) => {
   try {
     const { tid } = req.params;
-    const { nome, email, cargo, password } = req.body;
-    if (!nome || !email || !password) return res.status(400).json({ error: 'nome, email e password são obrigatórios.' });
+    const { nome, email, apelido, cargo, password } = req.body;
+    if (!nome || !password) return res.status(400).json({ error: 'nome e password são obrigatórios.' });
     const bcrypt = (await import('bcrypt')).default;
     const hash = await bcrypt.hash(password, 12);
     const result = await pool.query(
-      `INSERT INTO restaurante_users (restaurant_id, nome, email, senha_hash, cargo)
-       VALUES ($1, $2, $3, $4, $5) RETURNING id, nome, email, cargo`,
-      [tid, nome, email, hash, cargo || 'caixa']
+      `INSERT INTO restaurante_users (restaurant_id, nome, email, apelido, senha_hash, cargo)
+       VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, nome, email, apelido, cargo`,
+      [tid, nome, email||'', apelido||null, hash, cargo || 'caixa']
     );
     res.status(201).json(result.rows[0]);
   } catch (err) {
-    if (err.code === '23505') return res.status(409).json({ error: 'Email já existe para este tenant.' });
+    if (err.code === '23505') return res.status(409).json({ error: 'Apelido já existe para este tenant.' });
     console.error('[God] Erro:', err);
     res.status(500).json({ error: 'Erro interno do servidor.' });
   }
@@ -251,11 +694,12 @@ app.post('/api/tenants/:tid/users', async (req, res) => {
 app.put('/api/tenants/:tid/users/:uid', async (req, res) => {
   try {
     const { tid, uid } = req.params;
-    const { nome, email, cargo, password } = req.body;
+    const { nome, email, apelido, cargo, password } = req.body;
     const fields = [];
     const params = [uid, tid];
     let idx = 3;
     if (nome !== undefined) { fields.push(`nome = $${idx++}`); params.push(nome); }
+    if (apelido !== undefined) { fields.push(`apelido = $${idx++}`); params.push(apelido); }
     if (email !== undefined) { fields.push(`email = $${idx++}`); params.push(email); }
     if (cargo !== undefined) { fields.push(`cargo = $${idx++}`); params.push(cargo); }
     if (password) {
@@ -266,7 +710,7 @@ app.put('/api/tenants/:tid/users/:uid', async (req, res) => {
     }
     if (fields.length === 0) return res.status(400).json({ error: 'Nenhum campo para atualizar.' });
     const result = await pool.query(
-      `UPDATE restaurante_users SET ${fields.join(', ')} WHERE id = $1 AND restaurant_id = $2 RETURNING id, nome, email, cargo`,
+      `UPDATE restaurante_users SET ${fields.join(', ')} WHERE id = $1 AND restaurant_id = $2 RETURNING id, nome, email, apelido, cargo`,
       params
     );
     if (result.rows.length === 0) return res.status(404).json({ error: 'Usuário não encontrado.' });

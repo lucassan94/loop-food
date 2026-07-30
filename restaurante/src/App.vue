@@ -10,7 +10,7 @@
       </div>
 
       <form @submit.prevent="login">
-        <div class="form-group"><label>E-mail</label><input v-model="email" type="email" required /></div>
+        <div class="form-group"><label>Apelido</label><input v-model="apelido" type="text" placeholder="maria.cozinha" required minlength="2" /></div>
         <div class="form-group"><label>Senha</label><input v-model="password" type="password" required minlength="8" /></div>
         <button type="submit" class="btn btn-primary btn-block" style="justify-content:center;width:100%;" :disabled="loading">
           {{ loading ? 'Entrando...' : 'Entrar' }}
@@ -124,7 +124,7 @@ import ConfigView from './views/ConfigView.vue'
 import MesasView from './views/MesasView.vue'
 
 const authStore = useAuthStore()
-const email = ref('')
+const apelido = ref('')
 const password = ref('')
 const loading = ref(false)
 const errorMsg = ref('')
@@ -216,7 +216,7 @@ async function login() {
   loading.value = true; errorMsg.value = ''
   try {
     const apiAuth = (await import('./services/api')).default
-    const { data } = await apiAuth.post('/auth/restaurante/login', { email: email.value, password: password.value })
+    const { data } = await apiAuth.post('/auth/restaurante/login', { apelido: apelido.value, password: password.value })
     // Cross-login prevention: verificar se o módulo confere
     if (data.user?.module !== 'admin') {
       errorMsg.value = 'Acesso negado: você não tem permissão para este módulo.'

@@ -7,7 +7,7 @@
         <p>Entre com suas credenciais de entregador</p>
         <div v-if="errorMsg" style="background:#fee2e2;color:#991b1b;padding:0.75rem;border-radius:6px;font-size:0.85rem;margin-bottom:1rem;">{{ errorMsg }}</div>
         <form @submit.prevent="login">
-          <div class="form-group"><label>E-mail</label><input v-model="email" type="email" required /></div>
+          <div class="form-group"><label>Telefone</label><input v-model="telefone" type="tel" placeholder="(11) 99999-9999" required /></div>
           <div class="form-group"><label>Senha</label><input v-model="password" type="password" required minlength="8" /></div>
           <button type="submit" class="btn btn-primary btn-block" :disabled="loading">{{ loading ? 'Entrando...' : 'Entrar' }}</button>
         </form>
@@ -280,7 +280,7 @@ import api from './services/api'
 import { connectRealtime, onEvent, offEvent } from './services/realtime'
 
 const user = ref(null)
-const email = ref('')
+const telefone = ref('')
 const password = ref('')
 const loading = ref(false)
 const errorMsg = ref('')
@@ -328,7 +328,7 @@ function paymentLabel(m) { const l = { credito: 'Cartão Crédito', debito: 'Car
 async function login() {
   loading.value = true; errorMsg.value = ''
   try {
-    const { data } = await api.post('/auth/entregador/login', { email: email.value, password: password.value })
+    const { data } = await api.post('/auth/entregador/login', { telefone: telefone.value, password: password.value })
     // Cross-login prevention: verificar se o módulo confere
     if (data.user?.module !== 'entregador') {
       errorMsg.value = 'Acesso negado: você não tem permissão para este módulo.'

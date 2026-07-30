@@ -19,12 +19,17 @@ async function seed() {
     // Admin user
     const adminHash = await bcrypt.hash('admin123', 12);
     await query(
-      `INSERT INTO restaurante_users (restaurant_id, nome, email, senha_hash, cargo)
-       VALUES ($1, 'Administrador', 'admin@saborexpress.com', $2, 'admin')
+      `INSERT INTO restaurante_users (restaurant_id, nome, email, apelido, senha_hash, cargo)
+       VALUES ($1, 'Administrador', 'admin@saborexpress.com', 'admin', $2, 'admin')
        ON CONFLICT (restaurant_id, email) DO NOTHING`,
       [config.restaurantId, adminHash]
     );
-    console.log('✅ Admin user created: admin@saborexpress.com / admin123');
+    // Garantir apelido se o usuário já existia
+    await query(
+      "UPDATE restaurante_users SET apelido = COALESCE(apelido, 'admin') WHERE restaurant_id = $1 AND nome = 'Administrador'",
+      [config.restaurantId]
+    );
+    console.log('✅ Admin user created: admin / admin123');
 
     // Sample products
     const produtos = [
@@ -94,6 +99,59 @@ async function seed() {
       [config.restaurantId, clienteHash]
     );
     console.log('✅ Test client created: maria@email.com / cliente123');
+
+    // Raios de entrega
+    const raios = [
+      { km: 1, min: 15, max: 25, custo: 5.00 },
+      { km: 3, min: 20, max: 35, custo: 7.00 },
+      { km: 5, min: 25, max: 45, custo: 10.00 },
+      { km: 10, min: 30, max: 60, custo: 15.00 },
+    ];
+    for (const r of raios) {
+      await query(
+        `INSERT INTO raios_entrega (restaurant_id, raio_km, tempo_min, tempo_max, custo)
+         VALUES ($1, $2, $3, $4, $5)
+         ON CONFLICT (restaurant_id, raio_km) DO NOTHING`,
+        [config.restaurantId, r.km, r.min, r.max, r.custo]
+      );
+    }
+    console.log(`✅ ${raios.length} delivery zones created`);
+
+    // Mesas
+    const mesaCount = await query('SELECT COUNT(*) as total FROM mesas WHERE restaurant_id = $1', [config.restaurantId]);
+    if (parseInt(mesaCount.rows[0].total) === 0) {
+      for (let i = 1; i <= 10; i++) {
+        await query(
+          `INSERT INTO mesas (restaurant_id, nome, capacidade, status)
+           VALUES ($1, $2, $3, $4)`,
+          [config.restaurantId, `Mesa ${i}`, i === 1 ? 2 : (i <= 3 ? 6 : 4), 'livre']
+        );
+      }
+      console.log('✅ 10 tables created (2-6 seats each)');
+    } else {
+      console.log(`⏩ ${mesaCount.rows[0].total} tables already exist, skipping`);
+    }
+
+    // Banners
+    const bannerCount = await query('SELECT COUNT(*) as total FROM banners WHERE restaurant_id = $1', [config.restaurantId]);
+    if (parseInt(bannerCount.rows[0].total) === 0) {
+      const banners = [
+        { titulo: 'Promoção do Dia!', subtitulo: 'Desconto especial em todos os burguers', ordem: 1 },
+        { titulo: 'Novidade no Cardápio', subtitulo: 'Experimente nossa nova Pizza Especial', ordem: 2 },
+        { titulo: 'Combos Imperdíveis', subtitulo: 'Burger + Batata + Refri por apenas R$ 34,90', ordem: 3 },
+      ];
+      for (const b of banners) {
+        await query(
+          `INSERT INTO banners (restaurant_id, titulo, subtitulo, ordem, ativo)
+           VALUES ($1, $2, $3, $4, true)
+           ON CONFLICT DO NOTHING`,
+          [config.restaurantId, b.titulo, b.subtitulo, b.ordem]
+        );
+      }
+      console.log(`✅ ${banners.length} banners created`);
+    } else {
+      console.log(`⏩ ${bannerCount.rows[0].total} banners already exist, skipping`);
+    }
 
     console.log('\n🌱 Seed completed successfully!\n');
   } catch (err) {
