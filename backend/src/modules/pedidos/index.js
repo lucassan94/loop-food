@@ -400,7 +400,7 @@ router.get('/:id', authenticate, async (req, res, next) => {
 router.patch('/:id/status', authenticate, async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { status, motivo, entregador_id } = req.body;
+    const { status, motivo, entregador_id, metodo_pagamento } = req.body;
     const { role, id: userId, cargo } = req.user;
 
     const statusSchema = z.object({
