@@ -161,6 +161,19 @@ body {
   display: none;
 }
 
+/* Container do botão Sair quando colapsado — mais compacto */
+.sidebar.collapsed .sidebar-footer {
+  padding: 0.5rem 0.25rem;
+  border-top: none;
+}
+.sidebar.collapsed .sidebar-footer .sidebar-item {
+  justify-content: center;
+  padding: 0.5rem;
+}
+.sidebar.collapsed .sidebar-footer .sidebar-item span {
+  display: none;
+}
+
 /* ─── Sidebar Toggle Button (topo, dentro do brand) ─── */
 .sidebar-toggle {
   margin-left: auto;
@@ -183,22 +196,9 @@ body {
   color: white;
 }
 
-/* No collapsed, toggle fica centralizado no topo da sidebar */
+/* No collapsed, o toggle some (clica na logo para expandir) */
 .sidebar.collapsed .sidebar-toggle {
-  display: flex;
-  position: fixed;
-  left: 50%;
-  transform: translateX(-50%);
-  top: 1rem;
-  background: #1e293b;
-  border: 1px solid rgba(255,255,255,0.15);
-  z-index: 101;
-  width: 28px;
-  height: 28px;
-  margin-left: 0;
-}
-.sidebar.collapsed .sidebar-toggle:hover {
-  background: #334155;
+  display: none;
 }
 
 /* ─── Main Content ─── */

@@ -44,7 +44,7 @@
           </button>
         </template>
       </nav>
-      <div style="margin-top:auto;border-top:1px solid rgba(255,255,255,0.1);padding:1rem;">
+      <div class="sidebar-footer" style="margin-top:auto;border-top:1px solid rgba(255,255,255,0.1);padding:1rem;">
         <button class="sidebar-item" @click="showLogoutConfirm = true">
           <i-lucide-log-out />
           <span>Sair</span>
