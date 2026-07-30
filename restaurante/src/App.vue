@@ -293,6 +293,7 @@ watch(features, () => {
 }, { deep: true })
 </script>
 
+<style scoped>
 .sidebar-group-label.collapsed {
   opacity: 0;
   width: 0;
@@ -310,7 +311,6 @@ watch(features, () => {
   border-radius: 8px;
 }
 
-<style scoped>
 .cargo-badge {
   display: inline-flex;
   align-items: center;
