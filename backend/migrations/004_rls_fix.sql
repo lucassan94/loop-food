@@ -70,8 +70,11 @@ DROP POLICY IF EXISTS pedidos_staff ON pedidos;
 DROP POLICY IF EXISTS pedidos_staff_admin ON pedidos;
 DROP POLICY IF EXISTS pedidos_admin_all ON pedidos;
 DROP POLICY IF EXISTS pedidos_chef ON pedidos;
+DROP POLICY IF EXISTS pedidos_chef_select ON pedidos;
+DROP POLICY IF EXISTS pedidos_chef_update ON pedidos;
 DROP POLICY IF EXISTS pedidos_caixa_select ON pedidos;
 DROP POLICY IF EXISTS pedidos_caixa ON pedidos;
+DROP POLICY IF EXISTS pedidos_caixa_update ON pedidos;
 
 DROP POLICY IF EXISTS pedido_itens_restaurant_isolation ON pedido_itens;
 DROP POLICY IF EXISTS pedido_itens_cliente ON pedido_itens;
@@ -79,6 +82,8 @@ DROP POLICY IF EXISTS pedido_itens_entregador ON pedido_itens;
 DROP POLICY IF EXISTS pedido_itens_staff ON pedido_itens;
 DROP POLICY IF EXISTS pedido_itens_admin ON pedido_itens;
 DROP POLICY IF EXISTS pedido_itens_chef ON pedido_itens;
+DROP POLICY IF EXISTS pedido_itens_chef_select ON pedido_itens;
+DROP POLICY IF EXISTS pedido_itens_chef_update ON pedido_itens;
 DROP POLICY IF EXISTS pedido_itens_caixa_select ON pedido_itens;
 
 DROP POLICY IF EXISTS pedido_timeline_restaurant_isolation ON pedido_timeline;
@@ -272,19 +277,47 @@ CREATE POLICY pedidos_admin ON pedidos
         AND current_setting('app.user_cargo', true) IN ('admin', 'gerente')
     );
 
--- Chef: SELECT + UPDATE (mudar status: pendente→preparando→pronto_entrega)
-CREATE POLICY pedidos_chef ON pedidos
-    FOR SELECT, UPDATE
+-- Chef: SELECT (ver pedidos)
+CREATE POLICY pedidos_chef_select ON pedidos
+    FOR SELECT
     USING (
         restaurant_id = current_setting('app.restaurant_id', true)::integer
         AND current_setting('app.user_role', true) = 'restaurante'
         AND current_setting('app.user_cargo', true) = 'chef'
     );
 
--- Caixa: SELECT + UPDATE (pode ver fila e cancelar pedidos via PATCH status)
-CREATE POLICY pedidos_caixa ON pedidos
-    FOR SELECT, UPDATE
+-- Chef: UPDATE (mudar status: pendente→preparando→pronto_entrega)
+CREATE POLICY pedidos_chef_update ON pedidos
+    FOR UPDATE
     USING (
+        restaurant_id = current_setting('app.restaurant_id', true)::integer
+        AND current_setting('app.user_role', true) = 'restaurante'
+        AND current_setting('app.user_cargo', true) = 'chef'
+    )
+    WITH CHECK (
+        restaurant_id = current_setting('app.restaurant_id', true)::integer
+        AND current_setting('app.user_role', true) = 'restaurante'
+        AND current_setting('app.user_cargo', true) = 'chef'
+    );
+
+-- Caixa: SELECT (ver fila de pedidos)
+CREATE POLICY pedidos_caixa_select ON pedidos
+    FOR SELECT
+    USING (
+        restaurant_id = current_setting('app.restaurant_id', true)::integer
+        AND current_setting('app.user_role', true) = 'restaurante'
+        AND current_setting('app.user_cargo', true) = 'caixa'
+    );
+
+-- Caixa: UPDATE (cancelar pedidos via PATCH status)
+CREATE POLICY pedidos_caixa_update ON pedidos
+    FOR UPDATE
+    USING (
+        restaurant_id = current_setting('app.restaurant_id', true)::integer
+        AND current_setting('app.user_role', true) = 'restaurante'
+        AND current_setting('app.user_cargo', true) = 'caixa'
+    )
+    WITH CHECK (
         restaurant_id = current_setting('app.restaurant_id', true)::integer
         AND current_setting('app.user_role', true) = 'restaurante'
         AND current_setting('app.user_cargo', true) = 'caixa'
@@ -333,10 +366,30 @@ CREATE POLICY pedido_itens_admin ON pedido_itens
         AND current_setting('app.user_cargo', true) IN ('admin', 'gerente')
     );
 
--- Chef: SELECT + UPDATE
-CREATE POLICY pedido_itens_chef ON pedido_itens
-    FOR SELECT, UPDATE
+-- Chef: SELECT (ver itens)
+CREATE POLICY pedido_itens_chef_select ON pedido_itens
+    FOR SELECT
     USING (
+        pedido_id IN (
+            SELECT id FROM pedidos
+            WHERE restaurant_id = current_setting('app.restaurant_id', true)::integer
+        )
+        AND current_setting('app.user_role', true) = 'restaurante'
+        AND current_setting('app.user_cargo', true) = 'chef'
+    );
+
+-- Chef: UPDATE (alterar itens)
+CREATE POLICY pedido_itens_chef_update ON pedido_itens
+    FOR UPDATE
+    USING (
+        pedido_id IN (
+            SELECT id FROM pedidos
+            WHERE restaurant_id = current_setting('app.restaurant_id', true)::integer
+        )
+        AND current_setting('app.user_role', true) = 'restaurante'
+        AND current_setting('app.user_cargo', true) = 'chef'
+    )
+    WITH CHECK (
         pedido_id IN (
             SELECT id FROM pedidos
             WHERE restaurant_id = current_setting('app.restaurant_id', true)::integer

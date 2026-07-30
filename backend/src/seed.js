@@ -21,7 +21,7 @@ async function seed() {
     await query(
       `INSERT INTO restaurante_users (restaurant_id, nome, email, senha_hash, cargo)
        VALUES ($1, 'Administrador', 'admin@saborexpress.com', $2, 'admin')
-       ON CONFLICT (email) DO NOTHING`,
+       ON CONFLICT (restaurant_id, email) DO NOTHING`,
       [config.restaurantId, adminHash]
     );
     console.log('✅ Admin user created: admin@saborexpress.com / admin123');
@@ -90,7 +90,7 @@ async function seed() {
     await query(
       `INSERT INTO clientes (restaurant_id, nome, sobrenome, email, telefone, senha_hash, endereco, cep, bairro, cidade, estado)
        VALUES ($1, 'Maria', 'Silva', 'maria@email.com', '(11) 99999-8888', $2, 'Av. Paulista, 1000', '01310-100', 'Bela Vista', 'São Paulo', 'SP')
-       ON CONFLICT (email) DO NOTHING`,
+       ON CONFLICT (restaurant_id, email) DO NOTHING`,
       [config.restaurantId, clienteHash]
     );
     console.log('✅ Test client created: maria@email.com / cliente123');
