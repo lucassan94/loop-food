@@ -269,12 +269,27 @@ onMounted(async () => {
 })
 
 // Handler de navegação vindo de MesasView (irParaPedido)
+function validarBase64Imagem(b64) {
+  // CWE-79: validar que o base64 contém apenas caracteres válidos
+  if (!b64 || typeof b64 !== 'string') return ''
+  const trimmed = b64.trim()
+  // Aceita apenas base64 padrão (com padding = ou ==) ou base64url (sem padding, com -_)
+  const isValidBase64 = /^[A-Za-z0-9+/]+={0,2}$/.test(trimmed)
+  const isValidBase64Url = /^[A-Za-z0-9_-]+$/.test(trimmed)
+  if (!isValidBase64 && !isValidBase64Url) {
+    console.warn('[Logo] base64 inválido ignorado')
+    return ''
+  }
+  return trimmed
+}
+
 function detectImgSrc(b64) {
-  if (!b64) return ''
-  if (b64.startsWith('/9j/')) return 'data:image/jpeg;base64,' + b64
-  if (b64.startsWith('iVBORw0KGgo')) return 'data:image/png;base64,' + b64
-  if (b64.startsWith('UklGR')) return 'data:image/webp;base64,' + b64
-  return 'data:image/png;base64,' + b64
+  const limpo = validarBase64Imagem(b64)
+  if (!limpo) return ''
+  if (limpo.startsWith('/9j/')) return 'data:image/jpeg;base64,' + limpo
+  if (limpo.startsWith('iVBORw0KGgo')) return 'data:image/png;base64,' + limpo
+  if (limpo.startsWith('UklGR')) return 'data:image/webp;base64,' + limpo
+  return 'data:image/png;base64,' + limpo
 }
 
 function handleMesaNavigate({ view, mesa }) {

@@ -297,20 +297,22 @@ onMounted(async () => {
     const { data } = await api.get('/restaurante')
     storeOpen.value = data.status_loja
 
-    // Aplicar cores do tema dinamicamente
+    // Aplicar cores do tema dinamicamente (CWE-79: validar formato hex antes de injetar no CSS)
     const root = document.documentElement
-    if (data.cor_primaria) {
-      root.style.setProperty('--primary', data.cor_primaria)
-      // Calcular versão escura (para hover) e clara (para backgrounds)
-      root.style.setProperty('--primary-dark', adjustColor(data.cor_primaria, -20))
-      root.style.setProperty('--primary-light', hexToRgba(data.cor_primaria, 0.12))
+    const corPrimaria = validarCorHex(data.cor_primaria)
+    const corSecundaria = validarCorHex(data.cor_secundaria)
+    const corTerciaria = validarCorHex(data.cor_terciaria)
+    if (corPrimaria) {
+      root.style.setProperty('--primary', corPrimaria)
+      root.style.setProperty('--primary-dark', adjustColor(corPrimaria, -20))
+      root.style.setProperty('--primary-light', hexToRgba(corPrimaria, 0.12))
     }
-    if (data.cor_secundaria) {
-      root.style.setProperty('--secondary', data.cor_secundaria)
+    if (corSecundaria) {
+      root.style.setProperty('--secondary', corSecundaria)
     }
-    if (data.cor_terciaria) {
-      root.style.setProperty('--info', data.cor_terciaria)
-      root.style.setProperty('--info-light', hexToRgba(data.cor_terciaria, 0.12))
+    if (corTerciaria) {
+      root.style.setProperty('--info', corTerciaria)
+      root.style.setProperty('--info-light', hexToRgba(corTerciaria, 0.12))
     }
   } catch { /* Ignore */ }
 
@@ -365,10 +367,25 @@ onUnmounted(() => {
   window.removeEventListener('scroll', handleScroll)
 })
 
-// ── Helpers de cor ──
+// ── Helpers de cor (CWE-79: validar formato hex antes de usar) ──
+function validarCorHex(value) {
+  // Aceita hex de 3, 6 ou 8 dígitos (#RGB, #RRGGBB, #RRGGBBAA)
+  if (!value || typeof value !== 'string') return null
+  const trimmed = value.trim()
+  if (!/^#[0-9a-fA-F]{8}$/.test(trimmed) &&
+      !/^#[0-9a-fA-F]{6}$/.test(trimmed) &&
+      !/^#[0-9a-fA-F]{3}$/.test(trimmed)) {
+    console.warn('[Tema] Cor inválida ignorada:', value)
+    return null
+  }
+  return trimmed
+}
+
 function adjustColor(hex, percent) {
   // Escurece (percent negativo) ou clareia (percent positivo) uma cor hex
-  const num = parseInt(hex.replace('#', ''), 16)
+  // Descarta canal alpha (#RRGGBBAA -> #RRGGBB) se presente
+  const cleanHex = hex.replace('#', '').slice(0, 6)
+  const num = parseInt(cleanHex, 16)
   const r = Math.min(255, Math.max(0, ((num >> 16) & 0xFF) + percent))
   const g = Math.min(255, Math.max(0, ((num >> 8) & 0xFF) + percent))
   const b = Math.min(255, Math.max(0, (num & 0xFF) + percent))
@@ -376,7 +393,9 @@ function adjustColor(hex, percent) {
 }
 
 function hexToRgba(hex, alpha) {
-  const num = parseInt(hex.replace('#', ''), 16)
+  // Descarta canal alpha (#RRGGBBAA -> #RRGGBB) se presente
+  const cleanHex = hex.replace('#', '').slice(0, 6)
+  const num = parseInt(cleanHex, 16)
   const r = (num >> 16) & 0xFF
   const g = (num >> 8) & 0xFF
   const b = num & 0xFF

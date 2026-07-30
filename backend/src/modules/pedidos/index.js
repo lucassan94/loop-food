@@ -348,9 +348,11 @@ router.get('/', authenticate, async (req, res, next) => {
 router.get('/:id', authenticate, async (req, res, next) => {
   try {
     const { id } = req.params;
+    const { role, id: userId } = req.user;
 
-    const result = await query(
-      `SELECT p.*,
+    // CWE-862: Clientes só podem ver seus próprios pedidos
+    let sql = `
+      SELECT p.*,
               e.nome as entregador_nome, e.telefone as entregador_telefone,
               COALESCE(
                 (SELECT json_agg(json_build_object(
@@ -380,9 +382,17 @@ router.get('/:id', authenticate, async (req, res, next) => {
               ) as mensagens
        FROM pedidos p
        LEFT JOIN entregadores e ON p.entregador_id = e.id
-       WHERE p.id = $1`,
-      [id]
-    );
+       WHERE p.id = $1
+    `;
+    const params = [id];
+
+    // Clientes só acessam seus próprios pedidos
+    if (role === 'cliente') {
+      sql += ' AND p.cliente_id = $2';
+      params.push(userId);
+    }
+
+    const result = await query(sql, params);
 
     if (result.rows.length === 0) {
       throw new AppError('Pedido não encontrado.', 404);
@@ -418,7 +428,7 @@ router.patch('/:id/status', authenticate, async (req, res, next) => {
     const userCargo = (cargo || '').toLowerCase();
 
     if (userRole === 'cliente') {
-      // Cliente só pode cancelar pedidos próprios (RLS cuida do isolation)
+      // CWE-862: Cliente só pode cancelar pedidos próprios
       if (data.status !== 'cancelado') {
         throw new AppError('Clientes só podem cancelar pedidos.', 403);
       }
@@ -475,10 +485,13 @@ router.patch('/:id/status', authenticate, async (req, res, next) => {
     }
 
     const result = await transaction(async (client) => {
-      const pedido = await client.query(
-        'SELECT * FROM pedidos WHERE id = $1',
-        [id]
-      );
+      // CWE-862: Ownership check unificado — cliente só acessa pedidos próprios
+      const pedidoQuery = userRole === 'cliente'
+        ? 'SELECT * FROM pedidos WHERE id = $1 AND cliente_id = $2'
+        : 'SELECT * FROM pedidos WHERE id = $1';
+      const pedidoParams = userRole === 'cliente' ? [id, userId] : [id];
+
+      const pedido = await client.query(pedidoQuery, pedidoParams);
       if (pedido.rows.length === 0) throw new AppError('Pedido não encontrado.', 404);
 
       const pedidoAtual = pedido.rows[0];

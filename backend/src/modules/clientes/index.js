@@ -22,13 +22,20 @@ router.get('/', authenticate, authorize('admin', 'gerente', 'caixa'), async (req
     const params = [restaurantId];
 
     if (busca) {
+      // Escapar wildcards LIKE (% e _) para evitar buscas não intencionais
+      const buscaSegura = busca.replace(/[%_]/g, '\\$&');
       sql += ' AND (LOWER(nome) LIKE $' + (params.length + 1) + ' OR LOWER(email) LIKE $' + (params.length + 1) + ' OR LOWER(telefone) LIKE $' + (params.length + 1) + ')';
-      params.push(`%${busca.toLowerCase()}%`);
+      params.push(`%${buscaSegura.toLowerCase()}%`);
     }
 
-    // Ordenação
-    const colunasPermitidas = ['nome', 'pedidos_total', 'total_gasto', 'criado_em'];
-    const coluna = colunasPermitidas.includes(ordenar_por) ? ordenar_por : 'total_gasto';
+    // Ordenação — mapeamento fixo (CWE-89: sem interpolação direta de coluna/direção)
+    const ORDER_BY_MAP = {
+      nome: 'nome',
+      pedidos_total: 'pedidos_total',
+      total_gasto: 'total_gasto',
+      criado_em: 'criado_em',
+    };
+    const coluna = ORDER_BY_MAP[ordenar_por] || 'total_gasto';
     const dir = ordem === 'asc' ? 'ASC' : 'DESC';
     sql += ` ORDER BY ${coluna} ${dir}`;
 

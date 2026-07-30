@@ -26,9 +26,11 @@ const ASAAS_IPS = [
 
 async function validateWebhookSignature(req, res, next) {
   try {
+    const isProduction = config.asaas.environment === 'production';
+
     // 1. Verificar IP (produção)
     const clientIp = req.ip || req.connection?.remoteAddress;
-    if (config.asaas.environment === 'production' && clientIp) {
+    if (isProduction && clientIp) {
       const ipLimpo = clientIp.replace(/^::ffff:/, '');
       if (!ASAAS_IPS.includes(ipLimpo)) {
         console.warn(`[Asaas] Webhook rejeitado: IP ${ipLimpo} não autorizado`);
@@ -44,35 +46,54 @@ async function validateWebhookSignature(req, res, next) {
       return res.status(200).json({ received: true });
     }
 
-    // 3. Se o token pertence a um tenant específico, resolver o restaurant_id
+    // 3. Resolver secret HMAC (tenant-específico ou global)
+    let hmacSecret = null;
     if (tenantId) {
       req.restaurantId = tenantId;
 
-      // Verificar HMAC com o secret do tenant (se configurado)
+      // Buscar webhook secret do tenant
       const { query } = await import('../../config/database.js');
       const tenantResult = await query(
         'SELECT asaas_webhook_secret FROM restaurantes WHERE id = $1',
         [tenantId]
       );
-      const tenantSecret = tenantResult.rows[0]?.asaas_webhook_secret;
-      if (tenantSecret) {
-        const signature = req.headers['asaas-signature'];
-        const rawBody = req.rawBody || JSON.stringify(req.body);
-        if (!asaas.verificarAssinaturaWebhook(rawBody, signature, tenantSecret)) {
-          console.warn('[Asaas] Webhook rejeitado: assinatura HMAC inválida para tenant');
-          return res.status(200).json({ received: true });
-        }
-      }
+      hmacSecret = tenantResult.rows[0]?.asaas_webhook_secret || null;
     } else {
-      // Token global: usar webhookSecret global (se configurado)
-      if (config.asaas.webhookSecret) {
-        const signature = req.headers['asaas-signature'];
-        const rawBody = req.rawBody || JSON.stringify(req.body);
-        if (!asaas.verificarAssinaturaWebhook(rawBody, signature, config.asaas.webhookSecret)) {
-          console.warn('[Asaas] Webhook rejeitado: assinatura HMAC inválida (global)');
-          return res.status(200).json({ received: true });
-        }
+      // Token global: usar webhookSecret global
+      hmacSecret = config.asaas.webhookSecret || null;
+    }
+
+    // CWE-346: Em produção, HMAC é OBRIGATÓRIO
+    if (isProduction && !hmacSecret) {
+      console.error(
+        '[Asaas] ⛔ Webhook rejeitado: ASAAS_WEBHOOK_SECRET não configurado! ' +
+        'Configure a variável de ambiente ASAAS_WEBHOOK_SECRET (ou asaas_webhook_secret por tenant) ' +
+        'para validar a assinatura HMAC dos webhooks.'
+      );
+      return res.status(200).json({ received: true });
+    }
+
+    // 4. Verificar assinatura HMAC (sempre que houver secret configurado)
+    if (hmacSecret) {
+      const signature = req.headers['asaas-signature'];
+      const rawBody = req.rawBody || JSON.stringify(req.body);
+
+      if (!signature) {
+        console.warn('[Asaas] Webhook rejeitado: header asaas-signature ausente');
+        return res.status(200).json({ received: true });
       }
+
+      if (!asaas.verificarAssinaturaWebhook(rawBody, signature, hmacSecret)) {
+        const tenantInfo = tenantId ? ` para tenant ${tenantId}` : '';
+        console.warn(`[Asaas] Webhook rejeitado: assinatura HMAC inválida${tenantInfo}`);
+        return res.status(200).json({ received: true });
+      }
+    }
+
+    // Em desenvolvimento, permitir sem HMAC (para testes locais)
+    if (!isProduction && !hmacSecret) {
+      console.warn('[Asaas] ⚠️ Webhook aceito sem verificação HMAC (apenas desenvolvimento). ' +
+        'Configure ASAAS_WEBHOOK_SECRET em produção.');
     }
 
     next();
@@ -155,16 +176,9 @@ router.post('/criar', authenticate, async (req, res, next) => {
         })).optional().default([]),
         subtotal: z.number().positive(),
       })).min(1),
-      // 🔒 PCI COMPLIANT: creditCardToken é preferido (cartão tokenizado via Asaas)
+      // 🔒 PCI COMPLIANT: APENAS creditCardToken (cartão tokenizado via Asaas no frontend)
+      // Dados brutos de cartão NUNCA devem trafegar no servidor (PCI-DSS)
       creditCardToken: z.string().optional(),
-      // ⚠️ DEPRECATED: creditCard será removido em versão futura
-      creditCard: z.object({
-        holderName: z.string(),
-        number: z.string(),
-        expiryMonth: z.string(),
-        expiryYear: z.string(),
-        ccv: z.string(),
-      }).optional(),
       creditCardHolderInfo: z.object({
         name: z.string(),
         email: z.string().email(),
@@ -176,6 +190,21 @@ router.post('/criar', authenticate, async (req, res, next) => {
       remoteIp: z.string().optional(),
       tempo_preparo_estimado: z.number().int().positive().optional(),
       tempo_entrega_estimado: z.number().int().positive().optional(),
+    }).superRefine((data, ctx) => {
+      if (data.tipo === 'CREDIT_CARD' && !data.creditCardToken) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'creditCardToken é obrigatório para pagamento com cartão. Tokenize o cartão primeiro em /api/pagamentos/tokenizar-cartao.',
+          path: ['creditCardToken'],
+        });
+      }
+      if (data.tipo === 'CREDIT_CARD' && !data.creditCardHolderInfo) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'creditCardHolderInfo é obrigatório para pagamento com cartão.',
+          path: ['creditCardHolderInfo'],
+        });
+      }
     });
 
     const data = schema.parse(req.body);
@@ -317,9 +346,8 @@ router.post('/criar', authenticate, async (req, res, next) => {
       });
 
     } else {
-      // CREDIT_CARD
-      // 🔒 PCI: Preferir creditCardToken (tokenizado via Asaas) sobre dados brutos
-      const usarToken = !!data.creditCardToken;
+      // CREDIT_CARD — PCI Compliant: usa APENAS creditCardToken (tokenizado via Asaas)
+      // Dados brutos de cartão NUNCA passam pelo servidor
       const paymentBody = {
         customer: customer.id,
         billingType: 'CREDIT_CARD',
@@ -328,23 +356,9 @@ router.post('/criar', authenticate, async (req, res, next) => {
         description: `Pedido #${result.pedido_id || result.id} - SaborExpress`,
         externalReference: result.id,
         remoteIp: data.remoteIp || req.ip,
+        creditCardToken: data.creditCardToken,
+        creditCardHolderInfo: data.creditCardHolderInfo,
       };
-
-      if (usarToken) {
-        // ✅ PCI Compliant: usa cartão tokenizado — dados sensíveis nunca chegam ao servidor
-        paymentBody.creditCardToken = data.creditCardToken;
-        paymentBody.creditCardHolderInfo = data.creditCardHolderInfo;
-      } else {
-        // ⚠️ Fallback legado: dados brutos do cartão (será removido)
-        if (!data.creditCard) {
-          throw new AppError(
-            'Informe creditCardToken (recomendado) ou creditCard (legado).',
-            400
-          );
-        }
-        paymentBody.creditCard = data.creditCard;
-        paymentBody.creditCardHolderInfo = data.creditCardHolderInfo;
-      }
 
       const payment = await asaas.createPayment(paymentBody, idempotencyKey, restaurantId);
 
@@ -376,7 +390,7 @@ router.post('/criar', authenticate, async (req, res, next) => {
         cartao: {
           aprovado: payment.status === 'CONFIRMED' || payment.status === 'RECEIVED',
           creditCardToken: payment.creditCardToken || null,
-          tokenizado: usarToken,
+          tokenizado: true,
         },
       });
     }

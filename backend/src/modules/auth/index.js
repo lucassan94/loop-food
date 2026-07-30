@@ -68,8 +68,9 @@ function setTokenCookies(req, res, tokens) {
   // Detecta se a conexão é segura (HTTPS) de forma confiável
   const isSecure = req.secure || req.headers['x-forwarded-proto'] === 'https';
   
-  // 365 dias em ms
-  const UM_ANO = 365 * 24 * 60 * 60 * 1000;
+  // Duração alinhada com a expiração dos JWTs em config/index.js
+  const ACCESS_MAX_AGE = 24 * 60 * 60 * 1000;     // 24h (access token)
+  const REFRESH_MAX_AGE = 7 * 24 * 60 * 60 * 1000; // 7d (refresh token)
 
   const cookieOptions = {
     httpOnly: true,
@@ -80,12 +81,12 @@ function setTokenCookies(req, res, tokens) {
 
   res.cookie('token', tokens.accessToken, {
     ...cookieOptions,
-    maxAge: UM_ANO,
+    maxAge: ACCESS_MAX_AGE,
   });
 
   res.cookie('refreshToken', tokens.refreshToken, {
     ...cookieOptions,
-    maxAge: UM_ANO,
+    maxAge: REFRESH_MAX_AGE,
   });
 
   // Token legível para o frontend (útil para Socket.IO auth e interceptor API)
@@ -94,7 +95,7 @@ function setTokenCookies(req, res, tokens) {
     secure: isSecure,
     sameSite: 'lax',
     path: '/',
-    maxAge: UM_ANO,
+    maxAge: ACCESS_MAX_AGE,
   });
 }
 

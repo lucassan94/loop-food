@@ -35,8 +35,8 @@ export const config = {
       }
       return s || 'dev-secret-change-in-production';
     })(),
-    expiresIn: process.env.JWT_EXPIRES_IN || '365d',
-    refreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '365d',
+    expiresIn: process.env.JWT_EXPIRES_IN || '24h',
+    refreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '7d',
   },
 
   // Multi-tenant: Restaurant ID (fallback para desenvolvimento local)

@@ -54,12 +54,11 @@ export function errorHandler(err, req, res, _next) {
     });
   }
 
-  // Erro não esperado (log no servidor)
+  // Erro não esperado — log detalhado no servidor, resposta genérica (CWE-200)
   console.error('[ERROR]', err);
 
   res.status(err.statusCode || 500).json({
     error: 'Erro interno do servidor.',
     code: 'INTERNAL_ERROR',
-    ...(req.app.get('env') === 'development' && { detail: err.message }),
   });
 }

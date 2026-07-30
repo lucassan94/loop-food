@@ -247,7 +247,7 @@ export async function findOrCreateCustomer(clienteData, tenantId = null) {
 export async function createPayment({
   customer, billingType, value, dueDate,
   description, externalReference,
-  creditCard, creditCardHolderInfo, remoteIp,
+  creditCardToken, creditCardHolderInfo, remoteIp,
 }, idempotencyKey = null, tenantId = null) {
   const body = {
     customer,
@@ -258,14 +258,9 @@ export async function createPayment({
     externalReference: String(externalReference),
   };
 
-  if (billingType === 'CREDIT_CARD' && creditCard) {
-    body.creditCard = {
-      holderName: creditCard.holderName,
-      number: creditCard.number,
-      expiryMonth: creditCard.expiryMonth,
-      expiryYear: creditCard.expiryYear,
-      ccv: creditCard.ccv,
-    };
+  // PCI Compliant: APENAS cartão tokenizado — dados brutos nunca passam pelo servidor
+  if (billingType === 'CREDIT_CARD') {
+    body.creditCardToken = creditCardToken;
     body.creditCardHolderInfo = {
       name: creditCardHolderInfo.name,
       email: creditCardHolderInfo.email,

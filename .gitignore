@@ -87,3 +87,9 @@ webhook-portainer
 asd.html
 temp
 
+# =====================================
+# ARQUIVOS LOCAIS NÃO VERSIONADOS
+# =====================================
+cookies.txt
+pedidos*.md
+

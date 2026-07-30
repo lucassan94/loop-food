@@ -139,3 +139,64 @@ export async function deleteUploadFile(publicUrl) {
     return false;
   }
 }
+
+// ============================================================================
+// Subdiretórios permitidos (whitelist — CWE-22)
+// ============================================================================
+export const ALLOWED_UPLOAD_TYPES = ['cardapio', 'banners', 'entregadores', 'categorias'];
+
+/**
+ * Serve um arquivo de upload com segurança, prevenindo path traversal.
+ *
+ * Extrai tenantId, tipo e nome do arquivo da URL, valida cada segmento
+ * contra whitelists, e usa path.resolve + startsWith para garantir que
+ * o arquivo servido está dentro do diretório base de uploads.
+ *
+ * @param {string} tenantId - ID do restaurante (deve ser numérico)
+ * @param {string} type - Tipo do arquivo (cardapio, banners, etc.)
+ * @param {string} filename - Nome do arquivo
+ * @param {object} res - Express response object
+ */
+export function serveUploadFile(tenantId, type, filename, res) {
+  // CWE-22: Validar tenantId (apenas dígitos)
+  if (!/^\d+$/.test(tenantId)) {
+    console.warn(`[Upload] Tenant ID inválido: ${tenantId}`);
+    return res.status(400).json({ error: 'Parâmetro inválido.' });
+  }
+
+  // CWE-22: Validar tipo contra whitelist
+  if (!ALLOWED_UPLOAD_TYPES.includes(type)) {
+    console.warn(`[Upload] Tipo de arquivo inválido: ${type}`);
+    return res.status(400).json({ error: 'Parâmetro inválido.' });
+  }
+
+  // CWE-22: Validar nome do arquivo (sem path separators)
+  if (!filename || filename.includes('..') || filename.includes('/') || filename.includes('\\')) {
+    console.warn(`[Upload] Nome de arquivo inválido: ${filename}`);
+    return res.status(400).json({ error: 'Parâmetro inválido.' });
+  }
+
+  // CWE-22: Resolver path absoluto e verificar se está dentro do diretório base
+  const baseDir = path.resolve(getUploadBaseDir());
+  const filePath = path.resolve(baseDir, tenantId, type, filename);
+
+  if (!filePath.startsWith(baseDir + path.sep)) {
+    console.warn(`[Upload] Path traversal detectado: ${tenantId}/${type}/${filename}`);
+    return res.status(400).json({ error: 'Parâmetro inválido.' });
+  }
+
+  // Verificar se o arquivo existe
+  if (!fs.existsSync(filePath)) {
+    return res.status(404).json({ error: 'Arquivo não encontrado.' });
+  }
+
+  // Servir o arquivo com callback de erro (race condition: arquivo pode ser removido entre existsSync e sendFile)
+  return res.sendFile(filePath, (err) => {
+    if (err) {
+      console.warn(`[Upload] Erro ao servir arquivo ${filePath}:`, err.message);
+      if (!res.headersSent) {
+        res.status(404).json({ error: 'Arquivo não encontrado.' });
+      }
+    }
+  });
+}

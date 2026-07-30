@@ -156,8 +156,10 @@ router.get('/', async (req, res, next) => {
     }
 
     if (busca) {
+      // Escapar wildcards LIKE (% e _) para evitar buscas não intencionais
+      const buscaSegura = busca.replace(/[%_]/g, '\\$&');
       sql += ' AND (LOWER(p.nome) LIKE $' + (params.length + 1) + ' OR LOWER(p.descricao) LIKE $' + (params.length + 1) + ')';
-      params.push(`%${busca.toLowerCase()}%`);
+      params.push(`%${buscaSegura.toLowerCase()}%`);
     }
 
     sql += ' ORDER BY p.destaque DESC, p.nome ASC';
@@ -192,8 +194,10 @@ router.get('/com-extras', async (req, res, next) => {
     }
 
     if (busca) {
+      // Escapar wildcards LIKE (% e _) para evitar buscas não intencionais
+      const buscaSegura = busca.replace(/[%_]/g, '\\$&');
       sql += ' AND (LOWER(p.nome) LIKE $' + (params.length + 1) + ' OR LOWER(p.descricao) LIKE $' + (params.length + 1) + ')';
-      params.push(`%${busca.toLowerCase()}%`);
+      params.push(`%${buscaSegura.toLowerCase()}%`);
     }
 
     sql += ' ORDER BY p.destaque DESC, p.nome ASC';

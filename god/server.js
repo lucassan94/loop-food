@@ -64,8 +64,8 @@ app.get('/api/tenants', async (req, res) => {
     );
     res.json(result.rows);
   } catch (err) {
-    console.error('[TENANTS ERROR]', err);
-    res.status(500).json({ error: err.message || 'Erro desconhecido', stack: err.stack?.substring(0, 500) });
+    console.error('[Tenants] Erro ao listar tenants:', err);
+    res.status(500).json({ error: 'Erro interno do servidor.' });
   }
 });
 
@@ -78,7 +78,8 @@ app.get('/api/tenants/:id', async (req, res) => {
     if (result.rows.length === 0) return res.status(404).json({ error: 'Tenant não encontrado' });
     res.json(result.rows[0]);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('[God] Erro:', err);
+    res.status(500).json({ error: 'Erro interno do servidor.' });
   }
 });
 
@@ -111,7 +112,8 @@ app.post('/api/tenants', async (req, res) => {
   } catch (err) {
     try { await client.query('ROLLBACK'); } catch {}
     if (err.code === '23505') return res.status(409).json({ error: 'Slug ou domínio já existe.' });
-    res.status(500).json({ error: err.message });
+    console.error('[God] Erro:', err);
+    res.status(500).json({ error: 'Erro interno do servidor.' });
   } finally {
     client.release();
   }
@@ -128,7 +130,8 @@ app.get('/api/tenants/:tid/features', async (req, res) => {
     const features = result.rows[0].features || { salao: true, delivery: true };
     res.json(features);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('[God] Erro:', err);
+    res.status(500).json({ error: 'Erro interno do servidor.' });
   }
 });
 
@@ -146,7 +149,8 @@ app.put('/api/tenants/:tid/features', async (req, res) => {
     if (result.rows.length === 0) return res.status(404).json({ error: 'Tenant não encontrado' });
     res.json(result.rows[0]);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('[God] Erro:', err);
+    res.status(500).json({ error: 'Erro interno do servidor.' });
   }
 });
 
@@ -174,7 +178,8 @@ app.put('/api/tenants/:id', async (req, res) => {
     if (result.rows.length === 0) return res.status(404).json({ error: 'Tenant não encontrado' });
     res.json(result.rows[0]);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('[God] Erro:', err);
+    res.status(500).json({ error: 'Erro interno do servidor.' });
   }
 });
 
@@ -186,7 +191,8 @@ app.delete('/api/tenants/:id', async (req, res) => {
     if (result.rows.length === 0) return res.status(404).json({ error: 'Tenant não encontrado' });
     res.json({ message: `"${result.rows[0].nome}" excluído.` });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('[God] Erro:', err);
+    res.status(500).json({ error: 'Erro interno do servidor.' });
   }
 });
 
@@ -200,7 +206,8 @@ app.post('/api/tenants/:id/regenerate-jwt', async (req, res) => {
   if (result.rows.length === 0) return res.status(404).json({ error: 'Tenant não encontrado' });
     res.json({ message: `JWT do "${result.rows[0].nome}" regenerado.` });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('[God] Erro:', err);
+    res.status(500).json({ error: 'Erro interno do servidor.' });
   }
 });
 
@@ -216,7 +223,8 @@ app.get('/api/tenants/:tid/users', async (req, res) => {
     );
     res.json(result.rows);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('[God] Erro:', err);
+    res.status(500).json({ error: 'Erro interno do servidor.' });
   }
 });
 
@@ -235,7 +243,8 @@ app.post('/api/tenants/:tid/users', async (req, res) => {
     res.status(201).json(result.rows[0]);
   } catch (err) {
     if (err.code === '23505') return res.status(409).json({ error: 'Email já existe para este tenant.' });
-    res.status(500).json({ error: err.message });
+    console.error('[God] Erro:', err);
+    res.status(500).json({ error: 'Erro interno do servidor.' });
   }
 });
 
@@ -263,7 +272,8 @@ app.put('/api/tenants/:tid/users/:uid', async (req, res) => {
     if (result.rows.length === 0) return res.status(404).json({ error: 'Usuário não encontrado.' });
     res.json(result.rows[0]);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('[God] Erro:', err);
+    res.status(500).json({ error: 'Erro interno do servidor.' });
   }
 });
 
@@ -276,7 +286,8 @@ app.delete('/api/tenants/:tid/users/:uid', async (req, res) => {
     if (result.rows.length === 0) return res.status(404).json({ error: 'Usuário não encontrado.' });
     res.json({ message: `"${result.rows[0].nome}" removido.` });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('[God] Erro:', err);
+    res.status(500).json({ error: 'Erro interno do servidor.' });
   }
 });
 
@@ -306,7 +317,8 @@ app.get('/api/tenants/:tid/cardapio', async (req, res) => {
     );
     res.json({ categorias: categorias.rows, produtos: produtos.rows, extras: extras.rows });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('[God] Erro:', err);
+    res.status(500).json({ error: 'Erro interno do servidor.' });
   }
 });
 
@@ -324,7 +336,8 @@ app.post('/api/tenants/:tid/categorias', async (req, res) => {
     res.status(201).json(result.rows[0]);
   } catch (err) {
     if (err.code === '23505') return res.status(409).json({ error: 'Slug já existe para este tenant.' });
-    res.status(500).json({ error: err.message });
+    console.error('[God] Erro:', err);
+    res.status(500).json({ error: 'Erro interno do servidor.' });
   }
 });
 
@@ -344,7 +357,8 @@ app.put('/api/tenants/:tid/categorias/:cid', async (req, res) => {
     if (result.rows.length === 0) return res.status(404).json({ error: 'Categoria não encontrada.' });
     res.json(result.rows[0]);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('[God] Erro:', err);
+    res.status(500).json({ error: 'Erro interno do servidor.' });
   }
 });
 
@@ -357,7 +371,8 @@ app.delete('/api/tenants/:tid/categorias/:cid', async (req, res) => {
     if (result.rows.length === 0) return res.status(404).json({ error: 'Categoria não encontrada.' });
     res.json({ message: `"${result.rows[0].nome}" excluída.` });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('[God] Erro:', err);
+    res.status(500).json({ error: 'Erro interno do servidor.' });
   }
 });
 
@@ -374,7 +389,8 @@ app.post('/api/tenants/:tid/produtos', async (req, res) => {
     );
     res.status(201).json(result.rows[0]);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('[God] Erro:', err);
+    res.status(500).json({ error: 'Erro interno do servidor.' });
   }
 });
 
@@ -394,7 +410,8 @@ app.put('/api/tenants/:tid/produtos/:pid', async (req, res) => {
     if (result.rows.length === 0) return res.status(404).json({ error: 'Produto não encontrado.' });
     res.json(result.rows[0]);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('[God] Erro:', err);
+    res.status(500).json({ error: 'Erro interno do servidor.' });
   }
 });
 
@@ -407,7 +424,8 @@ app.delete('/api/tenants/:tid/produtos/:pid', async (req, res) => {
     if (result.rows.length === 0) return res.status(404).json({ error: 'Produto não encontrado.' });
     res.json({ message: `"${result.rows[0].nome}" excluído.` });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('[God] Erro:', err);
+    res.status(500).json({ error: 'Erro interno do servidor.' });
   }
 });
 
@@ -422,7 +440,8 @@ app.post('/api/tenants/:tid/extras', async (req, res) => {
     );
     res.status(201).json(result.rows[0]);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('[God] Erro:', err);
+    res.status(500).json({ error: 'Erro interno do servidor.' });
   }
 });
 
@@ -438,7 +457,8 @@ app.put('/api/tenants/:tid/extras/:eid', async (req, res) => {
     if (result.rows.length === 0) return res.status(404).json({ error: 'Extra não encontrado.' });
     res.json(result.rows[0]);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('[God] Erro:', err);
+    res.status(500).json({ error: 'Erro interno do servidor.' });
   }
 });
 
@@ -448,7 +468,8 @@ app.delete('/api/tenants/:tid/extras/:eid', async (req, res) => {
     if (result.rows.length === 0) return res.status(404).json({ error: 'Extra não encontrado.' });
     res.json({ message: `"${result.rows[0].nome}" excluído.` });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('[God] Erro:', err);
+    res.status(500).json({ error: 'Erro interno do servidor.' });
   }
 });
 
@@ -463,7 +484,8 @@ app.get('/api/tenants/:tid/pagamentos', async (req, res) => {
     const config = result.rows[0].config || {};
     res.json(config.formas_pagamento || ['dinheiro', 'credito', 'debito', 'pix']);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('[God] Erro:', err);
+    res.status(500).json({ error: 'Erro interno do servidor.' });
   }
 });
 
@@ -480,7 +502,8 @@ app.put('/api/tenants/:tid/pagamentos', async (req, res) => {
     await pool.query('UPDATE restaurantes SET config = $1 WHERE id = $2', [JSON.stringify(config), tid]);
     res.json({ formas_pagamento });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('[God] Erro:', err);
+    res.status(500).json({ error: 'Erro interno do servidor.' });
   }
 });
 
@@ -498,7 +521,8 @@ app.get('/api/tenants/:tid/drivers', async (req, res) => {
     );
     res.json(result.rows);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('[God] Erro:', err);
+    res.status(500).json({ error: 'Erro interno do servidor.' });
   }
 });
 
@@ -517,7 +541,8 @@ app.post('/api/tenants/:tid/drivers', async (req, res) => {
     res.status(201).json(result.rows[0]);
   } catch (err) {
     if (err.code === '23505') return res.status(409).json({ error: 'Email ou CPF já existe para este tenant.' });
-    res.status(500).json({ error: err.message });
+    console.error('[God] Erro:', err);
+    res.status(500).json({ error: 'Erro interno do servidor.' });
   }
 });
 
@@ -543,7 +568,8 @@ app.put('/api/tenants/:tid/drivers/:did', async (req, res) => {
     if (result.rows.length === 0) return res.status(404).json({ error: 'Entregador não encontrado.' });
     res.json(result.rows[0]);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('[God] Erro:', err);
+    res.status(500).json({ error: 'Erro interno do servidor.' });
   }
 });
 
@@ -556,7 +582,8 @@ app.delete('/api/tenants/:tid/drivers/:did', async (req, res) => {
     if (result.rows.length === 0) return res.status(404).json({ error: 'Entregador não encontrado.' });
     res.json({ message: `"${result.rows[0].nome}" excluído.` });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('[God] Erro:', err);
+    res.status(500).json({ error: 'Erro interno do servidor.' });
   }
 });
 
@@ -579,7 +606,8 @@ app.get('/api/cep/:cep', async (req, res) => {
       cep: data.cep || '',
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('[God] Erro:', err);
+    res.status(500).json({ error: 'Erro interno do servidor.' });
   }
 });
 

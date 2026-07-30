@@ -11,6 +11,7 @@ import { errorHandler, notFound } from './middleware/errorHandler.js';
 import { pgContext } from './middleware/pgContext.js';
 import { tenantResolver } from './middleware/tenantResolver.js';
 import { apiLimiter } from './middleware/rateLimiter.js';
+import { serveUploadFile } from './config/upload.js';
 
 // Import routes
 import authRoutes from './modules/auth/index.js';
@@ -39,11 +40,15 @@ app.set('trust proxy', 1);
 // ============================
 
 // CSP dinâmica: em produção removemos unsafe-eval (Vue build não precisa)
-// Em desenvolvimento, unsafe-eval é necessário para o hot-reload do Vite
+// Em desenvolvimento, unsafe-eval é necessário para o hot-reload do Vite.
+// Nota: NÃO incluímos 'unsafe-inline' na styleSrc porque este CSP é aplicado
+// apenas às respostas JSON da API, não ao HTML da SPA servido pelo nginx.
+// O CSP definitivo para o frontend (HTML, JS, CSS) deve ser configurado
+// no nginx (Content-Security-Policy-Report-Only ou enforce).
 const cspDirectives = {
   defaultSrc: ["'self'"],
   scriptSrc: ["'self'"],
-  styleSrc: ["'self'", "'unsafe-inline'", 'https://cdnjs.cloudflare.com', 'https://fonts.googleapis.com'],
+  styleSrc: ["'self'", 'https://cdnjs.cloudflare.com', 'https://fonts.googleapis.com'],
   fontSrc: ["'self'", 'https://cdnjs.cloudflare.com', 'https://fonts.gstatic.com'],
   imgSrc: ["'self'", 'data:', 'blob:', 'https://images.unsplash.com', 'https://viacep.com.br', 'https://brasilapi.com.br'],
   connectSrc: ["'self'", 'https://viacep.com.br', 'https://brasilapi.com.br'],
@@ -110,7 +115,7 @@ app.use(express.json({
 app.use(express.urlencoded({ extended: true }));
 
 // ============================
-// STATIC FILES (Uploads)
+// STATIC FILES (Uploads) — Protegido contra Path Traversal (CWE-22)
 // ============================
 // A estrutura de diretórios segue o padrão multi-tenant:
 //   ./uploads/{tenantId}/cardapio/
@@ -118,9 +123,13 @@ app.use(express.urlencoded({ extended: true }));
 //   ./uploads/{tenantId}/entregadores/
 //   ./uploads/{tenantId}/categorias/
 //
-// O express.static serve a partir do diretório base,
-// e o tenant é resolvido pelo path da URL (/uploads/{tenantId}/...).
-app.use('/uploads', express.static(config.upload.dir));
+// Em vez de express.static (que serve arquivos sem validação),
+// usamos uma rota controlada que valida cada segmento do path
+// contra whitelists e previne path traversal.
+app.get('/uploads/:tenantId/:type/:filename', (req, res) => {
+  const { tenantId, type, filename } = req.params;
+  serveUploadFile(tenantId, type, filename, res);
+});
 
 // ============================
 // TENANT RESOLVER (identifica o restaurante pelo subdomínio)
