@@ -168,9 +168,13 @@ app.use('/api/dashboard', dashboardRoutes);
 // ============================
 // TENANT DIAGNOSTIC — mostra como o tenant está sendo resolvido
 // ============================
+// ⚠️ CWE-200: APENAS em desenvolvimento — expõe dados internos
 // Acesse: GET /api/debug/tenant
 // Mostra o Host header, o domínio extraído, o tenant resolvido e o cache.
-app.get('/api/debug/tenant', async (req, res) => {
+app.get('/api/debug/tenant', (req, res) => {
+  if (!config.isDev) {
+    return res.status(404).json({ error: 'Rota não encontrada.', code: 'NOT_FOUND' });
+  }
   res.json({
     host: req.headers.host,
     hostname: req.headers.host?.split(':')[0]?.toLowerCase() || null,
