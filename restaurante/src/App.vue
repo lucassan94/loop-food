@@ -294,6 +294,15 @@ watch(features, () => {
 </script>
 
 <style scoped>
+.sidebar-group-label {
+  padding: 0.5rem 1.25rem 0.25rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: rgba(255,255,255,0.35);
+}
+
 .sidebar-group-label.collapsed {
   opacity: 0;
   width: 0;
