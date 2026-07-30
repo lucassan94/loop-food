@@ -106,6 +106,39 @@ app.post('/api/tenants', async (req, res) => {
   }
 });
 
+// ============================================================================
+// FEATURES (Salão / Delivery)
+// ============================================================================
+
+app.get('/api/tenants/:tid/features', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT features FROM restaurantes WHERE id = $1', [req.params.tid]);
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Tenant não encontrado' });
+    const features = result.rows[0].features || { salao: true, delivery: true };
+    res.json(features);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.put('/api/tenants/:tid/features', async (req, res) => {
+  try {
+    const { tid } = req.params;
+    const { features } = req.body;
+    if (!features || typeof features !== 'object') {
+      return res.status(400).json({ error: 'features deve ser um objeto JSON com salao/delivery.' });
+    }
+    const result = await pool.query(
+      'UPDATE restaurantes SET features = $1, atualizado_em = NOW() WHERE id = $2 RETURNING id, nome, features',
+      [JSON.stringify(features), tid]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Tenant não encontrado' });
+    res.json(result.rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.put('/api/tenants/:id', async (req, res) => {
   try {
     const { id } = req.params;

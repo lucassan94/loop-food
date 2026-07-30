@@ -272,6 +272,37 @@
           </form>
         </div>
       </div>
+
+      <!-- Features (Salão / Delivery) -->
+      <div class="section-card">
+        <div class="section-card-header">⚙️ Funções Ativas do Restaurante</div>
+        <div class="section-card-body">
+          <p style="font-size:13px;color:var(--text-2);margin-bottom:12px">
+            Ative ou desative módulos. Itens desativados serão ocultados do menu lateral do restaurante.
+          </p>
+          <div style="display:flex;flex-direction:column;gap:12px;">
+            <div class="payment-option" id="featSalao" onclick="document.getElementById('f_feat_salao').checked = !document.getElementById('f_feat_salao').checked; updateFeatureUI();" style="display:flex;align-items:center;gap:12px;padding:12px 16px;cursor:pointer;">
+              <input type="checkbox" id="f_feat_salao" style="width:18px;height:18px;accent-color:var(--accent);cursor:pointer;flex-shrink:0;" onchange="updateFeatureUI()" onclick="event.stopPropagation()">
+              <div style="flex:1">
+                <strong style="font-size:14px;">🏪 Salão</strong>
+                <p style="font-size:12px;color:var(--text-2);margin-top:2px;">Mesas, PDV, Cozinha (KDS)</p>
+              </div>
+              <span id="featSalaoStatus" class="tag tag-on" style="font-size:11px;flex-shrink:0">Ativo</span>
+            </div>
+            <div class="payment-option" id="featDelivery" onclick="document.getElementById('f_feat_delivery').checked = !document.getElementById('f_feat_delivery').checked; updateFeatureUI();" style="display:flex;align-items:center;gap:12px;padding:12px 16px;cursor:pointer;">
+              <input type="checkbox" id="f_feat_delivery" style="width:18px;height:18px;accent-color:var(--accent);cursor:pointer;flex-shrink:0;" onchange="updateFeatureUI()" onclick="event.stopPropagation()">
+              <div style="flex:1">
+                <strong style="font-size:14px;">🛵 Delivery</strong>
+                <p style="font-size:12px;color:var(--text-2);margin-top:2px;">Fila de Pedidos, Entregadores, Relatórios</p>
+              </div>
+              <span id="featDeliveryStatus" class="tag tag-on" style="font-size:11px;flex-shrink:0">Ativo</span>
+            </div>
+          </div>
+          <div style="margin-top:12px;">
+            <button class="btn btn-primary" onclick="saveFeatures()">Salvar Funções</button>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- TAB: Usuários -->
@@ -590,6 +621,7 @@
       document.getElementById('mgmtTenantId').textContent = `#${id}`;
       switchTab('dados');
       await loadTenantData();
+      await loadFeatures();
       await loadUsers();
       await loadCardapio();
       await loadPagamentos();
@@ -684,6 +716,52 @@
         toast('✅ Dados salvos!', 'success');
       } catch (err) { toast(`❌ ${err.message}`, 'error'); }
       finally { btn.disabled = false; btn.textContent = 'Salvar Dados'; }
+    }
+
+    // ─── TAB: Features ────────────
+    let currentFeatures = { salao: true, delivery: true };
+
+    async function loadFeatures() {
+      try {
+        const r = await fetch(`${API}/${currentTenantId}/features`);
+        if (!r.ok) return;
+        currentFeatures = await r.json();
+        document.getElementById('f_feat_salao').checked = currentFeatures.salao !== false;
+        document.getElementById('f_feat_delivery').checked = currentFeatures.delivery !== false;
+        updateFeatureUI();
+      } catch (err) { /* ignore */ }
+    }
+
+    function updateFeatureUI() {
+      const s = document.getElementById('f_feat_salao').checked;
+      const d = document.getElementById('f_feat_delivery').checked;
+      document.getElementById('featSalao').classList.toggle('selected', s);
+      document.getElementById('featDelivery').classList.toggle('selected', d);
+      document.getElementById('featSalaoStatus').textContent = s ? 'Ativo' : 'Inativo';
+      document.getElementById('featSalaoStatus').className = `tag ${s ? 'tag-on' : 'tag-off'}`;
+      document.getElementById('featDeliveryStatus').textContent = d ? 'Ativo' : 'Inativo';
+      document.getElementById('featDeliveryStatus').className = `tag ${d ? 'tag-on' : 'tag-off'}`;
+    }
+
+    async function saveFeatures() {
+      const features = {
+        salao: document.getElementById('f_feat_salao').checked,
+        delivery: document.getElementById('f_feat_delivery').checked,
+      };
+      try {
+        const r = await fetch(`${API}/${currentTenantId}/features`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ features })
+        });
+        if (!r.ok) { const err = await r.json(); throw new Error(err.error); }
+        const result = await r.json();
+        currentFeatures = result.features;
+        updateFeatureUI();
+        toast('✅ Funções salvas com sucesso!', 'success');
+      } catch (err) {
+        toast(`❌ ${err.message}`, 'error');
+      }
     }
 
     // ─── TAB: Usuários ─────────

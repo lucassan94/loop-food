@@ -48,38 +48,6 @@
         </div>
       </div>
 
-      <!-- Features Toggles -->
-      <div class="card">
-        <div class="card-header">
-          <i-lucide-toggle-left style="width:16px;height:16px" /> Funções Ativas
-        </div>
-        <div class="card-body" style="display:grid;gap:1rem;">
-          <p style="font-size:0.85rem;color:var(--text-muted);">
-            Ative ou desative módulos inteiros da aplicação. Itens desativados serão ocultados do menu lateral.
-          </p>
-          <div style="display:flex;align-items:center;justify-content:space-between;padding:0.75rem 1rem;border:1px solid var(--border);border-radius:8px;">
-            <div>
-              <strong><i-lucide-store style="width:16px;height:16px" /> Funções de Salão</strong>
-              <p style="font-size:0.8rem;color:var(--text-muted);margin-top:2px;">Mesas, PDV, Cozinha (KDS)</p>
-            </div>
-            <label class="toggle">
-              <input type="checkbox" :checked="features.salao" @change="toggleFeature('salao')" />
-              <span class="slider"></span>
-            </label>
-          </div>
-          <div style="display:flex;align-items:center;justify-content:space-between;padding:0.75rem 1rem;border:1px solid var(--border);border-radius:8px;">
-            <div>
-              <strong><i-lucide-truck style="width:16px;height:16px" /> Funções de Delivery</strong>
-              <p style="font-size:0.8rem;color:var(--text-muted);margin-top:2px;">Fila de Pedidos, Entregadores, Relatórios</p>
-            </div>
-            <label class="toggle">
-              <input type="checkbox" :checked="features.delivery" @change="toggleFeature('delivery')" />
-              <span class="slider"></span>
-            </label>
-          </div>
-        </div>
-      </div>
-
       <!-- Logo Upload -->
       <div class="card">
         <div class="card-header">
@@ -596,7 +564,6 @@ const allPaymentMethods = [
 
 const storeOpen = ref(true)
 const modoSemEntregador = ref(false)
-const features = ref({ salao: true, delivery: true })
 const logoPreview = ref('')
 const logoBase64 = ref('')
 const restaurante = reactive({ nome: '', endereco: '', cep: '', cidade: '', estado: '', latitude: null, longitude: null, tempo_preparo_min: 20, cor_primaria: '#dc2626', cor_secundaria: '#f97316', cor_terciaria: '#3b82f6' })
@@ -707,7 +674,6 @@ async function load() {
   storeOpen.value = r.data.status_loja
   modoSemEntregador.value = r.data.modo_sem_entregador || false
   formaspagamento.value = r.data.formas_pagamento_aceitas || ['dinheiro', 'credito', 'debito', 'pix', 'pix_online', 'credito_online']
-  features.value = r.data.features || { salao: true, delivery: true }
   if (r.data.logo_base64) {
     logoPreview.value = 'data:image/png;base64,' + r.data.logo_base64
     logoBase64.value = r.data.logo_base64
@@ -722,16 +688,6 @@ async function toggleModoSemEntregador() {
     modoSemEntregador.value = data.modo_sem_entregador
   } catch (err) {
     alert(err.response?.data?.error || 'Erro ao alterar modo de entrega')
-  }
-}
-
-async function toggleFeature(key) {
-  const novo = { ...features.value, [key]: !features.value[key] }
-  try {
-    await api.put('/restaurante', { features: novo })
-    features.value = novo
-  } catch (err) {
-    alert(err.response?.data?.error || 'Erro ao alterar função')
   }
 }
 
@@ -758,9 +714,7 @@ async function buscarCEP() {
 
 async function salvarRestaurante() {
   salvando.value = true; cepMsg.value = null
-  // Incluir também features e logo se presentes neste save
   const payload = { ...restaurante }
-  if (features.value) payload.features = features.value
   if (logoBase64.value) payload.logo_base64 = logoBase64.value
   try {
     await api.put('/restaurante', payload)
