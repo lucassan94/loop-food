@@ -8,10 +8,18 @@
 // Acessar: http://localhost:3002
 // ============================================================================
 
+import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import express from 'express';
 import cors from 'cors';
 import crypto from 'crypto';
 import pg from 'pg';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+dotenv.config({ path: path.resolve(__dirname, '../.env') });
+
+console.log('[God] .env carregado de:', path.resolve(__dirname, '../.env'));
 
 const PORT = process.env.ADMIN_PORT || 3002;
 const DB_HOST = process.env.DB_HOST || '86.48.18.22';
@@ -27,6 +35,8 @@ const pool = new pg.Pool({
   user: DB_USER,
   password: DB_PASS,
   max: 5,
+  connectionTimeoutMillis: 10000,
+  idleTimeoutMillis: 30000,
 });
 
 const app = express();
@@ -54,7 +64,8 @@ app.get('/api/tenants', async (req, res) => {
     );
     res.json(result.rows);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('[TENANTS ERROR]', err);
+    res.status(500).json({ error: err.message || 'Erro desconhecido', stack: err.stack?.substring(0, 500) });
   }
 });
 
