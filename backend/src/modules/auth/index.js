@@ -128,7 +128,7 @@ router.post('/cliente/login', loginLimiter, async (req, res, next) => {
     const result = await query(
       `SELECT id, nome, sobrenome, email, telefone, endereco, numero, bairro, complemento, cidade, estado, cep, cpf_cnpj, senha_hash
        FROM clientes
-       WHERE restaurant_id = $1 AND REPLACE(REPLACE(REPLACE(telefone, '(', ''), ')', ''), ' ', '') LIKE $2 AND ativo = true`,
+       WHERE restaurant_id = $1 AND REGEXP_REPLACE(telefone, '\\D', '', 'g') LIKE $2 AND ativo = true`,
       [restaurantId, `%${digits}`]
     );
 
@@ -178,7 +178,7 @@ router.post('/cliente/signup', signupLimiter, async (req, res, next) => {
     // Verificar se telefone já existe
     const digits = data.telefone.replace(/\D/g, '');
     const existing = await query(
-      "SELECT id FROM clientes WHERE restaurant_id = $1 AND REPLACE(REPLACE(REPLACE(telefone, '(', ''), ')', ''), ' ', '') = $2",
+      "SELECT id FROM clientes WHERE restaurant_id = $1 AND REGEXP_REPLACE(telefone, '\\D', '', 'g') = $2",
       [restaurantId, digits]
     );
     if (existing.rows.length > 0) {
@@ -234,7 +234,7 @@ router.post('/entregador/login', loginLimiter, async (req, res, next) => {
     const result = await query(
       `SELECT id, nome, email, telefone, senha_hash, status, entregas_total, frete_total_recebido
        FROM entregadores
-       WHERE restaurant_id = $1 AND REPLACE(REPLACE(REPLACE(telefone, '(', ''), ')', ''), ' ', '') LIKE $2`,
+       WHERE restaurant_id = $1 AND REGEXP_REPLACE(telefone, '\\D', '', 'g') LIKE $2`,
       [restaurantId, `%${digits}`]
     );
 
