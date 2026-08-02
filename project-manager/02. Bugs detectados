@@ -1,0 +1,22 @@
+# 02. Bugs detectados — Projeto: Migração Asaas → API da Rede
+
+> Última atualização: 02/08/2026 — Bugs BUG-001 a BUG-009, BUG-011 e BUG-012 foram **resolvidos/prevenidos**. Abaixo somente o que está **aberto**.
+
+## 🐞 Bugs abertos
+
+### BUG-012 — Form controls do painel com fonte Arial (≠ Inter) (CORRIGIDO 02/08/2026)
+- **Local:** `restaurante/src/assets/main.css`
+- **Descrição:** selects, abas e botões do painel renderizavam com `font-family: Arial` (UA stylesheet do navegador) porque o CSS global só definia a Inter no `body` — `button/input/select/textarea` não herdam fonte por padrão.
+- **Correção:** reset global `button, input, select, textarea { font-family: inherit; }` após o bloco `body`. Os inputs de cor em ConfigView mantêm `monospace` (inline style tem precedência).
+- **Status:** ✅ **CORRIGIDO** (build do restaurante OK).
+
+### BUG-011 — Imagens do cardápio não apareciam (URLs sem tenantId) (CORRIGIDO 02/08/2026)
+- **Local:** `produtos.imagem_url` (banco) + `backend/uploads/cardapio/` (disco)
+- **Descrição:** após a migração multi-tenant, 44 produtos ficaram com `imagem_url` no formato antigo `/uploads/cardapio/13_....jpg` (sem tenantId) e arquivos em `uploads/cardapio/` (sem subpasta do tenant). A rota `serveUploadFile` exige `/uploads/{tenantId}/cardapio/{filename}` → 404 → fallback Unsplash.
+- **Correção:** novo script `backend/src/corrigir-imagens-cardapio.js` (idempotente) move os arquivos para `uploads/{tenantId}/cardapio/` e atualiza `imagem_url` no banco. **44/44 migrados**, URLs novas servidas com **200** (validação por HTTP).
+- **Status:** ✅ **CORRIGIDO no banco + disco local** — 37 arquivos órfãos (duplicatas não referenciadas) removidos de `backend/uploads/cardapio/` após verificação no banco (0 referências em produtos/banners). ⚠️ Em produção (Docker/volume `backend_uploads`) o mesmo script precisa ser executado dentro do container.
+
+### BUG-010 — Tenant 3 (Loop) sem usuários após seeds
+- **Local:** banco de produção — `restaurantes` id=3 (Loop)
+- **Descrição:** os seeds (`seed.js`/`seed-tenant2.js`) só criam usuários nos tenants 1 (Palazzo) e 2 (SaborExpress). Após a limpeza, o tenant 3 ficou sem `restaurante_users`/clientes/entregadores.
+- **Status:** ⏳ **PENDENTE** — criar acesso via módulo god (novo admin no tenant 3) se o tenant ainda estiver em uso.

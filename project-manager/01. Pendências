@@ -1,0 +1,24 @@
+# 01. Pendências — Projeto: Migração Asaas → API da Rede
+
+> Última atualização: 02/08/2026 — Migração **implementada** (Fases 0-12 concluídas), **deploy via SSH realizado** (stack `restaurante-v3` no ar) e **estrutura de pastas reorganizada** (`app/`, `spec/`, `project-manager/`, `others/`, `migrations/`, `trash/`). Abaixo somente o que está **pendente**.
+
+## ✅ Ações executadas (02/08/2026)
+
+1. ✅ **Deploy via SSH** — novo fluxo sem GitHub: `deploy.py` (paramiko/SFTP) sobe os arquivos para `/opt/restaurante-v3` e gerencia a stack com `docker-compose` (v1.29.2 no servidor). Containers: `restaurante-v3_backend` (8090), `_cliente` (8091), `_router` (8094) — todos **healthy**. Stack antiga `loop-food-temp` removida (portas liberadas).
+2. ✅ **Healthcheck do backend corrigido** — wget agora usa `127.0.0.1` (IPv4); o `localhost` resolvia para `::1` e o servidor só escuta em IPv4 → falso `unhealthy` eliminado.
+3. ✅ **Uploads em bind mount** — `./backend/uploads:/app/uploads`; as 44 imagens do cardápio foram enviadas junto e **servidas com 200** em produção (fim do BUG-011 também em produção).
+4. ✅ **Volumes órfãos removidos** (`loop-food-dev_*`, `loop-food-temp_backend_uploads`).
+5. ✅ **.env de produção criado** no servidor (não sobrescreve edições futuras).
+6. ✅ **Certificado wildcard `*.loopautomacoes.com.br` emitido** (Let's Encrypt via DNS-01 manual na Umbler) — resolveu a página em branco dos subdomínios de tenant (`ERR_CERT_COMMON_NAME_INVALID`): o cert anterior só cobria o domínio raiz e a CSP `upgrade-insecure-requests` forçava HTTPS. Validade até 31/10/2026. **502 transitório** durante o reload do NPM (proxy temporariamente usou `forward_scheme=https` contra o router HTTP) — voltou ao normal sozinho após o reload.
+
+## ⏳ Pendências ativas
+
+1. **Credenciais reais do sandbox da Rede** (PV + Chave de Integração + projeto no Portal developer.userede.com.br) — preencher no módulo god → testar as jornadas (e2e-rede-test.js). ⛔ **Bloqueado:** usuário ainda não tem acesso ao portal.
+2. **Cadastro da URL de notificação PIX** — via call center da Rede (4001 4433 / 0800 728 4433), ativação ~2 dias úteis. Sem isso, PIX só é confirmado por polling.
+3. **Habilitar TLS 1.2+ nos nginx** (bloco HTTPS já adicionado/comentado — MELHORIA-001): montar certificados (volumes no docker-compose) e terminar TLS no proxy externo — necessário para PCI-DSS do checkout transparente.
+4. **Tenant 3 (Loop) sem usuários** (BUG-010) — criar admin no módulo god se o tenant ainda estiver em uso.
+5. **Trocar o `JWT_SECRET` global** (hoje `dev-secret-change-in-production`) por um segredo aleatório no `.env` do servidor — os tenants 1-3 têm `jwt_secret` próprio no banco, então o global é apenas fallback; troca não invalida sessões atuais.
+6. **Segurança do deploy**: trocar a senha da VPS (foi compartilhada) e migrar para **chave SSH** no `deploy.py` (o paramiko já suporta `key_filename`).
+7. **Migrations**: rodar `python deploy.py migrate` quando novas migrations forem adicionadas (banco atual já tem 001-027).
+8. ⚠️ **Renovação automática do certificado wildcard** — o `renewal/npm-1.conf` agora usa `authenticator = manual` + `pref_challs = dns-01` (hooks `/tmp/acme-auth.sh`/`/tmp/acme-cleanup.sh`), então o NPM ao renovar vai **pausar pedindo novo registro TXT** na Umbler. Expira em **31/10/2026**. Antes disso: renovar manualmente (repetir o procedimento DNS-01) ou trocar para um plugin DNS automático. **Se expirar, a página em branco volta.**
+9. **Concluir movimentação pós-reorganização** — com os dev servers fechados: mover os resíduos de `cliente/`, `entregador/`, `restaurante/` (raiz) para `app/` (`src/`, `public/`, `.vite/`). O `backend/` e `router/` da raiz já estão vazios (conteúdo movido). Depois remover as pastas vazias da raiz.

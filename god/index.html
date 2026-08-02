@@ -75,8 +75,8 @@
     .tag{display:inline-flex;align-items:center;gap:4px;padding:2px 10px;border-radius:20px;font-size:11px;font-weight:600}
     .tag-on{background:var(--success-bg);color:var(--success)}
     .tag-off{background:var(--danger-bg);color:var(--danger)}
-    .tag-asaas{background:var(--accent-light);color:var(--accent)}
-    .tag-no-asaas{background:var(--surface-2);color:var(--text-2)}
+    .tag-rede{background:var(--accent-light);color:var(--accent)}
+    .tag-no-rede{background:var(--surface-2);color:var(--text-2)}
     .tag-jwt{background:rgba(34,197,94,0.1);color:var(--success)}
     .tag-no-jwt{background:var(--warning-bg);color:var(--warning)}
     .tag-warning{background:var(--warning-bg);color:var(--warning)}
@@ -202,7 +202,7 @@
     <div class="table-wrap">
       <table>
         <thead><tr>
-          <th class="col-id">#</th><th>Nome</th><th>Slug / Domínio</th><th>Status</th><th>Asaas</th><th>JWT</th><th>Preparo</th><th style="width:100px;text-align:right">Ações</th>
+          <th class="col-id">#</th><th>Nome</th><th>Slug / Domínio</th><th>Status</th><th>Rede</th><th>JWT</th><th>Preparo</th><th style="width:100px;text-align:right">Ações</th>
         </tr></thead>
         <tbody id="tableBody">
           <tr><td colspan="8" class="empty-state"><div class="spinner"></div><p style="margin-top:8px">Carregando…</p></td></tr>
@@ -233,7 +233,7 @@
       <button class="tab" data-tab="banners" onclick="switchTab('banners')">🖼️ Banners</button>
       <button class="tab" data-tab="mesas" onclick="switchTab('mesas')">🪑 Mesas</button>
       <button class="tab" data-tab="pedidos" onclick="switchTab('pedidos')">📦 Pedidos</button>
-      <button class="tab" data-tab="asaas" onclick="switchTab('asaas')">💰 Asaas</button>
+      <button class="tab" data-tab="rede" onclick="switchTab('rede')">🔒 Rede</button>
     </div>
 
     <!-- TAB: Dados -->
@@ -266,12 +266,19 @@
               <div class="form-group"><label>Tempo Preparo (min)</label><input type="number" name="tempo_preparo_min" id="f_tempo" min="1"></div>
               <div class="form-group checkbox"><input type="checkbox" name="status_loja" id="f_statusLoja"><label for="f_statusLoja">Loja aberta</label></div>
               <div class="form-group full" style="margin-top:8px;padding-top:12px;border-top:1px solid var(--border)">
-                <label style="color:var(--accent);font-size:13px;text-transform:none;letter-spacing:0">🔐 Credenciais Asaas</label>
+                <label style="color:var(--accent);font-size:13px;text-transform:none;letter-spacing:0">🔒 Credenciais Rede Pagamentos</label>
               </div>
-              <div class="form-group full"><label>API Key</label><input type="password" name="asaas_api_key" id="f_asaas_key" placeholder="$aass_..."></div>
-              <div class="form-group"><label>Ambiente</label><select name="asaas_env" id="f_asaas_env"><option value="sandbox">Sandbox</option><option value="production">Produção</option></select></div>
-              <div class="form-group"><label>Webhook Token</label><input type="text" name="asaas_webhook_token" id="f_asaas_wt"></div>
-              <div class="form-group full"><label>Webhook Secret</label><input type="password" name="asaas_webhook_secret" id="f_asaas_ws"></div>
+              <div class="form-group"><label>Ambiente</label><select name="rede_env" id="f_rede_env"><option value="sandbox">Sandbox</option><option value="production">Produção</option></select></div>
+              <div class="form-group full"><label>PV / Filiação (clientId OAuth2)</label><input type="text" name="rede_client_id" id="f_rede_client_id" placeholder="Ex: 90104480 (sem zeros à esquerda)"></div>
+              <div class="form-group full"><label>Chave de Integração (clientSecret OAuth2)</label><input type="password" name="rede_client_secret" id="f_rede_client_secret" placeholder="Portal Rede → Chave de integração"></div>
+              <div class="form-group full"><label>Webhook Token (nosso)</label><input type="text" name="rede_webhook_token" id="f_rede_wt" placeholder="Token escolhido por você, enviado à Rede no cadastro da URL"></div>
+              <div class="form-group full" style="font-size:12px;color:var(--text-2);background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px 12px;line-height:1.6">
+                💡 <strong>Onde obter:</strong> Portal do Desenvolvedor Rede (developer.userede.com.br) → criar projeto →
+                menu "para vender" &gt; e-commerce: <strong>PV</strong> = nº de filiação (clientId) e
+                <strong>Chave de Integração</strong> = clientSecret (OAuth2). Para ativar o webhook PIX em produção,
+                ligue para o call center da Rede (4001 4433 / 0800 728 4433) informando a URL
+                <code>https://SEU_DOMINIO/api/pagamentos/webhook</code> e o token abaixo (ativação ~2 dias úteis).
+              </div>
             </div>
             <div style="margin-top:16px;display:flex;gap:8px">
               <button type="submit" class="btn btn-primary" id="saveTenantBtn">Salvar Dados</button>
@@ -427,6 +434,7 @@
             <h4 id="driverFormTitle" style="font-size:14px;margin-bottom:8px">Novo Entregador</h4>
             <div class="inline-form">
               <input type="text" id="df_nome" placeholder="Nome" style="width:160px">
+              <input type="text" id="df_apelido" placeholder="Apelido (login)" style="width:130px" title="Usuário de login (ex: entregador)">
               <input type="email" id="df_email" placeholder="Email" style="width:180px">
               <input type="text" id="df_telefone" placeholder="Telefone" style="width:130px">
               <select id="df_status"><option value="ativo">Ativo</option><option value="inativo">Inativo</option></select>
@@ -456,6 +464,7 @@
             <div class="inline-form">
               <input type="text" id="cif_nome" placeholder="Nome*" style="width:140px">
               <input type="text" id="cif_sobrenome" placeholder="Sobrenome" style="width:140px">
+              <input type="text" id="cif_apelido" placeholder="Apelido (login)" style="width:130px" title="Usuário de login (ex: cliente)">
               <input type="email" id="cif_email" placeholder="Email*" style="width:180px">
               <input type="text" id="cif_telefone" placeholder="Telefone" style="width:120px">
               <input type="password" id="cif_password" placeholder="Senha*" style="width:120px">
@@ -576,14 +585,14 @@
       </div>
     </div>
 
-    <!-- TAB: Asaas Pagamentos -->
-    <div class="tab-section" id="tab-asaas">
+    <!-- TAB: Rede Pagamentos (Transações) -->
+    <div class="tab-section" id="tab-rede">
       <div class="section-card">
-        <div class="section-card-header">💰 Transações Asaas</div>
+        <div class="section-card-header">💰 Transações Rede</div>
         <div class="section-card-body">
           <table>
-            <thead><tr><th>ID</th><th>Pedido</th><th>Tipo</th><th>Status</th><th>Valor Bruto</th><th>Taxa</th><th>Data</th><th style="width:60px"></th></tr></thead>
-            <tbody id="asaasTableBody"><tr><td colspan="8" class="empty-state"><div class="spinner"></div></td></tr></tbody>
+            <thead><tr><th>TID</th><th>Pedido</th><th>Tipo</th><th>Status</th><th>NSU</th><th>Cód</th><th>Valor Bruto</th><th>Taxa</th><th>Data</th><th style="width:60px"></th></tr></thead>
+            <tbody id="redeTableBody"><tr><td colspan="10" class="empty-state"><div class="spinner"></div></td></tr></tbody>
           </table>
         </div>
       </div>
@@ -693,7 +702,7 @@
         <td><div class="tenant-name">${esc(t.nome)}</div></td>
         <td><div class="tenant-slug">${esc(t.slug||'—')}</div><div class="tenant-slug" style="font-size:11px">${esc(t.dominio||'')}</div></td>
         <td><span class="tag ${t.status_loja?'tag-on':'tag-off'}">${t.status_loja?'● Aberto':'○ Fechado'}</span></td>
-        <td><span class="tag ${t.tem_asaas?'tag-asaas':'tag-no-asaas'}">${t.tem_asaas?'✅ Configurado':'—'}</span></td>
+        <td><span class="tag ${t.tem_rede?'tag-rede':'tag-no-rede'}">${t.tem_rede?'✅ Configurado':'—'}</span></td>
         <td><span class="tag ${t.tem_jwt?'tag-jwt':'tag-no-jwt'}">${t.tem_jwt?'🔑 OK':'⚠️ Pendente'}</span></td>
         <td style="color:var(--text-2)">${t.tempo_preparo_min||'—'} min</td>
         <td style="text-align:right" onclick="event.stopPropagation()">
@@ -788,7 +797,7 @@
       await loadBanners();
       await loadMesas();
       await loadPedidos();
-      await loadAsaas();
+      await loadRede();
     }
 
     function closeManagement() {
@@ -797,12 +806,12 @@
       document.getElementById('userForm').style.display = 'none';
       document.getElementById('catForm').style.display = 'none';
       document.getElementById('prodForm').style.display = 'none';
-      document.getElementById(.driverForm.).style.display = .none.;
-      document.getElementById(.clienteForm.).style.display = .none.;
-      document.getElementById(.raioForm.).style.display = .none.;
-      document.getElementById(.bannerForm.).style.display = .none.;
-      document.getElementById(.mesaForm.).style.display = .none.;
-      document.getElementById(.pedidoDetail.).style.display = .none.;
+      document.getElementById('driverForm').style.display = 'none';
+      document.getElementById('clienteForm').style.display = 'none';
+      document.getElementById('raioForm').style.display = 'none';
+      document.getElementById('bannerForm').style.display = 'none';
+      document.getElementById('mesaForm').style.display = 'none';
+      document.getElementById('pedidoDetail').style.display = 'none';
       document.getElementById('managementView').classList.remove('active');
       document.getElementById('mainView').style.display = 'block';
       loadTenants();
@@ -831,10 +840,10 @@
         document.getElementById('f_longitude').value = t.longitude ?? '';
         document.getElementById('f_tempo').value = t.tempo_preparo_min ?? 20;
         document.getElementById('f_statusLoja').checked = !!t.status_loja;
-        document.getElementById('f_asaas_key').value = t.asaas_api_key || '';
-        document.getElementById('f_asaas_env').value = t.asaas_env || 'sandbox';
-        document.getElementById('f_asaas_wt').value = t.asaas_webhook_token || '';
-        document.getElementById('f_asaas_ws').value = t.asaas_webhook_secret || '';
+        document.getElementById('f_rede_client_id').value = t.rede_client_id || '';
+        document.getElementById('f_rede_env').value = t.rede_env || 'sandbox';
+        document.getElementById('f_rede_client_secret').value = t.rede_client_secret || '';
+        document.getElementById('f_rede_wt').value = t.rede_webhook_token || '';
       } catch (err) { toast('Erro ao carregar dados', 'error'); }
     }
 
@@ -872,10 +881,10 @@
         longitude: (() => { const v = parseFloat(document.getElementById('f_longitude').value); return isNaN(v) ? null : v; })(),
         tempo_preparo_min: parseInt(document.getElementById('f_tempo').value) || 20,
         status_loja: document.getElementById('f_statusLoja').checked,
-        asaas_api_key: document.getElementById('f_asaas_key').value || null,
-        asaas_env: document.getElementById('f_asaas_env').value,
-        asaas_webhook_token: document.getElementById('f_asaas_wt').value || null,
-        asaas_webhook_secret: document.getElementById('f_asaas_ws').value || null,
+        rede_client_id: document.getElementById('f_rede_client_id').value || null,
+        rede_env: document.getElementById('f_rede_env').value,
+        rede_client_secret: document.getElementById('f_rede_client_secret').value || null,
+        rede_webhook_token: document.getElementById('f_rede_wt').value || null,
       };
       const btn = document.getElementById('saveTenantBtn'); btn.disabled = true; btn.textContent = 'Salvando…';
       try {
@@ -1218,7 +1227,7 @@
         const r = await fetch(`${API}/${currentTenantId}/pagamentos`);
         if (!r.ok) return;
         paymentMethods = await r.json();
-        const labels = { dinheiro:'💵 Dinheiro', credito:'💳 Crédito', debito:'💳 Débito', pix:'📱 PIX', pix_online:'📱 PIX Online', credito_online:'💳 Cartão Online' };
+        const labels = { dinheiro:'💵 Dinheiro', credito:'💳 Crédito', debito:'💳 Débito', pix:'📱 PIX', pix_online:'📱 PIX Online', credito_online:'💳 Crédito Online', debito_online:'💳 Débito Online' };
         const grid = document.getElementById('paymentGrid');
         grid.innerHTML = Object.keys(labels).map(key => {
           const checked = paymentMethods.includes(key);
@@ -1252,7 +1261,7 @@
           <td><strong>${esc(d.nome)}</strong></td>
           <td>${esc(d.email)}</td>
           <td>${esc(d.telefone||'—')}</td>
-          <td><span class="tag ${d.status==='ativo'?'tag-on':d.status==='inativo'?'tag-off':'tag-no-asaas'}">${d.status||'—'}</span></td>
+          <td><span class="tag ${d.status==='ativo'?'tag-on':d.status==='inativo'?'tag-off':'tag-no-rede'}">${d.status||'—'}</span></td>
           <td>${d.entregas_total||0}</td>
           <td style="text-align:right">
             <button class="btn btn-ghost btn-xs" onclick="editDriver(${d.id})">✎</button>
@@ -1267,21 +1276,23 @@
       document.getElementById('driverForm').style.display = 'block';
       document.getElementById('driverFormTitle').textContent = data ? '✎ Editar Entregador' : '🛵 Novo Entregador';
       document.getElementById('df_nome').value = data ? data.nome : '';
+      document.getElementById('df_apelido').value = data ? data.apelido||'' : '';
       document.getElementById('df_email').value = data ? data.email : '';
       document.getElementById('df_telefone').value = data ? data.telefone||'' : '';
       document.getElementById('df_status').value = data ? data.status : 'ativo';
       document.getElementById('df_password').value = '';
       document.getElementById('df_password').placeholder = data ? 'Nova senha (opcional)' : 'Senha';
     }
-    function hideDriverForm() { document.getElementById(.driverForm.).style.display = .none.;
-      document.getElementById(.clienteForm.).style.display = .none.;
-      document.getElementById(.raioForm.).style.display = .none.;
-      document.getElementById(.bannerForm.).style.display = .none.;
-      document.getElementById(.mesaForm.).style.display = .none.;
-      document.getElementById(.pedidoDetail.).style.display = .none.; editingDriverId = null; }
+    function hideDriverForm() { document.getElementById('driverForm').style.display = 'none';
+      document.getElementById('clienteForm').style.display = 'none';
+      document.getElementById('raioForm').style.display = 'none';
+      document.getElementById('bannerForm').style.display = 'none';
+      document.getElementById('mesaForm').style.display = 'none';
+      document.getElementById('pedidoDetail').style.display = 'none'; editingDriverId = null; }
     async function saveDriver() {
       const data = {
         nome: document.getElementById('df_nome').value,
+        apelido: document.getElementById('df_apelido').value,
         email: document.getElementById('df_email').value,
         telefone: document.getElementById('df_telefone').value,
         status: document.getElementById('df_status').value,
@@ -1291,7 +1302,7 @@
       try {
         const url = editingDriverId ? `${API}/${currentTenantId}/drivers/${editingDriverId}` : `${API}/${currentTenantId}/drivers`;
         const method = editingDriverId ? 'PUT' : 'POST';
-        const body = editingDriverId ? { nome: data.nome, email: data.email, telefone: data.telefone, status: data.status, password: data.password || undefined } : data;
+        const body = editingDriverId ? { nome: data.nome, apelido: data.apelido, email: data.email, telefone: data.telefone, status: data.status, password: data.password || undefined } : data;
         const r = await fetch(url, { method, headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) });
         if (!r.ok) { const err = await r.json(); throw new Error(err.error); }
         toast(editingDriverId ? '✅ Entregador atualizado!' : '✅ Entregador criado!', 'success');
@@ -1336,6 +1347,7 @@
       document.getElementById('clienteFormTitle').textContent = data ? '✎ Editar Cliente' : '👤 Novo Cliente';
       document.getElementById('cif_nome').value = data ? data.nome : '';
       document.getElementById('cif_sobrenome').value = data ? data.sobrenome||'' : '';
+      document.getElementById('cif_apelido').value = data ? data.apelido||'' : '';
       document.getElementById('cif_email').value = data ? data.email : '';
       document.getElementById('cif_telefone').value = data ? data.telefone||'' : '';
       document.getElementById('cif_password').value = '';
@@ -1350,6 +1362,7 @@
       const data = {
         nome: document.getElementById('cif_nome').value,
         sobrenome: document.getElementById('cif_sobrenome').value,
+        apelido: document.getElementById('cif_apelido').value,
         email: document.getElementById('cif_email').value,
         telefone: document.getElementById('cif_telefone').value,
         password: document.getElementById('cif_password').value,
@@ -1557,7 +1570,7 @@
         tbody.innerHTML = pedidos.map(p => `<tr onclick="viewPedido(${p.id})" style="cursor:pointer">
           <td style="color:var(--accent);font-weight:600">${esc(p.pedido_id)}</td>
           <td><strong>${esc(p.cliente_nome||'—')}</strong></td>
-          <td><span class="tag ${p.status==='entregue'||p.status==='recebido'?'tag-on':p.status==='cancelado'?'tag-off':'tag-asaas'}">${p.status||'—'}</span></td>
+          <td><span class="tag ${p.status==='entregue'||p.status==='recebido'?'tag-on':p.status==='cancelado'?'tag-off':'tag-rede'}">${p.status||'—'}</span></td>
           <td style="color:var(--accent);font-weight:600">R$ ${parseFloat(p.total||0).toFixed(2)}</td>
           <td>${esc(p.metodo_pagamento||'—')}</td>
           <td style="font-size:12px;color:var(--text-2)">${new Date(p.criado_em).toLocaleString('pt-BR')}</td>
@@ -1599,8 +1612,13 @@
           });
         }
         if (p.pagamento) {
-          html += `<h5 style="margin-top:12px;font-size:12px;color:var(--text-2);text-transform:uppercase">Pagamento Asaas</h5>`;
-          html += `<div style="font-size:12px">ID: ${esc(p.pagamento.payment_id)} | Status: ${p.pagamento.status} | Tipo: ${p.pagamento.billing_type}</div>`;
+          const pag = p.pagamento;
+          html += `<h5 style="margin-top:12px;font-size:12px;color:var(--text-2);text-transform:uppercase">Pagamento Rede</h5>`;
+          html += `<div style="font-size:12px">TID: <span style="font-family:monospace">${esc(pag.payment_id)}</span> | Status: <strong>${esc(pag.status)}</strong> | Tipo: ${esc(pag.billing_type)}${pag.gateway ? ' · ' + esc(pag.gateway) : ''}</div>`;
+          html += `<div style="font-size:12px">Valor: R$ ${parseFloat(pag.valor_bruto||0).toFixed(2)}${pag.nsu ? ' | NSU: ' + esc(pag.nsu) : ''}${pag.return_code ? ' | Cód: ' + esc(pag.return_code) : ''}</div>`;
+          if (pag.authorization_code) html += `<div style="font-size:12px">Autorização: ${esc(pag.authorization_code)}</div>`;
+          if (pag.end_to_end_id) html += `<div style="font-size:12px">End-to-End ID: <span style="font-family:monospace">${esc(pag.end_to_end_id)}</span></div>`;
+          if (pag.pago_em) html += `<div style="font-size:12px">Pago em: ${new Date(pag.pago_em).toLocaleString('pt-BR')}</div>`;
         }
         document.getElementById('pedidoDetailContent').innerHTML = html;
       } catch (err) { toast('Erro ao carregar detalhes', 'error'); }
@@ -1625,19 +1643,21 @@
       } catch (err) { toast(`❌ ${err.message}`, 'error'); }
     }
 
-    // ─── TAB: Asaas Pagamentos ─
-    async function loadAsaas() {
+    // ─── TAB: Rede Pagamentos (Transações) ─
+    async function loadRede() {
       try {
         const r = await fetch(`${API}/${currentTenantId}/pagamentos/transacoes`);
         if (!r.ok) return;
         const pagamentos = await r.json();
-        const tbody = document.getElementById('asaasTableBody');
-        if (!pagamentos.length) { tbody.innerHTML = '<tr><td colspan="8" class="empty-state"><div class="emoji">💰</div><h3>Nenhuma transação</h3></td></tr>'; return; }
+        const tbody = document.getElementById('redeTableBody');
+        if (!pagamentos.length) { tbody.innerHTML = '<tr><td colspan="10" class="empty-state"><div class="emoji">💰</div><h3>Nenhuma transação</h3></td></tr>'; return; }
         tbody.innerHTML = pagamentos.map(p => `<tr>
-          <td style="font-size:11px;font-family:monospace">${esc(p.payment_id||'—')}</td>
+          <td style="font-size:11px;font-family:monospace" title="End-to-End ID: ${esc(p.end_to_end_id||'—')}">${esc(p.payment_id||'—')}</td>
           <td>${esc(p.pedido_ref||'—')}</td>
           <td><span class="tag" style="background:var(--surface-2)">${p.billing_type||'—'}</span></td>
-          <td><span class="tag ${p.status==='RECEIVED'||p.status==='CONFIRMED'?'tag-on':p.status==='OVERDUE'||p.status==='REFUNDED'?'tag-off':'tag-asaas'}">${p.status||'—'}</span></td>
+          <td><span class="tag ${p.status==='RECEIVED'||p.status==='CONFIRMED'?'tag-on':p.status==='OVERDUE'||p.status==='REFUNDED'||p.status==='REFUSED'||p.status==='CANCELLED'?'tag-off':'tag-rede'}">${p.status||'—'}</span></td>
+          <td style="font-size:12px;color:var(--text-2)">${esc(p.nsu||'—')}</td>
+          <td style="font-size:12px;color:var(--text-2)" title="returnCode Rede">${esc(p.return_code||'—')}</td>
           <td>R$ ${parseFloat(p.valor_bruto||0).toFixed(2)}</td>
           <td>${p.taxa ? 'R$ '+parseFloat(p.taxa).toFixed(2) : '—'}</td>
           <td style="font-size:12px;color:var(--text-2)">${new Date(p.criado_em).toLocaleString('pt-BR')}</td>
@@ -1650,7 +1670,7 @@
     async function deleteTransacao(id) {
       try { const r = await fetch(`${API}/${currentTenantId}/pagamentos/transacoes/${id}`, { method:'DELETE' });
         if (!r.ok) { const err = await r.json(); throw new Error(err.error); }
-        toast('🗑️ Transação excluída.', 'info'); loadAsaas();
+        toast('🗑️ Transação excluída.', 'info'); loadRede();
       } catch (err) { toast(`❌ ${err.message}`, 'error'); }
     }
 

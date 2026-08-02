@@ -56,10 +56,10 @@ app.get('/api/health', (req, res) => {
 app.get('/api/tenants', async (req, res) => {
   try {
     const result = await pool.query(
-      `SELECT id, nome, slug, dominio, asaas_env, status_loja,
+      `SELECT id, nome, slug, dominio, rede_env, status_loja,
               tempo_preparo_min, latitude, longitude, criado_em,
               CASE WHEN jwt_secret IS NOT NULL THEN true ELSE false END as tem_jwt,
-              CASE WHEN asaas_api_key IS NOT NULL THEN true ELSE false END as tem_asaas
+              CASE WHEN rede_client_id IS NOT NULL THEN true ELSE false END as tem_rede
        FROM restaurantes ORDER BY id ASC`
     );
     res.json(result.rows);
@@ -91,20 +91,20 @@ app.post('/api/tenants', async (req, res) => {
     const tenant = await client.query(
       `INSERT INTO restaurantes (nome, slug, dominio, endereco, cep, cidade, estado,
         latitude, longitude, status_loja, tempo_preparo_min,
-        asaas_api_key, asaas_env, asaas_webhook_token, asaas_webhook_secret)
+        rede_env, rede_client_id, rede_client_secret, rede_webhook_token)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
        RETURNING id, nome, slug, dominio, criado_em`,
       [data.nome, data.slug, data.dominio, data.endereco||'', data.cep||'', data.cidade||'', data.estado||'',
        data.latitude||null, data.longitude||null, data.status_loja??true, data.tempo_preparo_min||20,
-       data.asaas_api_key||null, data.asaas_env||'sandbox', data.asaas_webhook_token||null, data.asaas_webhook_secret||null]
+       data.rede_env||'sandbox', data.rede_client_id||null, data.rede_client_secret||null, data.rede_webhook_token||null]
     );
     const jwtSecret = crypto.randomBytes(32).toString('hex');
     await client.query('UPDATE restaurantes SET jwt_secret = $1 WHERE id = $2', [jwtSecret, tenant.rows[0].id]);
     const bcrypt = (await import('bcrypt')).default;
     const hash = await bcrypt.hash('admin123', 12);
     await client.query(
-      `INSERT INTO restaurante_users (restaurant_id, nome, email, senha_hash, cargo)
-       VALUES ($1, $2, $3, $4, 'admin')`,
+      `INSERT INTO restaurante_users (restaurant_id, nome, email, apelido, senha_hash, cargo)
+       VALUES ($1, $2, $3, 'admin', $4, 'admin')`,
       [tenant.rows[0].id, `Admin ${data.nome}`, `admin@${data.slug}.com`, hash]
     );
     await client.query('COMMIT');
@@ -163,7 +163,7 @@ app.put('/api/tenants/:id', async (req, res) => {
     let idx = 2;
     for (const key of ['nome','slug','dominio','endereco','cep','cidade','estado',
                        'latitude','longitude','status_loja','tempo_preparo_min',
-                       'asaas_api_key','asaas_env','asaas_webhook_token','asaas_webhook_secret']) {
+                       'rede_env','rede_client_id','rede_client_secret','rede_webhook_token']) {
       if (data[key] !== undefined) {
         fields.push(`${key} = $${idx++}`);
         params.push(data[key]);
@@ -250,21 +250,21 @@ app.get('/api/tenants/:tid/clientes/:cid', async (req, res) => {
 app.post('/api/tenants/:tid/clientes', async (req, res) => {
   try {
     const { tid } = req.params;
-    const { nome, sobrenome, email, telefone, cep, endereco, numero, bairro, complemento, cidade, estado, password } = req.body;
+    const { nome, sobrenome, apelido, email, telefone, cep, endereco, numero, bairro, complemento, cidade, estado, password } = req.body;
     if (!nome || !email || !password) return res.status(400).json({ error: 'nome, email e password são obrigatórios.' });
     const bcrypt = (await import('bcrypt')).default;
     const hash = await bcrypt.hash(password, 12);
     const result = await pool.query(
-      `INSERT INTO clientes (restaurant_id, nome, sobrenome, email, telefone, senha_hash,
+      `INSERT INTO clientes (restaurant_id, nome, sobrenome, apelido, email, telefone, senha_hash,
         cep, endereco, numero, bairro, complemento, cidade, estado)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
-       RETURNING id, nome, email, telefone, criado_em`,
-      [tid, nome, sobrenome||'', email, telefone||'', hash,
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+       RETURNING id, nome, apelido, email, telefone, criado_em`,
+      [tid, nome, sobrenome||'', apelido ? String(apelido).trim().toLowerCase() : null, email, telefone||'', hash,
        cep||'', endereco||'', numero||'', bairro||'', complemento||'', cidade||'', estado||'']
     );
     res.status(201).json(result.rows[0]);
   } catch (err) {
-    if (err.code === '23505') return res.status(409).json({ error: 'Email já existe para este tenant.' });
+    if (err.code === '23505') return res.status(409).json({ error: 'Email ou apelido já existe para este tenant.' });
     console.error('[God] Erro:', err);
     res.status(500).json({ error: 'Erro interno do servidor.' });
   }
@@ -273,7 +273,7 @@ app.post('/api/tenants/:tid/clientes', async (req, res) => {
 app.put('/api/tenants/:tid/clientes/:cid', async (req, res) => {
   try {
     const { tid, cid } = req.params;
-    const allowed = ['nome','sobrenome','email','telefone','cep','endereco','numero','bairro','complemento','cidade','estado','ativo'];
+    const allowed = ['nome','sobrenome','apelido','email','telefone','cep','endereco','numero','bairro','complemento','cidade','estado','ativo'];
     const fields = []; const params = [cid, tid]; let idx = 3;
     for (const key of allowed) {
       if (req.body[key] !== undefined) { fields.push(`${key} = $${idx++}`); params.push(req.body[key]); }
@@ -600,7 +600,7 @@ app.delete('/api/tenants/:tid/pedidos/:pid', async (req, res) => {
 });
 
 // ============================================================================
-// PAGAMENTOS / TRANSAÇÕES ASAAS
+// PAGAMENTOS / TRANSAÇÕES (REDE)
 // ============================================================================
 
 app.get('/api/tenants/:tid/pagamentos/transacoes', async (req, res) => {
@@ -681,7 +681,7 @@ app.post('/api/tenants/:tid/users', async (req, res) => {
     const result = await pool.query(
       `INSERT INTO restaurante_users (restaurant_id, nome, email, apelido, senha_hash, cargo)
        VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, nome, email, apelido, cargo`,
-      [tid, nome, email||'', apelido||null, hash, cargo || 'caixa']
+      [tid, nome, email||'', apelido ? String(apelido).trim().toLowerCase() : null, hash, cargo || 'caixa']
     );
     res.status(201).json(result.rows[0]);
   } catch (err) {
@@ -699,7 +699,7 @@ app.put('/api/tenants/:tid/users/:uid', async (req, res) => {
     const params = [uid, tid];
     let idx = 3;
     if (nome !== undefined) { fields.push(`nome = $${idx++}`); params.push(nome); }
-    if (apelido !== undefined) { fields.push(`apelido = $${idx++}`); params.push(apelido); }
+    if (apelido !== undefined && apelido !== '') { fields.push(`apelido = $${idx++}`); params.push(String(apelido).trim().toLowerCase()); }
     if (email !== undefined) { fields.push(`email = $${idx++}`); params.push(email); }
     if (cargo !== undefined) { fields.push(`cargo = $${idx++}`); params.push(cargo); }
     if (password) {
@@ -716,6 +716,7 @@ app.put('/api/tenants/:tid/users/:uid', async (req, res) => {
     if (result.rows.length === 0) return res.status(404).json({ error: 'Usuário não encontrado.' });
     res.json(result.rows[0]);
   } catch (err) {
+    if (err.code === '23505') return res.status(409).json({ error: 'Apelido ou e-mail já existe para este tenant.' });
     console.error('[God] Erro:', err);
     res.status(500).json({ error: 'Erro interno do servidor.' });
   }
@@ -926,7 +927,7 @@ app.get('/api/tenants/:tid/pagamentos', async (req, res) => {
     const result = await pool.query('SELECT config FROM restaurantes WHERE id = $1', [req.params.tid]);
     if (result.rows.length === 0) return res.status(404).json({ error: 'Tenant não encontrado.' });
     const config = result.rows[0].config || {};
-    res.json(config.formas_pagamento || ['dinheiro', 'credito', 'debito', 'pix']);
+    res.json(config.formas_pagamento || ['dinheiro', 'credito', 'debito', 'pix', 'pix_online', 'credito_online', 'debito_online']);
   } catch (err) {
     console.error('[God] Erro:', err);
     res.status(500).json({ error: 'Erro interno do servidor.' });
@@ -973,18 +974,18 @@ app.get('/api/tenants/:tid/drivers', async (req, res) => {
 app.post('/api/tenants/:tid/drivers', async (req, res) => {
   try {
     const { tid } = req.params;
-    const { nome, email, telefone, cpf, password, status } = req.body;
+    const { nome, apelido, email, telefone, cpf, password, status } = req.body;
     if (!nome || !email || !password) return res.status(400).json({ error: 'nome, email e password são obrigatórios.' });
     const bcrypt = (await import('bcrypt')).default;
     const hash = await bcrypt.hash(password, 12);
     const result = await pool.query(
-      `INSERT INTO entregadores (restaurant_id, nome, email, telefone, cpf, senha_hash, status)
-       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id, nome, email, status`,
-      [tid, nome, email, telefone||'', cpf||'', hash, status||'ativo']
+      `INSERT INTO entregadores (restaurant_id, nome, apelido, email, telefone, cpf, senha_hash, status)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id, nome, apelido, email, status`,
+      [tid, nome, apelido ? String(apelido).trim().toLowerCase() : null, email, telefone||'', cpf||'', hash, status||'ativo']
     );
     res.status(201).json(result.rows[0]);
   } catch (err) {
-    if (err.code === '23505') return res.status(409).json({ error: 'Email ou CPF já existe para este tenant.' });
+    if (err.code === '23505') return res.status(409).json({ error: 'Email, CPF ou apelido já existe para este tenant.' });
     console.error('[God] Erro:', err);
     res.status(500).json({ error: 'Erro interno do servidor.' });
   }
@@ -993,7 +994,7 @@ app.post('/api/tenants/:tid/drivers', async (req, res) => {
 app.put('/api/tenants/:tid/drivers/:did', async (req, res) => {
   try {
     const { tid, did } = req.params;
-    const allowed = ['nome','email','telefone','cpf','status'];
+    const allowed = ['nome','apelido','email','telefone','cpf','status'];
     const fields = []; const params = [did, tid]; let idx = 3;
     for (const key of allowed) {
       if (req.body[key] !== undefined) { fields.push(`${key} = $${idx++}`); params.push(req.body[key]); }

@@ -1,0 +1,20 @@
+# 03. Melhorias recomendadas — Projeto: Migração Asaas → API da Rede
+
+> Última atualização: 02/08/2026 — MELHORIA-002/004/005/006/007/008 e demais melhorias foram **aplicadas** durante a implementação. Abaixo somente o que está **pendente de análise/aplicação**.
+
+## 💡 Melhorias pendentes
+
+### MELHORIA-001 — Escopo PCI-DSS do checkout transparente (PARCIAL)
+- **Local:** infra (nginx/docker-compose)
+- **Descrição:** com o checkout transparente, o backend manipula dados brutos de cartão (escopo PCI-DSS SAQ A-EP). Bloco **TLS 1.2+ já adicionado/comentado** nos 4 nginx (443 ssl, TLSv1.2/1.3, ciphers fortes).
+- **Status:** ⏳ **PENDENTE** — habilitar montando os certificados (volumes no docker-compose) e terminar o TLS no proxy externo.
+
+### MELHORIA-002 — Cache de token OAuth2 (validar no sandbox)
+- **Local:** `backend/src/services/rede.js`
+- **Descrição:** token válido por 24min; cache de 20min + retry em 401. ✅ implementado.
+- **Status:** ⏳ **PENDENTE de validação** em teste real com credenciais do sandbox (bloqueado pela pendência #1).
+
+### MELHORIA-003 — Cadastro da URL de notificação PIX em produção
+- **Local:** operação (call center Rede)
+- **Descrição:** a Rede só ativa o webhook PIX via call center (~2 dias úteis). Sem isso, PIX só é confirmado por polling.
+- **Status:** ⏳ **PENDENTE** — agendar antes do go-live (pendência #2).

@@ -7,7 +7,9 @@ node_modules/
 # BUILD
 # =====================================
 dist/
+docs/
 
+run.bat
 # =====================================
 # AMBIENTE
 # =====================================
@@ -37,8 +39,8 @@ Thumbs.db
 # =====================================
 uploads/*
 !uploads/.gitkeep
-backend/uploads/*
-!backend/uploads/.gitkeep
+app/backend/uploads/*
+!app/backend/uploads/.gitkeep
 
 # =====================================
 # CARDÁPIO (dados de exemplo)
@@ -65,10 +67,20 @@ chavesAsaas.md
 portainer.md
 
 # =====================================
+# DEPLOY (credenciais da VPS — nunca commitar)
+# =====================================
+deploy_config.json
+
+# =====================================
 # ADMIN (tenant management - local only)
 # =====================================
 admin/
 
+# =====================================
+# ESTRUTURA REORGANIZADA — lixo e ferramentas locais
+# =====================================
+trash/
+others/god/node_modules/
 # =====================================
 # ARQUIVOS ESPECÍFICOS DO PROJETO
 # =====================================

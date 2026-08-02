@@ -1,0 +1,83 @@
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "8090:3001"
+    environment:
+      - NODE_ENV=production
+      - DB_HOST=${DB_HOST:-86.48.18.22}
+      - DB_PORT=${DB_PORT:-5432}
+      - DB_NAME=${DB_NAME:-delivery}
+      - DB_USER=${DB_USER:-default}
+      - DB_PASS=${DB_PASS:-default}
+      - JWT_SECRET=${JWT_SECRET:-dev-secret-change-in-production}
+      - RESTAURANT_ID=${RESTAURANT_ID:-1}
+      # CORS: incluir IPs dos containers + dominios dos tenants
+      # Para subdomínios wildcard, use prefixo *. (ex: *.loopautomacoes.com.br)
+      # O backend aceita wildcard: qualquer subdomínio que termine em .loopautomacoes.com.br
+      # Ex: https://palazzomooca.cliente.loopautomacoes.com.br será aceito
+      # Com o novo router (path-based), acessamos direto: {slug}.loopautomacoes.com.br
+      - CORS_ORIGIN=${CORS_ORIGIN:-http://86.48.18.22:8091,http://86.48.18.22:8094,*.loopautomacoes.com.br}
+      # Rede (e-Rede v2): credenciais são por-tenant (colunas rede_* no banco, via módulo god)
+      # Upload
+      - UPLOAD_DIR=${UPLOAD_DIR:-./uploads}
+      - MAX_FILE_SIZE=${MAX_FILE_SIZE:-5242880}
+    volumes:
+      # Bind mount (deploy por SSH): uploads viajam junto com o projeto em ./backend/uploads
+      - ./backend/uploads:/app/uploads
+      # Migrations ficam fora de app/ (pasta migrations/ na raiz do projeto);
+      # o deploy.py migrate sincroniza e o container monta aqui (somente leitura)
+      - ./migrations:/app/migrations:ro
+    healthcheck:
+      # 127.0.0.1 (IPv4): o wget do Alpine resolve 'localhost' para ::1, mas o servidor
+      # escuta apenas em 0.0.0.0 — causava falso 'unhealthy'.
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:3001/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  # Serviço individual (mantido para compatibilidade com acesso direto por IP)
+  # Restaurante e Entregador: acesse via ROUTER (8094) em /admin e /entregador
+  cliente:
+    build:
+      context: ./cliente
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "8091:80"
+    depends_on:
+      - backend
+    healthcheck:
+      test: ["CMD", "pidof", "nginx"]
+      interval: 30s
+      timeout: 3s
+      retries: 2
+      start_period: 5s
+
+  # ─── ROUTER: entry point unificado para subdomínios ──────────────
+  # Acesse via {slug}.loopautomacoes.com.br:
+  #   /           → Cliente (cardápio)
+  #   /admin      → Restaurante (painel admin)
+  #   /entregador → Entregador (app delivery)
+  router:
+    build:
+      context: .
+      dockerfile: router/Dockerfile
+    restart: unless-stopped
+    ports:
+      - "8094:80"
+    depends_on:
+      - backend
+    healthcheck:
+      test: ["CMD", "pidof", "nginx"]
+      interval: 30s
+      timeout: 3s
+      retries: 2
+      start_period: 5s
+
+volumes:
+  backend_uploads:
