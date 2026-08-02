@@ -2,6 +2,27 @@
 
 > Histórico cronológico do projeto. Atualizar após qualquer alteração.
 
+## [2.3.2] — 02/08/2026 — Deploy incremental (delta por hash)
+
+### Adicionado (deploy)
+- **Sincronização incremental no `deploy.py`**: manifesto `.deploy_manifest.json` no servidor com o hash SHA-256 de cada arquivo enviado. Na primeira subida (ou `--force`) envia tudo e grava o manifesto; nas seguintes, apenas os arquivos cujo hash mudou (ou que faltam no manifesto) são copiados — deploys rotineiros enviam só o que foi alterado, em segundos.
+- Flags `--force` (reenvia tudo, ignora a comparação) e `--dry-run` (mostra o que mudaria sem enviar nada) para `upload` e `images`.
+- `.vite` (cache do dev server, `deps_temp_*`) adicionado ao `EXCLUDE_DIRS` — deixou de subir 3 arquivos de lixo.
+
+### Alterado (deploy)
+- `upload` e `images` compartilham o **mesmo manifesto**: rodar um comando não apaga as entradas do outro (merge preserva a outra raiz).
+- Escrita do manifesto em bytes UTF-8 explícito (funciona em qualquer versão do paramiko).
+- Manifesto só é reescrito quando houve upload (evita write + round-trip à toa).
+- Docstring/uso: documentado o caso de arquivo removido manualmente no servidor (recuperação com `upload --force`).
+
+### Corrigido (deploy)
+- `--force` em `images` apagava as entradas de código do manifesto → o próximo `upload` refazia upload completo. Agora o manifesto é sempre carregado e o `--force` apenas ignora a comparação de igualdade.
+
+### Validado (VPS real)
+- 1º `upload`: 124 enviados, manifesto criado; 2º `upload`: 0 enviados / 124 inalterados (segundos).
+- `images`: 45 enviadas → 2º: 0 / 45 inalteradas.
+- Manifesto final no servidor: 169 entradas (124 código + 45 imagens) — merge entre comandos funcionando.
+
 ## [2.3.1] — 02/08/2026 — Endereço no checkout + fonte do painel
 
 ### Adicionado (cliente)

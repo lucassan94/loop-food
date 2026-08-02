@@ -4,6 +4,8 @@
 
 ## Última atividade
 
+**02/08/2026 (7)** — **Deploy incremental no `deploy.py`** — sincronização por **manifesto SHA-256** (`.deploy_manifest.json` gravado no servidor): na 1ª subida envia tudo e grava o manifesto; nas seguintes, só arquivos cujo hash mudou (ou faltam) são copiados. Flags `--force` (reenvia tudo) e `--dry-run` (prévia sem enviar) em `upload`/`images`; `.vite` (cache do dev server) excluído do envio. **Testado na VPS real**: 1º `upload` = 124 enviados (manifesto criado), 2º = 0/124 inalterados; `images` = 45 enviadas → 0/45; manifesto final com **169 entradas (124 código + 45 imagens)** coexistindo — `upload` e `images` compartilham o mesmo manifesto e o merge preserva a outra raiz. Code review: corrigido `--force` apagar entradas da outra raiz; escrita do manifesto em bytes UTF-8 explícito.
+
 **02/08/2026 (6)** — **Checkout: endereço salvo no perfil ao clicar "Continuar"** (cliente) — nova função `salvarPerfilNoCheckout(cpfCnpj)` chamada em `goToStep3` (fire-and-forget, não bloqueia) e reutilizada nos dois pontos de `confirmOrder` (eliminada a duplicação de payload). **Fonte do painel corrigida** (BUG-012): reset global `button, input, select, textarea { font-family: inherit; }` no `main.css` do restaurante — form controls (selects/abas/botões) agora usam Inter em vez de Arial. Builds de cliente e restaurante OK.
 
 **02/08/2026 (5)** — **Reorganização da estrutura de pastas**: raiz agora tem `app/`, `spec/`, `project-manager/`, `others/`, `migrations/` e `trash/`. `app/` = código que vai para a VPS (backend, cliente, restaurante, entregador, router, docker-compose.yml). Migrations movidas para `migrations/` (raiz; 006/011/023 → trash por serem Asaas/one-off). Ferramentas locais (deploy.py, god, README, run.bat, stack.env) em `others/`. deploy.py atualizado para subir `app/`; migrate.js com `MIGRATIONS_DIR`; docker-compose com mount de migrations. ⏳ Faltou mover `src/`, `public/`, `.vite/` de cliente/entregador/restaurante (dev servers ativos bloqueavam) — pendência #9.
@@ -28,6 +30,7 @@
 - **Estrutura /spec** criada (vision, requirements, architecture, decisions, progress, backlog, technical-debt, changelog).
 - **Deploy via SSH sem GitHub**: `deploy.py` + `docker-compose` no servidor; stack `restaurante-v3` no ar (backend/cliente/router healthy); healthcheck IPv4; uploads bind-mounted; imagens do cardápio funcionando em produção.
 - **Estrutura reorganizada**: `app/` (código → VPS), `migrations/` (fora de app), `others/` (ferramentas locais), `trash/` (lixo), `spec/` e `project-manager/` na raiz.
+- **Deploy incremental**: manifesto SHA-256 no servidor; `upload`/`images` enviam só o que mudou; `--force`/`--dry-run`; testado na VPS real (124 → 0/124; images 45 → 0/45).
 
 ## Em andamento
 
@@ -56,7 +59,7 @@
 
 ## Arquivos modificados (última execução)
 
-- `deploy.py` (novo), `deploy_config.json` (novo, gitignored), `docker-compose.yml` (healthcheck IPv4 + bind mount uploads), `backend/Dockerfile` (healthcheck IPv4), `.gitignore` (deploy_config.json), `project-manager/01. Pendências`, `spec/*` (progress/changelog).
+- `others/deploy.py` (sincronização incremental por hash SHA-256, `--force`/`--dry-run`, `.vite` no EXCLUDE_DIRS), `project-manager/*`, `spec/*` (progress/changelog).
 
 ## Cobertura aproximada da especificação
 

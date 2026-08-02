@@ -16,6 +16,7 @@ import { config } from '../../config/index.js';
 import { authenticate, authorize } from '../../middleware/auth.js';
 import { AppError } from '../../middleware/errorHandler.js';
 import { emitNovoPedido } from '../../services/realtime.js';
+import { validarEntrega } from '../../services/frete.js';
 import * as rede from '../../services/rede.js';
 import { processarEventoRede } from './redeWebhookHandler.js';
 
@@ -72,6 +73,9 @@ router.post('/criar', authenticate, async (req, res, next) => {
         cep: z.string(),
         cidade: z.string().default('São Paulo'),
         estado: z.string().default('SP'),
+        // Coordenadas do CEP (enviadas pelo cliente) — usadas para validar o raio
+        latitude: z.number().optional(),
+        longitude: z.number().optional(),
       }),
       subtotal: z.number().positive(),
       valor_frete: z.number().min(0),
@@ -127,6 +131,16 @@ router.post('/criar', authenticate, async (req, res, next) => {
 
     const restaurantId = req.restaurantId || config.restaurantId;
 
+    // IMPEDIR pedido fora do raio de entrega (online também é entrega).
+    // Lança erro se a distância exceder o maior raio cadastrado ou se o
+    // valor_frete enviado não conferir com o calculado no servidor.
+    await validarEntrega(restaurantId, {
+      latitude: data.pedido.latitude,
+      longitude: data.pedido.longitude,
+      estado: data.pedido.estado,
+      valorFrete: data.valor_frete,
+    });
+
     // ─── 1. Criar pedido 'aguardando_pagamento' (transação BD) ───
     const result = await transaction(async (conn) => {
       const loja = await conn.query(
@@ -141,16 +155,17 @@ router.post('/criar', authenticate, async (req, res, next) => {
         `INSERT INTO pedidos (
           restaurant_id, cliente_id, nome_cliente, telefone_cliente,
           endereco_cliente, numero_cliente, bairro_cliente, cep_cliente,
-          cidade_cliente, estado_cliente,
+          cidade_cliente, estado_cliente, latitude_cliente, longitude_cliente,
           subtotal, valor_frete, total, metodo_pagamento,
           detalhes_pagamento, observacoes,
           tempo_preparo_estimado, tempo_entrega_estimado, status
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, '', '', $15, $16, 'aguardando_pagamento')
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, '', '', $17, $18, 'aguardando_pagamento')
         RETURNING *`,
         [
           restaurantId, clienteId, data.cliente.nome, data.cliente.telefone,
           data.pedido.endereco, data.pedido.numero, data.pedido.bairro, data.pedido.cep,
           data.pedido.cidade, data.pedido.estado,
+          data.pedido.latitude || null, data.pedido.longitude || null,
           data.subtotal, data.valor_frete, data.total,
           metodoPorTipo(data.tipo),
           data.tempo_preparo_estimado || null, data.tempo_entrega_estimado || null,

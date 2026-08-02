@@ -327,6 +327,8 @@ const form = reactive({
   complemento: authStore.user?.complemento || '',
   cidade: authStore.user?.cidade || 'São Paulo',
   estado: authStore.user?.estado || 'SP',
+  latitude: null,   // preenchidas pela busca de CEP — enviadas ao pedido p/ validar raio
+  longitude: null,
   metodo_pagamento: 'credito',
   troco: '',
   observacoes: '',
@@ -440,6 +442,7 @@ onUnmounted(() => {
 })
 
 async function buscarCEP() {
+  if (buscandoCEP.value) return // evita buscas concorrentes duplicadas
   const cep = form.cep.replace(/\D/g, '')
   if (cep.length !== 8) {
     addToast('CEP deve ter 8 dígitos.', 'warning')
@@ -447,12 +450,18 @@ async function buscarCEP() {
   }
 
   buscandoCEP.value = true
+  // Zerar estado anterior: erro obsoleto (evita falso bloqueio) e coordenadas
+  erroFrete.value = null
+  form.latitude = null
+  form.longitude = null
   try {
     const { data } = await api.post('/cep', { cep })
     form.endereco = data.logradouro || form.endereco
     form.bairro = data.bairro || form.bairro
     form.cidade = data.cidade || form.cidade
     form.estado = data.estado || form.estado
+    form.latitude = data.latitude
+    form.longitude = data.longitude
 
     // Calcular frete — sempre chama o endpoint, mesmo sem coordenadas
     // O backend calcula o frete com coordenadas ou usa o raio padrão como fallback
@@ -485,7 +494,7 @@ function goToStep2() {
   currentStep.value = 2
 }
 
-function goToStep3() {
+async function goToStep3() {
   if (!form.endereco || !form.numero || !form.bairro) {
     addToast('Preencha o endereço completo.', 'warning')
     return
@@ -493,6 +502,19 @@ function goToStep3() {
   // Bloquear se o frete falhou (fora da área de entrega)
   if (erroFrete.value) {
     addToast('Corrija o endereço de entrega antes de continuar.', 'warning')
+    return
+  }
+  // Exigir frete VÁLIDO (endereço verificado dentro do raio) antes de avançar.
+  // Se ainda não calculou, tenta calcular agora (ex.: usuário digitou manualmente).
+  if (!freteInfo.value) {
+    await buscarCEP()
+  }
+  if (erroFrete.value) {
+    addToast('Não é possível continuar: esta região está fora do raio de entrega.', 'warning')
+    return
+  }
+  if (!freteInfo.value) {
+    addToast('Informe um CEP válido para verificar a área de entrega.', 'warning')
     return
   }
   // Registrar o endereço (novo ou alterado) no perfil do cliente no momento do clique
@@ -528,7 +550,15 @@ async function salvarPerfilNoCheckout(cpfCnpj = '') {
   }
 }
 
-function goToStep4() {
+async function goToStep4() {
+  // Garantir frete VÁLIDO antes da revisão (cobre fluxos que pulam a etapa 2)
+  if (!freteInfo.value && !erroFrete.value) {
+    await buscarCEP()
+  }
+  if (!freteInfo.value) {
+    addToast(erroFrete.value || 'Confirme seu CEP para verificar a área de entrega.', 'warning')
+    return
+  }
   // Se for pagamento online, CPF é obrigatório
   if (['pix_online', 'credito_online', 'debito_online'].includes(form.metodo_pagamento)) {
     const cpfLimpo = card.cpfCnpj.replace(/\D/g, '')
@@ -574,6 +604,15 @@ async function confirmOrder() {
   if (!authStore.isAuthenticated) {
     addToast('Sua sessão expirou. Faça login novamente.', 'warning')
     router.push('/auth')
+    return
+  }
+
+  // IMPEDIR pedido sem frete válido (fora do raio de entrega) — guarda final
+  if (!freteInfo.value) {
+    await buscarCEP()
+  }
+  if (erroFrete.value || !freteInfo.value) {
+    addToast(erroFrete.value || 'Não foi possível confirmar a área de entrega. Verifique o CEP.', 'warning')
     return
   }
 
@@ -624,6 +663,7 @@ async function confirmOrder() {
           cep: form.cep,
           cidade: form.cidade,
           estado: form.estado,
+          ...(form.latitude != null ? { latitude: form.latitude, longitude: form.longitude } : {}),
         },
         subtotal: valorSubtotal,
         valor_frete: valorFrete,
@@ -743,6 +783,7 @@ async function confirmOrder() {
       cep_cliente: form.cep,
       cidade_cliente: form.cidade,
       estado_cliente: form.estado,
+      ...(form.latitude != null ? { latitude_cliente: form.latitude, longitude_cliente: form.longitude } : {}),
       subtotal: subtotal.value,
       valor_frete: freteInfo.value?.custo || 0,
       total: subtotal.value + (freteInfo.value?.custo || 0),

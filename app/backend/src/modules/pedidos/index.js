@@ -6,7 +6,7 @@ import { authenticate, authorize, optionalAuth } from '../../middleware/auth.js'
 import { AppError } from '../../middleware/errorHandler.js';
 import { emitPedidoAtualizado, emitNovoPedido, emitEntregaDisponivel } from '../../services/realtime.js';
 import { orderLimiter } from '../../middleware/rateLimiter.js';
-import { calcularFrete } from '../../services/frete.js';
+import { validarEntrega } from '../../services/frete.js';
 
 const router = Router();
 
@@ -75,6 +75,17 @@ router.post('/', orderLimiter, optionalAuth, async (req, res, next) => {
     try {
       const restaurantId = req.restaurantId || config.restaurantId;
       const data = createOrderSchema.parse(req.body);
+
+      // IMPEDIR pedido fora do raio de entrega (validação server-side).
+      // Salão (PDV) não tem endereço/frete — validação só para delivery.
+      if (data.origem !== 'salao') {
+        await validarEntrega(restaurantId, {
+          latitude: data.latitude_cliente,
+          longitude: data.longitude_cliente,
+          estado: data.estado_cliente,
+          valorFrete: data.valor_frete,
+        });
+      }
 
       // SEGURANÇA: Se autenticado, usar cliente_id do JWT
       // Se não autenticado, permitir guest checkout com cliente_id do body
@@ -605,48 +616,13 @@ router.patch('/:id/status', authenticate, async (req, res, next) => {
 router.post('/calcular-frete', async (req, res, next) => {
   try {
     const restaurantId = req.restaurantId || config.restaurantId;
-    const { latitude, longitude, cidade, estado } = req.body;
+    const { latitude, longitude, estado } = req.body;
 
-    // Se tem coordenadas, calcula distância real
-    if (latitude && longitude) {
-      const frete = await calcularFrete(latitude, longitude, restaurantId);
-      return res.json(frete);
-    }
-
-    // ── SEM COORDENADAS: validar estado antes de usar fallback ──
-    // Buscar dados do restaurante para saber em qual estado ele está
-    const restaurante = await query(
-      'SELECT estado, tempo_preparo_min FROM restaurantes WHERE id = $1',
-      [restaurantId]
-    );
-
-    const restEstado = restaurante.rows[0]?.estado;
-    const tempoPreparo = restaurante.rows[0]?.tempo_preparo_min || 20;
-
-    // Se o cliente informou o estado e o restaurante tem estado cadastrado
-    if (estado && restEstado && estado.toUpperCase() !== restEstado.toUpperCase()) {
-      // Estados diferentes — rejeitar entrega
-      throw new AppError(
-        `Desculpe, não entregamos em ${estado.toUpperCase()}. Nosso raio de entrega abrange apenas ${restEstado.toUpperCase()}.`,
-        400
-      );
-    }
-
-    // Fallback: frete padrão (primeiro raio) para entregas dentro do estado
-    const result = await query(
-      'SELECT raio_km, tempo_min, tempo_max, custo FROM raios_entrega WHERE restaurant_id = $1 ORDER BY raio_km ASC LIMIT 1',
-      [restaurantId]
-    );
-    const faixa = result.rows[0] || { raio_km: 1, tempo_min: 15, tempo_max: 25, custo: 5.00 };
-
-    return res.json({
-      distancia_km: null,
-      faixa_raio: faixa.raio_km,
-      tempo_min: faixa.tempo_min,
-      tempo_max: faixa.tempo_max,
-      custo: parseFloat(faixa.custo),
-      tempo_preparo: tempoPreparo,
-    });
+    // Delega a validarEntrega: MESMO critério usado na criação do pedido
+    // (raio real com coordenadas; state check + fallback sem coordenadas).
+    // Garante que o frete mostrado no checkout é o mesmo validado no pedido.
+    const frete = await validarEntrega(restaurantId, { latitude, longitude, estado });
+    return res.json(frete);
   } catch (err) {
     next(err);
   }

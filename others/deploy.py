@@ -187,7 +187,8 @@ def load_remote_manifest(sftp):
 def save_remote_manifest(sftp, manifest):
     """Grava o manifesto no servidor. Escrita direta: se falhar no meio,
     o próximo run detecta corrupção e refaz o upload completo."""
-    # ⚠️ paramiko exige bytes (SFTPFile é binário) — str aqui dá TypeError
+    # bytes UTF-8 explícito: paramiko 5.x aceita str (encoda sozinho), mas
+    # bytes funciona em TODAS as versões — mais robusto.
     with sftp.open(manifest_remote_path(), "w") as f:
         f.write(json.dumps(manifest, indent=1).encode("utf-8"))
 
