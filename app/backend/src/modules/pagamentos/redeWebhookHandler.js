@@ -20,7 +20,7 @@
 // ⚠️ Devoluções feitas pela NOSSA API não geram evento (resposta síncrona).
 // ============================================================================
 
-import { transaction } from '../../config/database.js';
+import { transaction, transactionForTenant } from '../../config/database.js';
 import { emitPedidoAtualizado, emitNovoPedido } from '../../services/realtime.js';
 
 /**
@@ -155,9 +155,14 @@ const EVENT_HANDLERS = {
 
 /**
  * Processa o payload do webhook da Rede.
+ *
  * @param {object} payload - corpo do webhook ({ id, merchantId, events, data })
+ * @param {number|null} tenantId - ID do restaurante (obrigatório quando não há
+ *   request em andamento — ex: polling de backup, webhook fire-and-forget).
+ *   Com a role app_user (RLS ativo), sem esse contexto o processamento ficaria
+ *   restrito ao tenant do config.restaurantId e quebraria tenants 2/3.
  */
-export async function processarEventoRede(payload) {
+export async function processarEventoRede(payload, tenantId = null) {
   const event = Array.isArray(payload?.events) ? payload.events[0] : payload?.events;
   if (!event) {
     console.warn('[Rede] Webhook sem eventos. Ignorando.');
@@ -170,9 +175,16 @@ export async function processarEventoRede(payload) {
     return;
   }
 
-  await transaction(async (conn) => {
-    await handler(payload, conn);
-  });
+  if (tenantId) {
+    await transactionForTenant(tenantId, async (conn) => {
+      await handler(payload, conn);
+    });
+  } else {
+    // Sem tenant explícito: usa o contexto do request atual (quando houver)
+    await transaction(async (conn) => {
+      await handler(payload, conn);
+    });
+  }
 
-  console.log(`[Rede] Evento ${event} processado (webhook id ${payload?.id})`);
+  console.log(`[Rede] Evento ${event} processado (webhook id ${payload?.id}${tenantId ? `, tenant ${tenantId}` : ''})`);
 }

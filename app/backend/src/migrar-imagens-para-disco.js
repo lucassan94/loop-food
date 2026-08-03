@@ -21,8 +21,8 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DB_HOST = process.env.DB_HOST || '86.48.18.22';
 const DB_PORT = parseInt(process.env.DB_PORT || '5432');
 const DB_NAME = process.env.DB_NAME || 'delivery';
-const DB_USER = process.env.DB_USER || 'default';
-const DB_PASS = process.env.DB_PASS || 'default';
+const DB_USER = process.env.DB_ADMIN_USER || process.env.DB_USER || 'default';
+const DB_PASS = process.env.DB_ADMIN_PASS || process.env.DB_PASS || 'default';
 
 // Aceitar --tenant=X como argumento opcional
 const TENANT_ID = (() => {

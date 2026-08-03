@@ -1,4 +1,5 @@
 // Serviço de busca de CEP com fallback entre APIs
+import { AppError } from '../middleware/errorHandler.js';
 
 // Mapa de coordenadas aproximadas de cidades brasileiras (centro da cidade)
 // Usado quando BrasilAPI não retorna coordenadas e ViaCEP é o fallback
@@ -121,7 +122,7 @@ export async function buscarCEP(cep) {
   const cepLimpo = cep.replace(/\D/g, '');
 
   if (cepLimpo.length !== 8) {
-    throw new Error('CEP inválido. Use 8 dígitos.');
+    throw new AppError('CEP inválido. Use 8 dígitos.', 400, 'INVALID_CEP');
   }
 
   // ─── Tentativa 1: BrasilAPI ───
@@ -168,7 +169,7 @@ export async function buscarCEP(cep) {
     const response = await fetch(`https://viacep.com.br/ws/${cepLimpo}/json/`);
     if (response.ok) {
       const data = await response.json();
-      if (data.erro) throw new Error('CEP não encontrado.');
+      if (data.erro) throw new AppError('CEP não encontrado. Verifique o número digitado.', 404, 'CEP_NOT_FOUND');
 
       // Tentar obter coordenadas aproximadas pelo nome da cidade
       const coords = buscarCoordsCidade(data.localidade);
@@ -198,5 +199,5 @@ export async function buscarCEP(cep) {
     return dadosBrasilAPI;
   }
 
-  throw new Error('Não foi possível consultar o CEP. Verifique o número e tente novamente.');
+  throw new AppError('Não foi possível consultar o CEP. Verifique o número e tente novamente.', 400, 'CEP_LOOKUP_FAILED');
 }

@@ -12,12 +12,16 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const MIGRATIONS_DIR = process.env.MIGRATIONS_DIR
   || path.join(__dirname, '..', 'migrations');
 
+// Migrations rodam DDL (CREATE TABLE/ROLE) — exigem credencial ADMIN
+// (superuser). O backend em runtime usa app_user (DB_USER), que NÃO pode
+// executar DDL. Se DB_ADMIN_USER não estiver definido, cai para DB_USER
+// (compatível com ambientes onde a role runtime ainda é admin).
 const pool = new pg.Pool({
   host: process.env.DB_HOST || 'localhost',
   port: parseInt(process.env.DB_PORT || '5432'),
   database: process.env.DB_NAME || 'delivery',
-  user: process.env.DB_USER || 'default',
-  password: process.env.DB_PASS || 'default',
+  user: process.env.DB_ADMIN_USER || process.env.DB_USER || 'default',
+  password: process.env.DB_ADMIN_PASS || process.env.DB_PASS || 'default',
   max: 1,
 });
 
@@ -37,7 +41,22 @@ async function runMigrations() {
 
   for (const file of files) {
     const filePath = path.join(migrationsDir, file);
-    const sql = fs.readFileSync(filePath, 'utf-8');
+    let sql = fs.readFileSync(filePath, 'utf-8');
+
+    // Migration 029 (role app_user): substitui o placeholder da senha pela
+    // senha de runtime (DB_PASS — override do Portainer, nunca commitada).
+    if (process.env.DB_PASS && sql.includes('__APP_DB_PASSWORD__')) {
+      sql = sql.replaceAll('__APP_DB_PASSWORD__', process.env.DB_PASS);
+      console.log(`   🔑 ${file}: senha do app_user injetada (DB_PASS)`);
+    }
+
+    // SEM DB_PASS: pular migrations que exigem a senha. Re-executar a 029 com o
+    // placeholder literal resetaria a senha do app_user → outage. Pular mantém
+    // a senha real (já definida) e falha ruidosamente apenas em ambiente novo.
+    if (!process.env.DB_PASS && sql.includes('__APP_DB_PASSWORD__')) {
+      console.warn(`   ⏭️  ${file}: SKIP (DB_PASS não definido — senha do app_user preservada). Defina DB_PASS via override do Portainer.`);
+      continue;
+    }
 
     console.log(`➜ Executing: ${file}`);
 

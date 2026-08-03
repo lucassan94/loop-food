@@ -36,24 +36,30 @@ export function clearUserContext() {
   _userContext = null;
 }
 
-function getContextSQL() {
-  // restaurantId: usa o valor dinâmico do contexto (definido pelo tenantResolver)
-  // ou fallback para o config.restaurantId (desenvolvimento local / migrações)
-  const restaurantId = _userContext?.restaurantId || config.restaurantId;
+function buildContextSQL(ctx) {
+  // ctx: contexto explícito (ex: jobs de background por tenant) ou o contexto
+  // do request atual (_userContext). restaurantId usa o valor dinâmico
+  // (tenantResolver) ou fallback para config.restaurantId (dev/migrações).
+  const user = ctx || _userContext;
+  const restaurantId = user?.restaurantId || config.restaurantId;
   const settings = [`SET app.restaurant_id = ${restaurantId}`];
 
-  if (_userContext) {
-    if (_userContext.role) {
-      settings.push(`SET app.user_role = '${_userContext.role}'`);
+  if (user) {
+    if (user.role) {
+      settings.push(`SET app.user_role = '${user.role}'`);
     }
-    if (_userContext.id) {
-      settings.push(`SET app.user_id = ${_userContext.id}`);
+    if (user.id) {
+      settings.push(`SET app.user_id = ${user.id}`);
     }
-    if (_userContext.cargo) {
-      settings.push(`SET app.user_cargo = '${_userContext.cargo}'`);
+    if (user.cargo) {
+      settings.push(`SET app.user_cargo = '${user.cargo}'`);
     }
   }
   return settings.join('; ');
+}
+
+function getContextSQL() {
+  return buildContextSQL(null);
 }
 
 // ============================================================================
@@ -84,6 +90,48 @@ export async function transaction(callback) {
   try {
     await client.query('BEGIN');
     await client.query(getContextSQL());
+    const result = await callback(client);
+    await client.query('COMMIT');
+    return result;
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+// ============================================================================
+// HELPERS POR TENANT (jobs de background / webhooks — sem request)
+// ============================================================================
+// Com a role app_user (RLS ativo), uma query fora de request usa o contexto
+// do config.restaurantId — o que limitaria jobs (ex: polling da Rede) a um
+// único tenant. Estes helpers definem o contexto EXPLÍCITO de um tenant,
+// permitindo iterar por tenant sem depender do estado do request.
+
+/** Query com contexto explícito de tenant (conexão única: SET + query). */
+export async function queryForTenant(tenantId, text, params = []) {
+  const client = await pool.connect();
+  const start = Date.now();
+  try {
+    await client.query(buildContextSQL({ restaurantId: tenantId }));
+    const result = await client.query(text, params);
+    return result;
+  } finally {
+    client.release();
+    const duration = Date.now() - start;
+    if (duration > 1000) {
+      console.warn(`[DB] Slow query (${duration}ms):`, text.substring(0, 100));
+    }
+  }
+}
+
+/** Transação com contexto explícito de tenant. */
+export async function transactionForTenant(tenantId, callback) {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query(buildContextSQL({ restaurantId: tenantId }));
     const result = await callback(client);
     await client.query('COMMIT');
     return result;

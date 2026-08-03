@@ -7,6 +7,7 @@ import { query, transaction } from '../../config/database.js';
 import { config } from '../../config/index.js';
 import { authenticate, authorize } from '../../middleware/auth.js';
 import { AppError } from '../../middleware/errorHandler.js';
+import { saveBase64AsFile, deleteUploadFile, gerarNomeArquivo } from '../../config/upload.js';
 
 const router = Router();
 
@@ -61,6 +62,14 @@ router.post('/', authenticate, authorize('admin', 'gerente'), async (req, res, n
     const restaurantId = req.restaurantId || config.restaurantId;
     const data = bannerSchema.parse(req.body);
 
+    // Imagem em base64 → salvar na tabela imagens (banco) e usar a URL pública
+    if (data.imagem_base64 && data.imagem_base64.length > 50) {
+      const filename = gerarNomeArquivo(data.titulo || 'banner', data.imagem_base64);
+      const saved = await saveBase64AsFile(restaurantId, 'banners', filename, data.imagem_base64);
+      data.imagem_url = saved.publicUrl;
+      data.imagem_base64 = ''; // imagem agora vive na tabela imagens
+    }
+
     // Se não houver imagem, usar fallback do Unsplash
     if (!data.imagem_url && !data.imagem_base64) {
       data.imagem_url = 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?auto=format&fit=crop&w=1000&q=80';
@@ -100,6 +109,18 @@ router.put('/:id', authenticate, authorize('admin', 'gerente'), async (req, res,
     );
     if (existing.rows.length === 0) {
       throw new AppError('Banner não encontrado.', 404);
+    }
+
+    // Imagem em base64 → salvar na tabela imagens (banco) e usar a URL pública
+    if (data.imagem_base64 && data.imagem_base64.length > 50) {
+      // Remover imagem anterior (banco + disco) antes de substituir
+      if (data.imagem_url?.startsWith('/uploads/')) {
+        await deleteUploadFile(data.imagem_url);
+      }
+      const filename = gerarNomeArquivo(data.titulo || 'banner', data.imagem_base64);
+      const saved = await saveBase64AsFile(restaurantId, 'banners', filename, data.imagem_base64);
+      data.imagem_url = saved.publicUrl;
+      data.imagem_base64 = ''; // imagem agora vive na tabela imagens
     }
 
     const result = await query(

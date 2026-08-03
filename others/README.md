@@ -6,31 +6,64 @@ Plataforma completa de delivery multi-tenant com 3 módulos integrados (cliente,
 
 ```
 Delivery V3/
-├── app/                 ← CÓDIGO DA APLICAÇÃO — é isto que vai para a VPS
+├── docker-compose.yml   ← DEPLOY: stack canônica (raiz do repo, usada pelo Portainer)
+├── stack.env            ← DEPLOY: segredos commitados (JWT_SECRET, VAPID push)
+├── app/                 ← CÓDIGO DA APLICAÇÃO (contextos de build ./app/*)
 │   ├── backend/         ← API Express (porta 3001 / 8090 no servidor)
 │   ├── cliente/         ← Cardápio digital (Vue 3 SPA)
 │   ├── restaurante/     ← Painel admin/PDV (Vue 3 SPA)
 │   ├── entregador/      ← App do entregador (Vue 3 SPA)
 │   ├── router/          ← Nginx que unifica os 3 SPAs + proxy da API
-│   └── docker-compose.yml
-├── migrations/          ← SQL de schema (fora de app/; sincronizadas no `deploy.py migrate`)
+├── migrations/          ← SQL de schema (commitadas; montadas em /app/migrations no container)
 ├── others/              ← Ferramentas locais (não vão para a VPS)
-│   ├── deploy.py        ← Deploy via SSH (paramiko/SFTP)
+│   ├── deploy.py        ← Deploy via SSH (fallback; paramiko/SFTP)
 │   ├── deploy_config.json  ← Credenciais da VPS (gitignored)
 │   ├── god/             ← Painel admin multi-tenant (local, porta 3002)
 │   ├── run.bat          ← Inicia os dev servers
-│   ├── README.md
-│   └── stack.env
+│   └── README.md
 ├── spec/                ← Documentação spec-driven (vision, requirements, decisions, ...)
 ├── project-manager/     ← Registros do projeto (pendências, bugs, melhorias)
 └── trash/               ← Arquivos descartados (migrations antigas, docs obsoletas, ...)
 ```
 
-> A pasta `app/` é o único código que a VPS precisa. Tudo o mais (ferramentas, docs, migrations) fica fora dela.
+> O deploy usa `docker-compose.yml` + `stack.env` da **raiz** do repo (via Portainer). A pasta `app/` é o código da aplicação (contextos de build).
 
-## 🚀 Deploy via SSH (sem GitHub)
+## 🚀 Deploy via GitHub → Portainer (fluxo OFICIAL)
 
-> O deploy **não depende de git**. Os arquivos de `app/` sobem direto para a VPS via SFTP e os containers são geridos com docker-compose no servidor.
+> O deploy oficial é via **GitHub → Portainer**: a stack `restaurante-v3` no Portainer puxa o repositório, builda os Dockerfiles e sobe os containers. Os arquivos de deploy ficam na **raiz do repo**: `docker-compose.yml` + `stack.env`.
+
+### Como funciona
+
+1. Altere o código e faça `git push` para `main` (`github.com/lucassan94/loop-food`).
+2. No Portainer (http://86.48.18.22:9000), na stack `restaurante-v3`: clique em **Pull & redeploy** (ou use o webhook).
+3. O Portainer clona o repo, builda os 4 serviços (`backend`, `cliente`, `router`) e sobe.
+
+**Estrutura de deploy (raiz do repo):**
+
+| Arquivo | Papel |
+|---------|-------|
+| `docker-compose.yml` | Stack completa (contextos `./app/*`, volume nomeado de uploads, migrations montadas) |
+| `stack.env` | Segredos commitados (JWT_SECRET, VAPID push) — usados via `env_file` |
+| `migrations/` | SQL de schema, montado em `/app/migrations` no container |
+
+**Contextos de build** (docker-compose.yml na raiz):
+
+- `backend` → `./app/backend` (porta 8090)
+- `cliente` → `./app/cliente` (porta 8091)
+- `router` → `./app` + `router/Dockerfile` (porta 8094) — builda os 3 SPAs em um nginx só
+
+> 💡 **Imagens NO BANCO (migration 028)**: as imagens (cardápio, banners, entregadores, categorias, logos) vivem na tabela `imagens` (BYTEA) do Postgres — **não há mais volume de uploads**. URLs públicas `/uploads/{tenantId}/{tipo}/{filename}` continuam iguais (servidas pelo backend a partir do banco, com `Cache-Control`). Backup do banco = backup das imagens. O `UPLOAD_DIR` em disco fica apenas como fallback de transição.
+
+> ⚠️ **Migração (1ª vez):** rodar dentro do container backend para importar imagens antigas (disco + base64 em colunas) para a tabela:
+> ```bash
+> docker compose exec backend node src/migrar-imagens-para-banco.js
+> ```
+
+> ⚠️ **Migrations:** rodar dentro do container: `docker compose exec backend node src/migrate.js` (as migrations são commitadas e montadas em `/app/migrations`).
+
+## 🔧 Deploy via SSH (fallback, NÃO usar no dia a dia)
+
+> Script legado mantido como fallback (SFTP). Replica a MESMA estrutura do clone GitHub em `/opt/restaurante-v3`: `app/` → `{dir}/app`, compose e stack.env da raiz, `migrations/` → `{dir}/migrations`.
 
 ### Pré-requisitos
 
@@ -45,7 +78,7 @@ Delivery V3/
 ```bash
 cd others
 python deploy.py check    # inspeciona o servidor (read-only)
-python deploy.py upload   # envia/atualiza os arquivos de app/ (SEM uploads)
+python deploy.py upload   # envia/atualiza app/ → {dir}/app + compose/stack.env
 python deploy.py images   # sincroniza SOMENTE app/backend/uploads (cardápio/banners)
 python deploy.py env      # cria o .env de produção (só na 1ª vez)
 python deploy.py migrate  # sincroniza migrations/ e roda no container backend
@@ -55,18 +88,17 @@ python deploy.py logs backend   # logs de um serviço
 python deploy.py ps       # status dos containers
 ```
 
-> ⚠️ **Uploads:** `app/backend/uploads` **não** sobe no `deploy` automático (o diretório pertence ao servidor — evita sobrescrever banners/fotos enviados pelo painel). Para sincronizar imagens do cardápio local: `python deploy.py images`.
->
-> ⚠️ **Migrations:** ficam em `migrations/` (fora de `app/`). O comando `migrate` sincroniza a pasta e roda dentro do container (montada em `/app/migrations`).
+> ⚠️ **Uploads:** as imagens agora vivem no **banco** (migration 028). O comando `python deploy.py images` (sincroniza `app/backend/uploads`) está **obsoleto** — mantenha apenas para ambientes legados; o fluxo normal usa a tabela `imagens`.
 
-> 💡 **Fluxo do dia a dia:** alterou um arquivo em `app/`? Rode `python deploy.py deploy`.
+> ⚠️ **Layout do servidor:** o fallback agora sincroniza `app/` → `{dir}/app` (aninhado, igual ao clone GitHub). Se o servidor ainda tiver as pastas **planas** antigas (`{dir}/backend`, `{dir}/cliente`, ...) de deploys anteriores, elas ficam órfãs após o switch — remova manualmente para liberar disco:
+> ```bash
+> ssh root@86.48.18.22 'ls /opt/restaurante-v3'  # confira e remova: backend/ cliente/ entregador/ restaurante/ router/ antigos
+> ```
 
 ### Notas de produção
 
 - Stack: `restaurante-v3` — backend (8090), cliente (8091), router (8094). Restaurante/entregador são servidos pelo router (`/admin`, `/entregador`).
-- Uploads ficam em **bind mount** `./backend/uploads` (as imagens do cardápio viajam junto no deploy).
 - Banco: `grupopadrao-postgres` (86.48.18.22:5432/delivery). Migrations: `python deploy.py migrate`.
-- Servidor usa `docker-compose` **v1** (o plugin `docker compose` não está instalado) — o `deploy.py` detecta automaticamente.
 
 ## 🔧 Desenvolvimento Local
 

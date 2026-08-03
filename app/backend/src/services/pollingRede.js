@@ -15,7 +15,7 @@
 //   - Guarda de bloqueio por pedido via pedido_criado_em (evita reprocessar)
 // ============================================================================
 
-import { query } from '../config/database.js';
+import { query, queryForTenant } from '../config/database.js';
 import { config } from '../config/index.js';
 import * as rede from './rede.js';
 import { processarEventoRede } from '../modules/pagamentos/redeWebhookHandler.js';
@@ -28,11 +28,23 @@ let running = false;
 let intervalHandle = null;
 
 /**
- * Busca pedidos aguardando pagamento com pagamento PENDING (não finalizado).
+ * Lista os tenants (restaurantes) existentes. A role app_user tem RLS ativo,
+ * então a varredura de pedidos é feita POR TENANT (contexto explícito).
+ * A tabela restaurantes não tem RLS (tenantResolver por design), então esta
+ * consulta funciona para qualquer tenant/contexto.
+ */
+async function buscarTenants() {
+  const result = await query('SELECT id FROM restaurantes ORDER BY id');
+  return result.rows.map((r) => r.id);
+}
+
+/**
+ * Busca pedidos aguardando pagamento com pagamento PENDING de UM tenant.
  * Ordena pelos mais antigos primeiro (FIFO) e limita por ciclo.
  */
-async function buscarPedidosPendentes() {
-  const result = await query(
+async function buscarPedidosPendentes(tenantId) {
+  const result = await queryForTenant(
+    tenantId,
     `     SELECT o.id, o.restaurant_id, o.criado_em,
             pg.id as pagamento_id, pg.payment_id as tid, pg.valor_bruto,
             pg.billing_type, pg.restaurant_id as pagamento_restaurant_id
@@ -49,15 +61,18 @@ async function buscarPedidosPendentes() {
 
 /**
  * Cancela um pedido que estava aguardando pagamento (motivo de expiração).
+ * Usa contexto explícito de tenant (RLS: a role app_user só enxerga o tenant).
  */
-async function cancelarPedidoExpirado(pedidoId, tid, motivo) {
-  await query(
+async function cancelarPedidoExpirado(pedidoId, tid, motivo, tenantId) {
+  await queryForTenant(
+    tenantId,
     `UPDATE pedidos
      SET status = 'cancelado', motivo_cancelamento = $2, atualizado_em = NOW()
      WHERE id = $1 AND status = 'aguardando_pagamento'`,
     [pedidoId, motivo]
   );
-  await query(
+  await queryForTenant(
+    tenantId,
     `UPDATE pagamentos SET status = 'OVERDUE', atualizado_em = NOW() WHERE payment_id = $1`,
     [tid]
   ).catch(() => {});
@@ -65,10 +80,9 @@ async function cancelarPedidoExpirado(pedidoId, tid, motivo) {
 }
 
 /**
- * Processa um único pedido pendente.
+ * Processa um único pedido pendente (de um tenant específico).
  */
-async function processarPedido(pedido) {
-  const tenantId = pedido.pagamento_restaurant_id || pedido.restaurant_id || null;
+async function processarPedido(pedido, tenantId) {
   const tid = pedido.tid;
 
   // Idade do pedido: expiração do PIX + margem → desiste mesmo sem resposta da Rede.
@@ -82,7 +96,8 @@ async function processarPedido(pedido) {
     if (Date.now() > expiracaoPrevista) {
       await cancelarPedidoExpirado(
         pedido.id, tid,
-        'Pagamento não confirmado no prazo (QR Code PIX expirado)'
+        'Pagamento não confirmado no prazo (QR Code PIX expirado)',
+        tenantId
       );
       return;
     }
@@ -103,26 +118,28 @@ async function processarPedido(pedido) {
       id: `polling-${tid}-${Date.now()}`,
       events: ['PV.UPDATE_TRANSACTION_PIX'],
       data: { id: tid },
-    });
+    }, tenantId);
     console.log(`[PollingRede] ✅ Pedido ${pedido.id} ativado (TID ${tid} Approved).`);
     return;
   }
 
   // ⏰ Expirado → cancela pedido
   if (consulta.returnCode === '3036' || consulta.status === 'Canceled') {
-    await cancelarPedidoExpirado(pedido.id, tid, 'QR Code PIX expirado (Rede)');
+    await cancelarPedidoExpirado(pedido.id, tid, 'QR Code PIX expirado (Rede)', tenantId);
     return;
   }
 
   // ❌ Cartão negado (pós-3DS) → cancela pedido com motivo
   if (consulta.status === 'Denied') {
-    await query(
+    await queryForTenant(
+      tenantId,
       `UPDATE pedidos
        SET status = 'cancelado', motivo_cancelamento = 'Cartão recusado pelo emissor', atualizado_em = NOW()
        WHERE id = $1 AND status = 'aguardando_pagamento'`,
       [pedido.id]
     );
-    await query(
+    await queryForTenant(
+      tenantId,
       `UPDATE pagamentos SET status = 'REFUSED', atualizado_em = NOW() WHERE payment_id = $1`,
       [tid]
     ).catch(() => {});
@@ -135,21 +152,31 @@ async function processarPedido(pedido) {
 
 /**
  * Executa um ciclo do polling.
+ * Itera por tenant (a role app_user tem RLS ativo — cada tenant só enxerga
+ * os próprios pedidos/pagamentos).
  */
 async function executarCiclo() {
   if (running) return; // sem concorrência
   running = true;
   try {
-    const pedidos = await buscarPedidosPendentes();
-    if (pedidos.length > 0) {
-      console.log(`[PollingRede] 🔄 ${pedidos.length} pedido(s) aguardando pagamento (ciclo).`);
-    }
-    for (const pedido of pedidos) {
-      try {
-        await processarPedido(pedido);
-      } catch (err) {
-        console.error(`[PollingRede] ❌ Erro processando pedido ${pedido.id}:`, err.message);
+    const tenants = await buscarTenants();
+    let total = 0;
+    for (const tenantId of tenants) {
+      const pedidos = await buscarPedidosPendentes(tenantId);
+      total += pedidos.length;
+      if (pedidos.length > 0) {
+        console.log(`[PollingRede] 🔄 Tenant ${tenantId}: ${pedidos.length} pedido(s) aguardando pagamento.`);
       }
+      for (const pedido of pedidos) {
+        try {
+          await processarPedido(pedido, tenantId);
+        } catch (err) {
+          console.error(`[PollingRede] ❌ Erro processando pedido ${pedido.id}:`, err.message);
+        }
+      }
+    }
+    if (total > 0) {
+      console.log(`[PollingRede] 🔄 ${total} pedido(s) no total (ciclo).`);
     }
   } catch (err) {
     console.error('[PollingRede] ❌ Erro no ciclo de polling:', err.message);

@@ -1,0 +1,95 @@
+# =============================================================================
+# docker-compose.yml — DEPLOY VIA GITHUB → PORTAINER (fluxo oficial)
+# =============================================================================
+# Stack "restaurante-v3" no Portainer aponta para:
+#   https://github.com/lucassan94/loop-food.git  (branch main)
+#   Compose path: docker-compose.yml (raiz do repositório)
+#
+# Rotas servidas (router, porta 8094):
+#   /           → Cliente (cardápio)
+#   /admin      → Restaurante (painel admin)
+#   /entregador → Entregador (app delivery)
+#   /api        → Backend (proxy)
+#
+# Segredos (JWT, VAPID push): commitados em stack.env (repo privado) e
+# injetados via env_file. DB/CORS usam os defaults abaixo (produção).
+#
+# ⚠️ IMAGENS NO BANCO (migration 028): desde 03/08/2026 as imagens vivem na
+#   tabela `imagens` (BYTEA) do Postgres — NÃO há mais volume de uploads.
+#   As URLs públicas /uploads/{tenantId}/{tipo}/{filename} continuam iguais,
+#   servidas pelo backend a partir do banco. UPLOAD_DIR fica apenas como
+#   fallback de transição (pode ser removido após a migração completa).
+# =============================================================================
+
+name: restaurante-v3
+
+services:
+  backend:
+    build:
+      context: ./app/backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "8090:3001"
+    env_file:
+      - stack.env
+    environment:
+      - NODE_ENV=production
+      - DB_HOST=${DB_HOST:-86.48.18.22}
+      - DB_PORT=${DB_PORT:-5432}
+      - DB_NAME=${DB_NAME:-delivery}
+      # Runtime usa a role app_user (migration 029, RLS ativo). DB_PASS deve
+      # vir do override do Portainer — se ausente, o login falha ruidosamente
+      # (fail-closed) em vez de usar uma senha fraca conhecida.
+      - DB_USER=${DB_USER:-app_user}
+      - DB_PASS=${DB_PASS:-}
+      - RESTAURANT_ID=${RESTAURANT_ID:-1}
+      # CORS: IPs antigos + router 8094 + subdomínios wildcard dos tenants
+      - CORS_ORIGIN=${CORS_ORIGIN:-http://86.48.18.22:8091,http://86.48.18.22:8092,http://86.48.18.22:8093,http://86.48.18.22:8094,*.loopautomacoes.com.br}
+      - UPLOAD_DIR=${UPLOAD_DIR:-./uploads}
+      - MAX_FILE_SIZE=${MAX_FILE_SIZE:-5242880}
+    volumes:
+      - ./migrations:/app/migrations:ro
+    healthcheck:
+      # 127.0.0.1 (IPv4): o wget do Alpine resolve 'localhost' para ::1, mas o
+      # servidor escuta apenas em 0.0.0.0 — causava falso 'unhealthy'.
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:3001/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  # Cliente individual (mantido para compatibilidade com acesso direto por IP :8091)
+  # Restaurante e Entregador: acesse via ROUTER (8094) em /admin e /entregador
+  cliente:
+    build:
+      context: ./app/cliente
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "8091:80"
+    depends_on:
+      - backend
+    healthcheck:
+      test: ["CMD", "pidof", "nginx"]
+      interval: 30s
+      timeout: 3s
+      retries: 2
+      start_period: 5s
+
+  # ─── ROUTER: entry point unificado para subdomínios ──────────────
+  router:
+    build:
+      context: ./app
+      dockerfile: router/Dockerfile
+    restart: unless-stopped
+    ports:
+      - "8094:80"
+    depends_on:
+      - backend
+    healthcheck:
+      test: ["CMD", "pidof", "nginx"]
+      interval: 30s
+      timeout: 3s
+      retries: 2
+      start_period: 5s

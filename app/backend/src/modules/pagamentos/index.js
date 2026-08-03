@@ -416,6 +416,10 @@ router.post('/webhook', async (req, res) => {
     const tenantId = await rede.resolverTenantPorWebhook(merchantId);
     if (tenantId) {
       req.restaurantId = tenantId;
+    } else if (merchantId) {
+      // Com a role app_user (RLS ativo), sem tenant o processamento cai no
+      // fallback config.restaurantId (1) — tenants 2/3 seriam mal roteados.
+      console.warn(`[Rede] Webhook sem tenant resolvido (merchantId ${merchantId}) — usando fallback tenant ${config.restaurantId}.`);
     }
 
     const tid = payload?.data?.id || null;
@@ -446,7 +450,10 @@ router.post('/webhook', async (req, res) => {
     );
 
     // 4. Processar (async — responder 200 rápido)
-    processarEventoRede(payload).catch(async (err) => {
+    // Passa o tenantId resolvido pelo merchantId (PV): com a role app_user o
+    // RLS está ativo e, sem contexto, o processamento ficaria preso ao tenant
+    // do config.restaurantId (1), quebrando webhooks dos tenants 2/3.
+    processarEventoRede(payload, tenantId).catch(async (err) => {
       console.error(`[Rede] Erro processando evento ${eventId}:`, err.message);
       try {
         await query('UPDATE webhook_events SET error = $1, processed = FALSE WHERE event_id = $2', [err.message, eventId]);
@@ -555,7 +562,7 @@ router.get('/:pedidoId/verificar-status', authenticate, async (req, res, next) =
           id: `polling-${pagamento.payment_id}`,
           events: ['PV.UPDATE_TRANSACTION_PIX'],
           data: { id: pagamento.payment_id },
-        });
+        }, tenantId);
         atualizou = true;
 
         const updated = await query('SELECT status FROM pedidos WHERE id = $1', [pedidoId]);

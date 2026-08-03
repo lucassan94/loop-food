@@ -5,6 +5,7 @@ import { config } from '../../config/index.js';
 import { authenticate, authorize } from '../../middleware/auth.js';
 import { AppError } from '../../middleware/errorHandler.js';
 import { emitToRestaurant } from '../../services/realtime.js';
+import { saveBase64AsFile, deleteUploadFile, gerarNomeArquivo } from '../../config/upload.js';
 
 const router = Router();
 
@@ -268,13 +269,23 @@ router.post('/', authenticate, authorize('admin', 'gerente', 'chef'), async (req
     const restaurantId = req.restaurantId || config.restaurantId;
     const data = productSchema.parse(req.body);
 
+    // Imagem em base64 → salvar na tabela imagens (banco) e usar a URL pública
+    let imagemUrl = data.imagem_url || '';
+    let imagemBase64 = data.imagem_base64 || '';
+    if (imagemBase64 && imagemBase64.length > 50) {
+      const filename = gerarNomeArquivo(data.nome, imagemBase64);
+      const saved = await saveBase64AsFile(restaurantId, 'cardapio', filename, imagemBase64);
+      imagemUrl = saved.publicUrl;
+      imagemBase64 = ''; // imagem agora vive na tabela imagens
+    }
+
     const result = await transaction(async (client) => {
       const product = await client.query(
         `INSERT INTO produtos (restaurant_id, nome, descricao, categoria_id, preco, imagem_url, imagem_base64, ativo, destaque)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
          RETURNING *`,
         [restaurantId, data.nome, data.descricao, data.categoria_id || null,
-         data.preco, data.imagem_url, data.imagem_base64, data.ativo, data.destaque]
+         data.preco, imagemUrl, imagemBase64, data.ativo, data.destaque]
       );
 
       const produto = product.rows[0];
@@ -305,6 +316,22 @@ router.put('/:id', authenticate, authorize('admin', 'gerente', 'chef'), async (r
     const restaurantId = req.restaurantId || config.restaurantId;
     const { id } = req.params;
     const data = productSchema.partial().parse(req.body);
+
+    // Imagem em base64 → salvar na tabela imagens (banco) e usar a URL pública
+    if (data.imagem_base64 && data.imagem_base64.length > 50) {
+      // Remover imagem anterior (banco + disco) antes de substituir
+      const anterior = await query(
+        'SELECT imagem_url FROM produtos WHERE id = $1 AND restaurant_id = $2',
+        [id, restaurantId]
+      );
+      if (anterior.rows[0]?.imagem_url?.startsWith('/uploads/')) {
+        await deleteUploadFile(anterior.rows[0].imagem_url);
+      }
+      const filename = gerarNomeArquivo(data.nome || 'imagem', data.imagem_base64);
+      const saved = await saveBase64AsFile(restaurantId, 'cardapio', filename, data.imagem_base64);
+      data.imagem_url = saved.publicUrl;
+      data.imagem_base64 = ''; // imagem agora vive na tabela imagens
+    }
 
     const result = await transaction(async (client) => {
       // Verificar se o produto existe

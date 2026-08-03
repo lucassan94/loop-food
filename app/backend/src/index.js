@@ -120,9 +120,14 @@ app.use(express.urlencoded({ extended: true }));
 // Em vez de express.static (que serve arquivos sem validação),
 // usamos uma rota controlada que valida cada segmento do path
 // contra whitelists e previne path traversal.
-app.get('/uploads/:tenantId/:type/:filename', (req, res) => {
+app.get('/uploads/:tenantId/:type/:filename', async (req, res, next) => {
   const { tenantId, type, filename } = req.params;
-  serveUploadFile(tenantId, type, filename, res);
+  try {
+    await serveUploadFile(tenantId, type, filename, res);
+  } catch (err) {
+    // serveUploadFile já lida com a maioria dos erros; fallback para o errorHandler
+    if (!res.headersSent) next(err);
+  }
 });
 
 // ============================

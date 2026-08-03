@@ -1,25 +1,36 @@
 #!/usr/bin/env python3
 # ============================================================================
-# Deploy via SSH — SaborExpress V3 (sem GitHub)
+# Deploy via SSH — SaborExpress V3 (FALLBACK; fluxo oficial é GitHub→Portainer)
 # ============================================================================
-# Sobe a pasta app/ (o código da aplicação) direto para a VPS via SFTP e
-# gerencia os containers com docker compose, sem depender de git/Portainer.
+# ⚠️ FLUXO OFICIAL (a partir de 03/08/2026): deploy via GitHub → Portainer.
+#   A stack "restaurante-v3" no Portainer puxa do repositório
+#   https://github.com/lucassan94/loop-food.git (branch main) com o compose
+#   na RAIZ do repo (docker-compose.yml) + stack.env commitado. NÃO use este
+#   script para deploys rotineiros — use git push.
+#
+# Este script continua disponível como fallback via SFTP:
+#   Sobe a pasta app/ do projeto direto para a VPS e gerencia os containers
+#   com docker compose, replicando a MESMA estrutura do clone GitHub:
+#     {dir}/app/backend, {dir}/app/cliente, ... (mesmos contextos do compose)
+#     {dir}/docker-compose.yml  ← cópia do compose da raiz do repo
+#     {dir}/stack.env           ← cópia do stack.env da raiz do repo
+#     {dir}/migrations          ← SQL de schema (comando migrate)
 #
 # Estrutura do projeto:
-#   app/      → código da aplicação (backend, cliente, restaurante, entregador,
-#               router, docker-compose.yml) — É ISTO que vai para a VPS
-#   migrations/ → SQL de schema (sincronizadas sob demanda no comando migrate)
-#   others/   → ferramentas locais (deploy.py, god, README, run.bat, ...)
-#   spec/     → documentação da spec
+#   app/          → código da aplicação (backend, cliente, restaurante, entregador, router)
+#   migrations/   → SQL de schema (sincronizadas sob demanda no comando migrate)
+#   docker-compose.yml / stack.env → DEPLOY (raiz do repo, usados pelo Portainer)
+#   others/       → ferramentas locais (deploy.py, god, README, run.bat, ...)
+#   spec/         → documentação da spec
 #   project-manager/ → registros do projeto
-#   trash/    → arquivos descartados
+#   trash/        → arquivos descartados
 #
 # Pré-requisitos:  pip install paramiko
 #
 # Uso:
 #   python deploy.py check          # inspeciona o servidor (read-only)
 #   python deploy.py upload [--force] [--dry-run]
-#                                   # sincroniza app/ → VPS (delta por hash)
+#                                   # sincroniza app/ → {dir}/app + compose/stack.env
 #   python deploy.py images [--force] [--dry-run]
 #                                   # sincroniza SOMENTE app/backend/uploads (cardápio)
 #   python deploy.py env            # cria o .env de produção (1ª vez)
@@ -60,8 +71,11 @@ if hasattr(sys.stderr, "reconfigure"):
     sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
 PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
-# A pasta que vai para a VPS é app/ (irmã de others/)
+# A pasta que vai para a VPS é app/ (irmã de others/), sincronizada aninhada
+# em {dir}/app (mesma estrutura de um clone do GitHub — contextos do compose)
 APP_ROOT = os.path.normpath(os.path.join(PROJECT_ROOT, "..", "app"))
+# Raiz do projeto (irmã de others/): compose + stack.env canônicos do deploy
+REPO_ROOT = os.path.normpath(os.path.join(PROJECT_ROOT, ".."))
 # Migrations ficam fora de app/ (na raiz do projeto), sincronizadas sob demanda
 MIGRATIONS_ROOT = os.path.normpath(os.path.join(PROJECT_ROOT, "..", "migrations"))
 
@@ -286,15 +300,35 @@ def cmd_upload(force=False, dry_run=False):
     client = connect()
     try:
         remote_base = CONFIG["dir"]
-        print(f"📦 Sincronizando app/ → {remote_base} (delta por hash SHA-256) ...")
+        print(f"📦 Sincronizando app/ → {remote_base}/app + compose/stack.env (delta por hash SHA-256) ...")
         code, out, err = run(client, f"mkdir -p {remote_base}", check=True)
 
         sftp = client.open_sftp()
         sftp_mkdirs(sftp, remote_base)
 
         uploaded, unchanged, skipped, merged = sync_tree(
-            sftp, APP_ROOT, "", force=force, dry_run=dry_run
+            sftp, APP_ROOT, "app", force=force, dry_run=dry_run
         )
+
+        # Arquivos de deploy da raiz do repo (mesmos que o Portainer usa)
+        for deploy_file in ("docker-compose.yml", "stack.env"):
+            src = os.path.join(REPO_ROOT, deploy_file)
+            if not os.path.exists(src):
+                continue
+            dst = f"{remote_base}/{deploy_file}"
+            if force:
+                merged[f"{deploy_file}"] = hash_file(src)
+            elif merged.get(deploy_file) == hash_file(src):
+                unchanged += 1
+                continue
+            if dry_run:
+                print(f"   [dry-run] enviaria: {deploy_file}")
+                uploaded += 1
+                continue
+            sftp.put(src, dst)
+            merged[f"{deploy_file}"] = hash_file(src)
+            uploaded += 1
+            print(f"   ↑ {deploy_file}")
 
         # Só reescreve o manifesto quando algo mudou (evita write + round-trip)
         if not dry_run and uploaded:
@@ -316,11 +350,11 @@ def cmd_images(force=False, dry_run=False):
         if not os.path.isdir(local_uploads):
             print("ℹ️  app/backend/uploads não existe localmente — nada a enviar.")
             return
-        print(f"🖼️  Sincronizando imagens → {remote_base}/backend/uploads (delta por hash) ...")
+        print(f"🖼️  Sincronizando imagens → {remote_base}/app/backend/uploads (delta por hash) ...")
 
         sftp = client.open_sftp()
         uploaded, unchanged, skipped, merged = sync_tree(
-            sftp, local_uploads, "backend/uploads", force=force, dry_run=dry_run
+            sftp, local_uploads, "app/backend/uploads", force=force, dry_run=dry_run
         )
 
         # Só reescreve o manifesto quando algo mudou (evita write + round-trip)
@@ -404,8 +438,14 @@ DEFAULT_ENV = """NODE_ENV=production
 DB_HOST=86.48.18.22
 DB_PORT=5432
 DB_NAME=delivery
-DB_USER=default
-DB_PASS=default
+# Runtime usa a role app_user (RLS ativo, migration 029). DB_PASS deve ser
+# editado NESTE arquivo no servidor ou via override — nunca commitado.
+DB_USER=app_user
+DB_PASS=
+# Migrations/seeds rodam como admin (DDL). Rotacione a senha do superuser e
+# atualize DB_ADMIN_PASS no servidor (não commitado).
+DB_ADMIN_USER=default
+DB_ADMIN_PASS=
 JWT_SECRET=dev-secret-change-in-production
 RESTAURANT_ID=1
 CORS_ORIGIN=http://86.48.18.22:8091,http://86.48.18.22:8092,http://86.48.18.22:8093,http://86.48.18.22:8094,*.loopautomacoes.com.br
@@ -430,6 +470,9 @@ def cmd_env():
             f.write(DEFAULT_ENV)
         sftp.close()
         print(f"✅ .env criado em {env_path}")
+        print("⚠️  DB_PASS do .env está VAZIO (role app_user, migration 029).")
+        print("   Preencha DB_PASS (senha do app_user) neste arquivo antes de subir a stack —")
+        print("   sem ela o backend não autentica no Postgres (fail-closed, por design).")
     finally:
         client.close()
 

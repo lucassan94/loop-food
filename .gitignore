@@ -1,8 +1,9 @@
 god/
-migrations/
 others/
 spec/
 trash/
+# migrations/ NÃO está aqui: as migrations são commitadas e o container
+# monta ./migrations:/app/migrations no deploy (GitHub → Portainer)
 
 
 # =====================================
@@ -112,3 +113,6 @@ temp
 cookies.txt
 pedidos*.md
 
+
+# Cache do dev server (Vite)
+.vite/

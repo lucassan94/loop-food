@@ -4,3 +4,4 @@ dist
 *.md
 .DS_Store
 .gitignore
+.vite

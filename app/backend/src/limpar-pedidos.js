@@ -5,8 +5,8 @@ const pool = new pg.Pool({
   host: process.env.DB_HOST || '86.48.18.22',
   port: parseInt(process.env.DB_PORT || '5432'),
   database: process.env.DB_NAME || 'delivery',
-  user: process.env.DB_USER || 'default',
-  password: process.env.DB_PASS || 'default',
+  user: process.env.DB_ADMIN_USER || process.env.DB_USER || 'default',
+  password: process.env.DB_ADMIN_PASS || process.env.DB_PASS || 'default',
   max: 1,
   query_timeout: 30000,
 });

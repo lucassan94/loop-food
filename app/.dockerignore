@@ -1,0 +1,14 @@
+# =============================================================================
+# .dockerignore — contexto ./app (usado pelo build do ROUTER)
+# O router builda os 3 SPAs (cliente, restaurante, entregador) a partir deste
+# contexto. Excluímos tudo que não é fonte: node_modules, caches do dev server,
+# builds, uploads (não entram na imagem) e metadados.
+# =============================================================================
+**/node_modules
+**/.vite
+**/dist
+**/uploads
+.git
+*.md
+.DS_Store
+.gitignore
