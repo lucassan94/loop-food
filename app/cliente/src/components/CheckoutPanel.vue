@@ -22,6 +22,24 @@
           <div v-if="item.extras.length > 0" class="extras">
             + {{ item.extras.map(e => e.nome).join(', ') }}
           </div>
+          <div v-if="item.opcoes?.length" class="extras" style="font-size:0.78rem;">
+            {{ item.opcoes.map(o => o.grupo + ': ' + o.nome).join(' • ') }}
+          </div>
+          <div v-if="item.talheres != null" class="extras" style="font-size:0.78rem;">
+            🍴 {{ item.talheres ? 'Com talheres' : 'Sem talheres' }}
+          </div>
+          <!-- Observação por item -->
+          <div class="form-group mt-1" style="margin-bottom:0;">
+            <textarea
+              v-model="item.observacao"
+              rows="1"
+              placeholder="Observação (opcional)"
+              style="width:100%;padding:4px 8px;border:1px solid var(--border);border-radius:4px;font-family:inherit;font-size:0.78rem;outline:none;resize:none;transition:var(--transition);"
+              @focus="$event.target.style.borderColor = 'var(--primary)'"
+              @blur="$event.target.style.borderColor = 'var(--border)'"
+              @input="updateItemObservacao(index, $event.target.value)"
+            ></textarea>
+          </div>
           <div class="cart-item-qty mt-1">
             <button @click="decreaseQty(index)" :disabled="item.quantidade <= 1">−</button>
             <span style="font-weight:700;min-width:24px;text-align:center;">{{ item.quantidade }}</span>
@@ -73,9 +91,27 @@
       </div>
     </div>
 
-    <!-- Step 2: Address -->
+    <!-- Step 2: Entrega ou Retirada -->
     <div v-if="currentStep === 2" class="checkout-step active">
-      <h4><i-lucide-map-pin style="width:18px;height:18px" /> Endereço de Entrega</h4>
+      <!-- Escolha: Delivery vs Retirada -->
+      <div v-if="restaurantData?.retirada_habilitada" class="entrega-option-radios" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:1rem;">
+        <label class="entrega-option" :class="{ active: tipoEntrega === 'delivery' }" @click="tipoEntrega = 'delivery'">
+          <input type="radio" name="tipoEntrega" value="delivery" v-model="tipoEntrega" style="display:none" />
+          <i-lucide-truck style="width:20px;height:20px" />
+          <strong>Delivery</strong>
+          <span style="font-size:0.75rem;color:var(--text-muted);">Receba em casa</span>
+        </label>
+        <label class="entrega-option" :class="{ active: tipoEntrega === 'retirada' }" @click="tipoEntrega = 'retirada'">
+          <input type="radio" name="tipoEntrega" value="retirada" v-model="tipoEntrega" style="display:none" />
+          <i-lucide-store style="width:20px;height:20px" />
+          <strong>Retirar Pessoalmente</strong>
+          <span style="font-size:0.75rem;color:var(--text-muted);">Pegue no local</span>
+        </label>
+      </div>
+
+      <!-- Delivery: Endereço + Frete -->
+      <template v-if="tipoEntrega === 'delivery'">
+        <h4><i-lucide-map-pin style="width:18px;height:18px" /> Endereço de Entrega</h4>
 
       <div class="cep-row">
         <div class="form-group m-0">
@@ -133,6 +169,25 @@
         <strong>{{ erroFrete }}</strong>
         <br /><span style="font-size:0.8rem;">Não é possível continuar com este CEP. Escolha outro endereço.</span>
       </div>
+      </template>
+
+      <!-- Retirada: mostrar endereço do restaurante -->
+      <template v-if="tipoEntrega === 'retirada'">
+        <div class="cep-result success" style="display:block;margin-bottom:1rem;">
+          <strong><i-lucide-store style="width:16px;height:16px" /> Retire no Restaurante</strong>
+          <p style="font-size:0.85rem;margin-top:4px;">
+            {{ restaurantData?.endereco || 'Av. Principal, 500' }}<br />
+            {{ restaurantData?.cidade || 'São Paulo' }}/{{ restaurantData?.estado || 'SP' }}
+          </p>
+          <p style="font-size:0.8rem;color:var(--text-secondary);margin-top:6px;">
+            <i-lucide-clock style="width:14px;height:14px" /> Você tem até o horário de fechamento para retirar.
+          </p>
+          <p style="font-size:0.8rem;color:var(--text-secondary);">
+            <i-lucide-circle-check-big style="width:14px;height:14px" /> Frete: <strong>Grátis</strong>
+          </p>
+        </div>
+        <!-- Já tem endereço do cliente, mas não precisa de CEP -->
+      </template>
 
       <div class="form-actions">
         <button class="btn btn-secondary" @click="currentStep = 1">Voltar</button>
@@ -224,14 +279,26 @@
         <div v-for="(item, i) in cartItems" :key="i" class="review-item">
           {{ item.quantidade }}x {{ item.nome_produto }}
           <span v-if="item.extras.length">(+ {{ item.extras.map(e => e.nome).join(', ') }})</span>
+          <span v-if="item.opcoes?.length" style="color:var(--text-muted);font-size:0.8rem;">[{{ item.opcoes.map(o => o.grupo + ': ' + o.nome).join(', ') }}]</span>
+          <span v-if="item.talheres != null" style="color:var(--text-muted);font-size:0.8rem;">🍴 {{ item.talheres ? 'Com talheres' : 'Sem talheres' }}</span>
+          <span v-if="item.observacao" style="display:block;font-size:0.78rem;color:var(--text-muted);">📝 {{ item.observacao }}</span>
           <span class="review-item-price">{{ formatPrice(item.subtotal) }}</span>
         </div>
       </div>
 
       <div class="profile-section">
-        <div class="profile-section-title">Endereço</div>        <p style="font-size:0.9rem;">
-          {{ form.endereco }}, {{ form.numero }}{{ form.complemento ? ' - ' + form.complemento : '' }}<br />{{ form.bairro }} - {{ form.cidade }}/{{ form.estado }}<br />CEP: {{ form.cep }}
-        </p>
+        <div class="profile-section-title">{{ tipoEntrega === 'retirada' ? 'Retirada no Local' : 'Endereço' }}</div>
+        <template v-if="tipoEntrega === 'retirada'">
+          <p style="font-size:0.9rem;">
+            {{ restaurantData?.endereco || 'Av. Principal, 500' }}<br />
+            {{ restaurantData?.cidade || 'São Paulo' }}/{{ restaurantData?.estado || 'SP' }}
+          </p>
+        </template>
+        <template v-else>
+          <p style="font-size:0.9rem;">
+            {{ form.endereco }}, {{ form.numero }}{{ form.complemento ? ' - ' + form.complemento : '' }}<br />{{ form.bairro }} - {{ form.cidade }}/{{ form.estado }}<br />CEP: {{ form.cep }}
+          </p>
+        </template>
       </div>
 
       <div class="profile-section">
@@ -255,17 +322,20 @@
           <span>{{ formatPrice(subtotal) }}</span>
         </div>
         <div class="order-summary-row">
-          <span>Taxa de Entrega:</span>
-          <span>{{ formatPrice(freteInfo?.custo || 0) }}</span>
+          <span>{{ tipoEntrega === 'retirada' ? 'Taxa de Retirada:' : 'Taxa de Entrega:' }}</span>
+          <span>{{ formatPrice(tipoEntrega === 'retirada' ? 0 : (freteInfo?.custo || 0)) }}</span>
         </div>
         <div class="order-summary-total">
           <span>Total:</span>
-          <span>{{ formatPrice(subtotal + (freteInfo?.custo || 0)) }}</span>
+          <span>{{ formatPrice(subtotal + (tipoEntrega === 'retirada' ? 0 : (freteInfo?.custo || 0))) }}</span>
         </div>
       </div>
 
-      <div v-if="freteInfo" class="est-time-footer">
+      <div v-if="freteInfo && tipoEntrega !== 'retirada'" class="est-time-footer">
         <i-lucide-clock style="width:16px;height:16px" /> Tempo estimado: {{ freteInfo.tempo_preparo + freteInfo.tempo_min }}min a {{ freteInfo.tempo_preparo + freteInfo.tempo_max }}min
+      </div>
+      <div v-else-if="tipoEntrega === 'retirada'" class="est-time-footer">
+        <i-lucide-clock style="width:16px;height:16px" /> Seu pedido estará pronto para retirada em aproximadamente {{ freteInfo?.tempo_preparo || 20 }} minutos.
       </div>
 
       <div v-if="!authStore.isAuthenticated" class="cep-result warning login-notice">
@@ -297,6 +367,7 @@ import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import { criarPagamento } from '../services/api'
 import api from '../services/api'
+import { onEvent } from '../services/realtime'
 
 const emit = defineEmits(['close'])
 const router = useRouter()
@@ -306,6 +377,7 @@ const globalLoading = inject('globalLoading')
 const loadingMessage = inject('loadingMessage')
 const cartItems = inject('cartItems')
 const updateCart = inject('updateCart')
+const restaurantData = inject('restaurantData')
 
 const currentStep = ref(0)
 const buscandoCEP = ref(false)
@@ -315,6 +387,9 @@ const erroFrete = ref(null)
 
 // Carregar CEP salvo do localStorage (do onboarding)
 const savedCep = localStorage.getItem('saborexpress_cep') || ''
+
+// Tipo de entrega: 'delivery' | 'retirada'
+const tipoEntrega = ref('delivery')
 
 const form = reactive({
   nome: authStore.user?.nome || '',
@@ -551,6 +626,11 @@ async function salvarPerfilNoCheckout(cpfCnpj = '') {
 }
 
 async function goToStep4() {
+  // Retirada: não precisa de frete
+  if (tipoEntrega.value === 'retirada') {
+    currentStep.value = 4
+    return
+  }
   // Garantir frete VÁLIDO antes da revisão (cobre fluxos que pulam a etapa 2)
   if (!freteInfo.value && !erroFrete.value) {
     await buscarCEP()
@@ -568,6 +648,12 @@ async function goToStep4() {
     }
   }
   currentStep.value = 4
+}
+
+function updateItemObservacao(index, value) {
+  const items = [...cartItems.value]
+  items[index].observacao = value
+  updateCart(items)
 }
 
 function increaseQty(index) {
@@ -607,13 +693,16 @@ async function confirmOrder() {
     return
   }
 
-  // IMPEDIR pedido sem frete válido (fora do raio de entrega) — guarda final
-  if (!freteInfo.value) {
-    await buscarCEP()
-  }
-  if (erroFrete.value || !freteInfo.value) {
-    addToast(erroFrete.value || 'Não foi possível confirmar a área de entrega. Verifique o CEP.', 'warning')
-    return
+  // Retirada: não precisa de frete
+  if (tipoEntrega.value !== 'retirada') {
+    // IMPEDIR pedido sem frete válido (fora do raio de entrega) — guarda final
+    if (!freteInfo.value) {
+      await buscarCEP()
+    }
+    if (erroFrete.value || !freteInfo.value) {
+      addToast(erroFrete.value || 'Não foi possível confirmar a área de entrega. Verifique o CEP.', 'warning')
+      return
+    }
   }
 
   // ── MÉTODOS ONLINE (PIX / Cartão de Crédito / Débito) ──
@@ -666,8 +755,8 @@ async function confirmOrder() {
           ...(form.latitude != null ? { latitude: form.latitude, longitude: form.longitude } : {}),
         },
         subtotal: valorSubtotal,
-        valor_frete: valorFrete,
-        total: valorTotal,
+        valor_frete: tipoEntrega.value === 'retirada' ? 0 : valorFrete,
+        total: tipoEntrega.value === 'retirada' ? valorSubtotal : valorTotal,
         tempo_preparo_estimado: freteInfo.value?.tempo_preparo || 20,
         tempo_entrega_estimado: freteInfo.value?.tempo_max || 25,
         itens: cartItems.value.map(item => ({
@@ -679,6 +768,9 @@ async function confirmOrder() {
             nome: e.nome,
             preco: Number(e.preco) || 0,
           })),
+          opcoes: item.opcoes || [],
+          talheres: item.talheres ?? undefined,
+          observacao: item.observacao || '',
           subtotal: Number(item.subtotal) || 0,
         })),
       }
@@ -725,14 +817,14 @@ async function confirmOrder() {
         localStorage.setItem('saborexpress_cep', form.cep.replace(/\D/g, ''))
       }
 
-      // Salvar endereço/CPF no perfil do cliente
-      await salvarPerfilNoCheckout(card.cpfCnpj.replace(/\D/g, ''))
+    // Salvar endereço/CPF no perfil do cliente
+  await salvarPerfilNoCheckout(card.cpfCnpj.replace(/\D/g, ''))
 
-      // Limpar carrinho
-      updateCart([])
-      emit('close')
+    // Limpar carrinho
+    updateCart([])
+    emit('close')
 
-      if (form.metodo_pagamento === 'pix_online') {
+    if (form.metodo_pagamento === 'pix_online') {
         // Salvar dados do PIX no localStorage para a tela de tracking
         localStorage.setItem(`pix_${data.id}`, JSON.stringify(data.pix))
         addToast('QR Code gerado! Escaneie com seu banco.', 'success')
@@ -775,18 +867,19 @@ async function confirmOrder() {
   try {
     const pedido = {
       cliente_id: authStore.user.id,
+      origem: tipoEntrega.value === 'retirada' ? 'retirada' : 'delivery',
       nome_cliente: `${form.nome} ${form.sobrenome}`.trim(),
       telefone_cliente: form.telefone,
-      endereco_cliente: form.endereco,
-      numero_cliente: form.numero,
-      bairro_cliente: form.bairro,
-      cep_cliente: form.cep,
-      cidade_cliente: form.cidade,
-      estado_cliente: form.estado,
-      ...(form.latitude != null ? { latitude_cliente: form.latitude, longitude_cliente: form.longitude } : {}),
+      endereco_cliente: tipoEntrega.value === 'retirada' ? '' : form.endereco,
+      numero_cliente: tipoEntrega.value === 'retirada' ? '' : form.numero,
+      bairro_cliente: tipoEntrega.value === 'retirada' ? '' : form.bairro,
+      cep_cliente: tipoEntrega.value === 'retirada' ? '' : form.cep,
+      cidade_cliente: tipoEntrega.value === 'retirada' ? '' : form.cidade,
+      estado_cliente: tipoEntrega.value === 'retirada' ? '' : form.estado,
+      ...(form.latitude != null && tipoEntrega.value !== 'retirada' ? { latitude_cliente: form.latitude, longitude_cliente: form.longitude } : {}),
       subtotal: subtotal.value,
-      valor_frete: freteInfo.value?.custo || 0,
-      total: subtotal.value + (freteInfo.value?.custo || 0),
+      valor_frete: tipoEntrega.value === 'retirada' ? 0 : (freteInfo.value?.custo || 0),
+      total: tipoEntrega.value === 'retirada' ? subtotal.value : subtotal.value + (freteInfo.value?.custo || 0),
       metodo_pagamento: form.metodo_pagamento,
       detalhes_pagamento: form.metodo_pagamento === 'dinheiro' && form.troco
         ? `Troco para R$ ${parseFloat(form.troco).toFixed(2)}` : '',
@@ -799,6 +892,9 @@ async function confirmOrder() {
         quantidade: item.quantidade,
         preco_unitario: item.preco_unitario,
         extras: item.extras,
+        opcoes: item.opcoes || [],
+        talheres: item.talheres ?? undefined,
+        observacao: item.observacao || '',
         subtotal: item.subtotal,
       })),
     }

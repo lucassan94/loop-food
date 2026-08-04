@@ -104,6 +104,7 @@ import CheckoutPanel from './components/CheckoutPanel.vue'
 import CepOnboarding from './components/CepOnboarding.vue'
 import * as pushService from './services/push.js'
 import { Clock, Home, Receipt, User, ShoppingBag, Eye, ArrowRight, CheckCircle, XCircle, TriangleAlert, Info } from 'lucide-vue-next'
+import api from './services/api'
 
 const authStore = useAuthStore()
 const $router = useRouter()
@@ -114,6 +115,9 @@ const cartItems = ref([])
 const showCartDrawer = ref(false)
 const showCepModal = ref(false)
 const unreadMessages = ref(0)
+
+// Restaurant data for pickup (retirada)
+const restaurantData = ref({ endereco: '', cidade: '', estado: '', retirada_habilitada: false, horarios_funcionamento: [] })
 
 // Navbar scroll hide
 const navHidden = ref(false)
@@ -257,6 +261,7 @@ provide('globalLoading', globalLoading)
 provide('loadingMessage', loadingMessage)
 provide('showCepModal', showCepModal)
 provide('storeOpen', storeOpen)
+provide('restaurantData', restaurantData)
 
 onMounted(async () => {
   window.addEventListener('scroll', handleScroll, { passive: true })
@@ -289,13 +294,17 @@ onMounted(async () => {
   onEvent('mensagem:novo', () => {
     unreadMessages.value++
     addToast('💬 Nova mensagem da cozinha!', 'warning')
-  })
-
-  // Check store status & apply theme colors
-  try {
-    const api = (await import('./services/api')).default
-    const { data } = await api.get('/restaurante')
-    storeOpen.value = data.status_loja
+  })    // Check store status & apply theme colors
+    try {
+      const { data } = await api.get('/restaurante')
+      storeOpen.value = data.status_loja
+      restaurantData.value = {
+        endereco: data.endereco || '',
+        cidade: data.cidade || '',
+        estado: data.estado || '',
+        retirada_habilitada: data.retirada_habilitada || false,
+        horarios_funcionamento: data.horarios_funcionamento || [],
+      }
 
     // Aplicar cores do tema dinamicamente (CWE-79: validar formato hex antes de injetar no CSS)
     const root = document.documentElement

@@ -16,7 +16,7 @@ router.get('/', async (req, res, next) => {
   try {
     const restaurantId = req.restaurantId || config.restaurantId;
     const result = await query(
-      'SELECT id, nome, endereco, cep, cidade, estado, latitude, longitude, status_loja, tempo_preparo_min, modo_sem_entregador, formas_pagamento_aceitas, cor_primaria, cor_secundaria, cor_terciaria, features, logo_base64 FROM restaurantes WHERE id = $1',
+      'SELECT id, nome, endereco, cep, cidade, estado, latitude, longitude, status_loja, tempo_preparo_min, modo_sem_entregador, formas_pagamento_aceitas, cor_primaria, cor_secundaria, cor_terciaria, features, logo_base64, retirada_habilitada, horarios_funcionamento FROM restaurantes WHERE id = $1',
       [restaurantId]
     );
 
@@ -90,6 +90,11 @@ router.put('/', authenticate, authorize('admin', 'gerente'), async (req, res, ne
       params.push(JSON.stringify(features));
     }
     if (logo_base64 !== undefined) { fields.push(`logo_base64 = $${idx++}`); params.push(logo_base64); }
+    if (retirada_habilitada !== undefined) { fields.push(`retirada_habilitada = $${idx++}`); params.push(retirada_habilitada); }
+    if (horarios_funcionamento !== undefined) {
+      fields.push(`horarios_funcionamento = $${idx++}`);
+      params.push(JSON.stringify(horarios_funcionamento));
+    }
 
     if (fields.length === 0) {
       throw new AppError('Nenhum campo para atualizar.', 400);

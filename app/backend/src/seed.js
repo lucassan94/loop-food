@@ -33,18 +33,18 @@ async function seed() {
 
     // Sample products
     const produtos = [
-      { nome: 'X-Burguer', descricao: 'Hambúrguer 180g, queijo cheddar, alface, tomate e molho especial.', preco: 28.90, categoria_slug: 'burguers' },
-      { nome: 'X-Salada', descricao: 'Hambúrguer 180g, queijo mussarela, alface, tomate, cebola roxa e maionese.', preco: 25.90, categoria_slug: 'burguers' },
-      { nome: 'X-Bacon', descricao: 'Hambúrguer 180g, queijo cheddar, bacon crocante, alface, tomate e barbecue.', preco: 32.90, categoria_slug: 'burguers' },
-      { nome: 'Pizza Margherita', descricao: 'Molho de tomate, mussarela, manjericão fresco e azeite.', preco: 45.00, categoria_slug: 'pizzas' },
-      { nome: 'Pizza Calabresa', descricao: 'Molho de tomate, mussarela, calabresa fatiada e cebola.', preco: 48.00, categoria_slug: 'pizzas' },
-      { nome: 'Pizza Portuguesa', descricao: 'Molho de tomate, mussarela, presunto, ovos, cebola e azeitonas.', preco: 52.00, categoria_slug: 'pizzas' },
-      { nome: 'Coca-Cola 2L', descricao: 'Refrigerante Coca-Cola 2 litros gelado.', preco: 10.00, categoria_slug: 'bebidas' },
-      { nome: 'Suco de Laranja', descricao: 'Suco natural de laranja 500ml.', preco: 8.00, categoria_slug: 'bebidas' },
-      { nome: 'Água Mineral', descricao: 'Água mineral sem gás 500ml.', preco: 4.00, categoria_slug: 'bebidas' },
-      { nome: 'Pudim', descricao: 'Pudim de leite condensado com calda de caramelo.', preco: 12.00, categoria_slug: 'sobremesas' },
-      { nome: 'Brownie', descricao: 'Brownie de chocolate com nozes e sorvete.', preco: 15.00, categoria_slug: 'sobremesas' },
-      { nome: 'Batata Frita', descricao: 'Porção de batata frita crocante com queijo cheddar e bacon.', preco: 22.00, categoria_slug: 'porcoes' },
+      { nome: 'X-Burguer', descricao: 'Hambúrguer 180g, queijo cheddar, alface, tomate e molho especial.', preco: 28.90, categoria_slug: 'burguers', talheres: true, modulos: ['delivery', 'salao'] },
+      { nome: 'X-Salada', descricao: 'Hambúrguer 180g, queijo mussarela, alface, tomate, cebola roxa e maionese.', preco: 25.90, categoria_slug: 'burguers', talheres: false, modulos: ['delivery', 'salao'] },
+      { nome: 'X-Bacon', descricao: 'Hambúrguer 180g, queijo cheddar, bacon crocante, alface, tomate e barbecue.', preco: 32.90, categoria_slug: 'burguers', talheres: true, modulos: ['delivery', 'salao'] },
+      { nome: 'Pizza Margherita', descricao: 'Molho de tomate, mussarela, manjericão fresco e azeite.', preco: 45.00, categoria_slug: 'pizzas', talheres: false, modulos: ['delivery', 'salao'] },
+      { nome: 'Pizza Calabresa', descricao: 'Molho de tomate, mussarela, calabresa fatiada e cebola.', preco: 48.00, categoria_slug: 'pizzas', talheres: false, modulos: ['delivery', 'salao'] },
+      { nome: 'Pizza Portuguesa', descricao: 'Molho de tomate, mussarela, presunto, ovos, cebola e azeitonas.', preco: 52.00, categoria_slug: 'pizzas', talheres: false, modulos: ['delivery'] },
+      { nome: 'Coca-Cola 2L', descricao: 'Refrigerante Coca-Cola 2 litros gelado.', preco: 10.00, categoria_slug: 'bebidas', talheres: false, modulos: ['delivery', 'salao'] },
+      { nome: 'Suco de Laranja', descricao: 'Suco natural de laranja 500ml.', preco: 8.00, categoria_slug: 'bebidas', talheres: false, modulos: ['delivery', 'salao'] },
+      { nome: 'Água Mineral', descricao: 'Água mineral sem gás 500ml.', preco: 4.00, categoria_slug: 'bebidas', talheres: false, modulos: ['delivery', 'salao'] },
+      { nome: 'Pudim', descricao: 'Pudim de leite condensado com calda de caramelo.', preco: 12.00, categoria_slug: 'sobremesas', talheres: false, modulos: ['delivery', 'salao'] },
+      { nome: 'Brownie', descricao: 'Brownie de chocolate com nozes e sorvete.', preco: 15.00, categoria_slug: 'sobremesas', talheres: false, modulos: ['delivery', 'salao'] },
+      { nome: 'Batata Frita', descricao: 'Porção de batata frita crocante com queijo cheddar e bacon.', preco: 22.00, categoria_slug: 'porcoes', talheres: true, modulos: ['delivery', 'salao'] },
     ];
 
     for (const p of produtos) {
@@ -55,10 +55,10 @@ async function seed() {
       const categoriaId = catResult.rows[0]?.id;
 
       await query(
-        `INSERT INTO produtos (restaurant_id, nome, descricao, preco, categoria_id)
-         VALUES ($1, $2, $3, $4, $5)
+        `INSERT INTO produtos (restaurant_id, nome, descricao, preco, categoria_id, talheres_obrigatorio, modulos)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)
          ON CONFLICT DO NOTHING`,
-        [config.restaurantId, p.nome, p.descricao, p.preco, categoriaId]
+        [config.restaurantId, p.nome, p.descricao, p.preco, categoriaId, p.talheres, JSON.stringify(p.modulos)]
       );
     }
     console.log(`✅ ${produtos.length} products created`);
@@ -89,6 +89,116 @@ async function seed() {
       }
     }
     console.log(`✅ ${extras.length} extras created`);
+
+    // Opções do prato (gratuitas) — grupos + escolhas por produto
+    const opcoes = [
+      { produto_nome: 'X-Burguer', grupo: 'Ponto da carne', tipo: 'unica', obrigatoria: true, opcoes: ['Mal passado', 'Ao ponto', 'Bem passado'] },
+      { produto_nome: 'X-Burguer', grupo: 'Molhos grátis', tipo: 'multipla', obrigatoria: false, opcoes: ['Ketchup', 'Maionese', 'Mostarda'] },
+      { produto_nome: 'X-Bacon', grupo: 'Ponto da carne', tipo: 'unica', obrigatoria: true, opcoes: ['Mal passado', 'Ao ponto', 'Bem passado'] },
+      { produto_nome: 'Pizza Margherita', grupo: 'Espessura da borda', tipo: 'unica', obrigatoria: true, opcoes: ['Fina', 'Média', 'Grossa'] },
+      { produto_nome: 'Pizza Calabresa', grupo: 'Espessura da borda', tipo: 'unica', obrigatoria: true, opcoes: ['Fina', 'Média', 'Grossa'] },
+    ];
+
+    for (const o of opcoes) {
+      const prodResult = await query(
+        'SELECT id FROM produtos WHERE nome = $1 AND restaurant_id = $2',
+        [o.produto_nome, config.restaurantId]
+      );
+      if (!prodResult.rows[0]) continue;
+      let ordem = 0;
+      for (const nome of o.opcoes) {
+        const existente = await query(
+          'SELECT id FROM produto_opcoes WHERE produto_id = $1 AND grupo = $2 AND nome = $3 LIMIT 1',
+          [prodResult.rows[0].id, o.grupo, nome]
+        );
+        if (!existente.rows[0]) {
+          await query(
+            `INSERT INTO produto_opcoes (produto_id, grupo, nome, tipo, obrigatoria, ordem)
+             VALUES ($1, $2, $3, $4, $5, $6)`,
+            [prodResult.rows[0].id, o.grupo, nome, o.tipo, o.obrigatoria, ordem++]
+          );
+        }
+      }
+    }
+    console.log(`✅ ${opcoes.length} grupos de opções created`);
+
+    // Subcategorias de adicionais (catálogo compartilhado)
+    const subcategorias = [
+      { nome: 'Porções', itens: [
+        { nome: 'Arroz', preco: 5.00, maximo: 2 },
+        { nome: 'Feijão', preco: 4.00, maximo: 2 },
+        { nome: 'Batata Frita', preco: 6.00, maximo: 1 },
+        { nome: 'Salada', preco: 4.50, maximo: 1 },
+      ]},
+      { nome: 'Extra', itens: [
+        { nome: 'Queijo', preco: 4.00, maximo: 3 },
+        { nome: 'Carne', preco: 6.00, maximo: 2 },
+        { nome: 'Molho Especial', preco: 3.00, maximo: 1 },
+      ]},
+      { nome: 'Bebidas', itens: [
+        { nome: 'Coca-Cola Lata', preco: 6.00, maximo: 4 },
+        { nome: 'Água', preco: 3.50, maximo: 2 },
+        { nome: 'Chá Gelado', preco: 5.00, maximo: 2 },
+        { nome: 'Cerveja', preco: 8.00, maximo: 4 },
+      ]},
+    ];
+
+    const subIds = {};
+    for (const sub of subcategorias) {
+      const existente = await query(
+        'SELECT id FROM extra_subcategorias WHERE restaurant_id = $1 AND nome = $2 LIMIT 1',
+        [config.restaurantId, sub.nome]
+      );
+      let subId;
+      if (existente.rows[0]) {
+        subId = existente.rows[0].id;
+      } else {
+        const criada = await query(
+          'INSERT INTO extra_subcategorias (restaurant_id, nome, ordem) VALUES ($1, $2, $3) RETURNING id',
+          [config.restaurantId, sub.nome, Object.keys(subIds).length]
+        );
+        subId = criada.rows[0].id;
+      }
+      let ordem = 0;
+      for (const item of sub.itens) {
+        const itemExistente = await query(
+          'SELECT id FROM extra_subcategoria_itens WHERE subcategoria_id = $1 AND nome = $2 LIMIT 1',
+          [subId, item.nome]
+        );
+        if (!itemExistente.rows[0]) {
+          await query(
+            `INSERT INTO extra_subcategoria_itens (subcategoria_id, nome, preco, maximo, ordem)
+             VALUES ($1, $2, $3, $4, $5)`,
+            [subId, item.nome, item.preco, item.maximo, ordem++]
+          );
+        }
+      }
+      subIds[sub.nome] = subId;
+    }
+
+    // Ativar subcategorias em alguns produtos
+    const produtosComSubcats = [
+      { nome: 'X-Burguer', subs: ['Porções', 'Extra', 'Bebidas'] },
+      { nome: 'X-Bacon', subs: ['Porções', 'Extra', 'Bebidas'] },
+      { nome: 'Pizza Margherita', subs: ['Extra', 'Bebidas'] },
+      { nome: 'Pizza Calabresa', subs: ['Extra', 'Bebidas'] },
+    ];
+    for (const p of produtosComSubcats) {
+      const prodResult = await query(
+        'SELECT id FROM produtos WHERE nome = $1 AND restaurant_id = $2',
+        [p.nome, config.restaurantId]
+      );
+      if (!prodResult.rows[0]) continue;
+      for (const subNome of p.subs) {
+        const sid = subIds[subNome];
+        if (!sid) continue;
+        await query(
+          'INSERT INTO produto_extra_subcategorias (produto_id, subcategoria_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
+          [prodResult.rows[0].id, sid]
+        );
+      }
+    }
+    console.log(`✅ ${subcategorias.length} subcategorias de adicionais created`);
 
     // Sample cliente — login por username: cliente / cliente123 (ou telefone)
     const clienteHash = await bcrypt.hash('cliente123', 12);
@@ -121,6 +231,24 @@ async function seed() {
       [config.restaurantId]
     );
     console.log('✅ Test driver created: entregador / entregador123');
+
+    // Configurar retirada e horários de funcionamento
+    await query(
+      `UPDATE restaurantes SET
+        retirada_habilitada = true,
+        horarios_funcionamento = $1
+       WHERE id = $2`,
+      [JSON.stringify([
+        { aberto: false, abre: '', fecha: '' },         // domingo
+        { aberto: true, abre: '08:00', fecha: '23:00' }, // segunda
+        { aberto: true, abre: '08:00', fecha: '23:00' }, // terça
+        { aberto: true, abre: '08:00', fecha: '23:00' }, // quarta
+        { aberto: true, abre: '08:00', fecha: '23:00' }, // quinta
+        { aberto: true, abre: '08:00', fecha: '23:59' }, // sexta
+        { aberto: true, abre: '09:00', fecha: '23:00' }, // sábado
+      ]), config.restaurantId]
+    );
+    console.log('✅ Retirada habilitada com horários de funcionamento');
 
     // Raios de entrega
     const raios = [

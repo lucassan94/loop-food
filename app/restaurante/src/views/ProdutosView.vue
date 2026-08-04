@@ -90,6 +90,9 @@
           <button class="form-tab" :class="{ active: formTab === 'extras' }" @click="formTab = 'extras'">
             <i-lucide-circle-plus style="width:16px;height:16px" /> Adicionais
           </button>
+          <button class="form-tab" :class="{ active: formTab === 'opcoes' }" @click="formTab = 'opcoes'">
+            <i-lucide-list-checks style="width:16px;height:16px" /> Opções
+          </button>
         </div>
 
         <!-- Tab: Dados Básicos -->
@@ -161,11 +164,40 @@
         <div v-show="formTab === 'extras'">
           <div class="extras-header">
             <p style="color:var(--text-muted);font-size:0.85rem;">
-              Configure os adicionais que o cliente pode escolher.
-              O <strong>Máximo</strong> define quantas vezes o cliente pode pedir o mesmo adicional (ex: 2 carnes, 1 cebola).
+              Marque as <strong>subcategorias do catálogo</strong> que aparecem para este produto.
+              Os itens e preços vêm do catálogo compartilhado (mesmo preço em todos os produtos).
             </p>
           </div>
-          <div v-for="(extra, i) in form.extras" :key="i" class="extra-row">
+          <div v-if="subcategoriasCatalogo.length > 0" class="subcats-grid">
+            <label
+              v-for="sub in subcategoriasCatalogo"
+              :key="sub.id"
+              class="subcat-check"
+              :class="{ ativa: form.subcategorias.includes(sub.id) }"
+            >
+              <input type="checkbox" :value="sub.id" v-model="form.subcategorias" />
+              <span>
+                <strong>{{ sub.nome }}</strong>
+                <small>{{ sub.itens.length }} itens</small>
+              </span>
+            </label>
+          </div>
+          <p v-else style="color:var(--text-muted);font-size:0.85rem;">
+            Nenhuma subcategoria cadastrada ainda — clique em "Gerenciar catálogo" para pré-cadastrar.
+          </p>
+          <button class="btn btn-secondary btn-sm" style="margin-top:0.5rem;" @click="openCatalogoModal">
+            <i-lucide-list-checks style="width:14px;height:14px" /> Gerenciar catálogo de adicionais
+          </button>
+
+          <div class="extras-legado">
+            <div class="extras-legado-titulo">Adicionais avulsos deste produto (legado — aparecem no grupo "Geral")</div>
+            <div class="extras-header">
+              <p style="color:var(--text-muted);font-size:0.85rem;">
+                Configure os adicionais que o cliente pode escolher.
+                O <strong>Máximo</strong> define quantas vezes o cliente pode pedir o mesmo adicional (ex: 2 carnes, 1 cebola).
+              </p>
+            </div>
+            <div v-for="(extra, i) in form.extras" :key="i" class="extra-row">
             <div class="extra-fields">
               <input v-model="extra.nome" placeholder="Nome do adicional" class="extra-name" />
               <div class="extra-number-group">
@@ -181,8 +213,47 @@
               </button>
             </div>
           </div>
-          <button class="btn btn-secondary btn-block" @click="addExtra" style="margin-top:0.5rem;">
-            <i-lucide-plus style="width:14px;height:14px" /> Adicionar Opcional
+            <button class="btn btn-secondary btn-block" @click="addExtra" style="margin-top:0.5rem;">
+              <i-lucide-plus style="width:14px;height:14px" /> Adicionar Opcional
+            </button>
+          </div>
+        </div>
+
+        <!-- Tab: Opções do Prato (gratuitas) -->
+        <div v-show="formTab === 'opcoes'">
+          <div class="extras-header">
+            <p style="color:var(--text-muted);font-size:0.85rem;">
+              Opções <strong>gratuitas</strong> que o cliente escolhe (ex: ponto da carne, com/sem açúcar).
+              Não alteram o preço. <strong>Seleção única</strong> = radio; <strong>Seleção múltipla</strong> = checkbox.
+              Marque <strong>Obrigatória</strong> para exigir a escolha antes de adicionar ao carrinho.
+            </p>
+          </div>
+          <div v-for="(g, gi) in form.opcoes" :key="gi" class="extra-row">
+            <div class="extra-fields" style="flex-wrap:wrap;">
+              <input v-model="g.grupo" placeholder="Nome do grupo (ex: Ponto da carne)" class="extra-name" />
+              <select v-model="g.tipo" style="padding:6px 8px;border:1.5px solid var(--border);border-radius:4px;font-size:0.85rem;">
+                <option value="unica">Seleção única</option>
+                <option value="multipla">Seleção múltipla</option>
+              </select>
+              <label style="display:flex;align-items:center;gap:6px;font-size:0.8rem;font-weight:600;white-space:nowrap;cursor:pointer;">
+                <input type="checkbox" v-model="g.obrigatoria" style="width:16px;height:16px;accent-color:var(--primary);" /> Obrigatória
+              </label>
+              <button class="btn btn-sm btn-danger" @click="form.opcoes.splice(gi, 1)" title="Remover grupo">
+                <i-lucide-x style="width:14px;height:14px" />
+              </button>
+            </div>
+            <div v-for="(opNome, oi) in g.opcoes" :key="oi" class="extra-fields" style="margin-top:6px;margin-left:1.75rem;">
+              <input v-model="g.opcoes[oi]" placeholder="Ex: Ao ponto" class="extra-name" />
+              <button class="btn btn-sm btn-danger" @click="g.opcoes.splice(oi, 1)" title="Remover opção">
+                <i-lucide-x style="width:14px;height:14px" />
+              </button>
+            </div>
+            <button class="btn btn-secondary btn-sm" style="margin-top:6px;margin-left:1.75rem;" @click="g.opcoes.push('')">
+              <i-lucide-plus style="width:14px;height:14px" /> Opção
+            </button>
+          </div>
+          <button class="btn btn-secondary btn-block" @click="addOpcaoGrupo" style="margin-top:0.5rem;">
+            <i-lucide-plus style="width:14px;height:14px" /> Grupo de Opções
           </button>
         </div>
 
@@ -193,6 +264,69 @@
             {{ salvando ? 'Salvando...' : 'Salvar' }}
           </button>
           <button class="btn btn-secondary" @click="showForm = false">Cancelar</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Catalog Modal (subcategorias de adicionais) -->
+    <div v-if="showCatalogoModal" class="modal-overlay" @click.self="showCatalogoModal = false">
+      <div class="modal-content" style="max-width:640px;">
+        <h3>📂 Catálogo de Adicionais</h3>
+        <p style="color:var(--text-muted);font-size:0.85rem;margin:0.5rem 0 1rem;">
+          Subcategorias pré-cadastradas com seus itens e preços. Depois, em cada produto, basta marcar quais aparecem.
+        </p>
+
+        <div v-for="sub in subcategoriasCatalogo" :key="sub.id" class="cat-sub">
+          <div class="cat-sub-header">
+            <strong>{{ sub.nome }}</strong>
+            <span style="font-size:0.75rem;color:var(--text-muted);">{{ sub.itens.length }} itens</span>
+            <div style="display:flex;gap:4px;">
+              <button class="btn btn-sm btn-secondary" @click="editarCatalogoSub(sub)">Editar</button>
+              <button class="btn btn-sm btn-danger" @click="excluirCatalogoSub(sub)">Excluir</button>
+            </div>
+          </div>
+          <div class="cat-sub-itens">
+            <span v-for="item in sub.itens" :key="item.id" class="cat-item-chip">
+              {{ item.nome }} — {{ formatPrice(item.preco) }}
+            </span>
+            <span v-if="sub.itens.length === 0" style="font-size:0.8rem;color:var(--text-muted);">sem itens</span>
+          </div>
+        </div>
+        <p v-if="subcategoriasCatalogo.length === 0" style="color:var(--text-muted);font-size:0.85rem;">
+          Nenhuma subcategoria cadastrada.
+        </p>
+
+        <!-- Form nova/edição -->
+        <div style="margin-top:1rem;padding-top:1rem;border-top:1px solid var(--border);">
+          <h4 style="font-size:0.9rem;margin-bottom:0.5rem;">
+            {{ catalogEditId ? '✏️ Editar subcategoria' : '➕ Nova subcategoria' }}
+          </h4>
+          <input
+            v-model="catalogForm.nome"
+            placeholder="Nome (ex: Porções)"
+            style="width:100%;padding:8px 12px;border:1.5px solid var(--border);border-radius:6px;font-size:0.9rem;margin-bottom:0.5rem;"
+          />
+          <div v-for="(item, i) in catalogForm.itens" :key="i" class="cat-item-row">
+            <input v-model="item.nome" placeholder="Item (ex: Arroz)" class="extra-name" />
+            <input v-model.number="item.preco" type="number" step="0.50" min="0" placeholder="0,00" style="width:80px;" />
+            <input v-model.number="item.maximo" type="number" min="0" placeholder="Máx" style="width:56px;" title="Máximo por item (1 = checkbox, >1 = quantidade)" />
+            <button class="btn btn-sm btn-danger" @click="catalogForm.itens.splice(i, 1)">
+              <i-lucide-x style="width:14px;height:14px" />
+            </button>
+          </div>
+          <button class="btn btn-secondary btn-sm" @click="catalogForm.itens.push({ nome: '', preco: 0, maximo: 1 })">
+            <i-lucide-plus style="width:14px;height:14px" /> Item
+          </button>
+          <div style="display:flex;gap:8px;margin-top:1rem;">
+            <button class="btn btn-primary btn-sm" @click="salvarCatalogoSub" :disabled="!catalogForm.nome.trim()">
+              {{ catalogEditId ? 'Atualizar' : 'Criar' }}
+            </button>
+            <button v-if="catalogEditId" class="btn btn-secondary btn-sm" @click="cancelarCatalogoEdit">Cancelar edição</button>
+          </div>
+        </div>
+
+        <div style="margin-top:1rem;text-align:right;">
+          <button class="btn btn-secondary" @click="showCatalogoModal = false">Fechar</button>
         </div>
       </div>
     </div>
@@ -289,8 +423,14 @@ function getImageSrc(prod) {
 
 const form = reactive({
   nome: '', categoria_id: '', preco: 0, descricao: '',
-  imagem_url: '', imagem_base64: '', ativo: true, extras: []
+  imagem_url: '', imagem_base64: '', ativo: true, extras: [], opcoes: [], subcategorias: []
 })
+
+// Catálogo compartilhado de subcategorias de adicionais
+const subcategoriasCatalogo = ref([])
+const showCatalogoModal = ref(false)
+const catalogEditId = ref(null)
+const catalogForm = reactive({ nome: '', itens: [] })
 
 function formatPrice(v) { return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v) }
 
@@ -335,11 +475,61 @@ function resetForm() {
   editingId.value = null
   formTab.value = 'dados'
   previewImage.value = ''
-  Object.assign(form, { nome: '', categoria_id: '', preco: 0, descricao: '', imagem_url: '', imagem_base64: '', ativo: true, extras: [] })
+  Object.assign(form, { nome: '', categoria_id: '', preco: 0, descricao: '', imagem_url: '', imagem_base64: '', ativo: true, extras: [], opcoes: [], subcategorias: [] })
 }
 
 function novoProduto() { resetForm(); showForm.value = true }
 function addExtra() { form.extras.push({ nome: '', preco: 0, maximo: 1 }) }
+function addOpcaoGrupo() { form.opcoes.push({ grupo: '', tipo: 'unica', obrigatoria: false, opcoes: [''] }) }
+
+// ── Catálogo de subcategorias de adicionais ──
+async function carregarCatalogo() {
+  try {
+    const { data } = await api.get('/produtos/extra-subcategorias')
+    subcategoriasCatalogo.value = data
+  } catch { subcategoriasCatalogo.value = [] }
+}
+
+function openCatalogoModal() {
+  cancelarCatalogoEdit()
+  carregarCatalogo()
+  showCatalogoModal.value = true
+}
+
+function editarCatalogoSub(sub) {
+  catalogEditId.value = sub.id
+  catalogForm.nome = sub.nome
+  catalogForm.itens = sub.itens.map(i => ({ nome: i.nome, preco: Number(i.preco), maximo: i.maximo ?? 1 }))
+}
+
+function cancelarCatalogoEdit() {
+  catalogEditId.value = null
+  catalogForm.nome = ''
+  catalogForm.itens = []
+}
+
+async function salvarCatalogoSub() {
+  const nome = catalogForm.nome.trim()
+  if (!nome) return
+  const itens = catalogForm.itens
+    .filter(i => i.nome.trim())
+    .map(i => ({ nome: i.nome.trim(), preco: i.preco || 0, maximo: i.maximo ?? 1 }))
+  try {
+    if (catalogEditId.value) await api.put(`/produtos/extra-subcategorias/${catalogEditId.value}`, { nome, itens })
+    else await api.post('/produtos/extra-subcategorias', { nome, itens })
+    cancelarCatalogoEdit()
+    await carregarCatalogo()
+  } catch (err) { alert(err.response?.data?.error || 'Erro ao salvar subcategoria.') }
+}
+
+async function excluirCatalogoSub(sub) {
+  if (!confirm(`Excluir a subcategoria "${sub.nome}"? Produtos que a usam deixarão de exibi-la.`)) return
+  try {
+    await api.delete(`/produtos/extra-subcategorias/${sub.id}`)
+    form.subcategorias = form.subcategorias.filter(id => id !== sub.id)
+    await carregarCatalogo()
+  } catch (err) { alert(err.response?.data?.error || 'Erro ao excluir subcategoria.') }
+}
 
 async function editar(p) {
   resetForm()
@@ -351,6 +541,13 @@ async function editar(p) {
   try {
     const { data } = await api.get(`/produtos/${p.id}`)
     form.extras = (data.extras || []).map(e => ({ nome: e.nome, preco: e.preco, maximo: e.maximo ?? 1 }))
+    form.opcoes = (data.opcoes || []).map(g => ({
+      grupo: g.grupo,
+      tipo: g.tipo,
+      obrigatoria: !!g.obrigatoria,
+      opcoes: g.opcoes.map(o => o.nome),
+    }))
+    form.subcategorias = (data.subcategorias || []).map(s => s.id)
   } catch { form.extras = [] }
   showForm.value = true
 }
@@ -374,6 +571,15 @@ async function salvar() {
       nome: form.nome, categoria_id: form.categoria_id || undefined, preco: form.preco,
       descricao: form.descricao, imagem_url: form.imagem_url, imagem_base64: form.imagem_base64,
       ativo: form.ativo, extras: form.extras.filter(e => e.nome.trim()),
+      opcoes: form.opcoes
+        .filter(g => g.grupo.trim() && g.opcoes.some(o => o.trim()))
+        .map(g => ({
+          grupo: g.grupo.trim(),
+          tipo: g.tipo,
+          obrigatoria: !!g.obrigatoria,
+          opcoes: g.opcoes.map(o => o.trim()).filter(Boolean),
+        })),
+      subcategorias: form.subcategorias,
     }
     if (editingId.value) await api.put(`/produtos/${editingId.value}`, payload)
     else await api.post('/produtos', payload)
@@ -434,7 +640,7 @@ async function excluirCategoria(cat) {
   }
 }
 
-onMounted(load)
+onMounted(() => { load(); carregarCatalogo() })
 </script>
 
 <style scoped>
@@ -537,4 +743,46 @@ onMounted(load)
   font-size: 0.75rem; font-weight: 700;
 }
 .categoria-actions { display: flex; gap: 4px; }
+
+/* Subcategorias de adicionais (catálogo) */
+.subcats-grid {
+  display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 0.5rem;
+}
+.subcat-check {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 12px; border-radius: 8px; cursor: pointer;
+  background: var(--border-light); border: 1.5px solid transparent;
+  transition: var(--transition);
+}
+.subcat-check:hover { border-color: var(--primary); }
+.subcat-check.ativa { border-color: var(--primary); background: var(--primary-light); }
+.subcat-check input { width: 16px; height: 16px; accent-color: var(--primary); }
+.subcat-check span { display: flex; flex-direction: column; line-height: 1.2; }
+.subcat-check small { color: var(--text-muted); font-size: 0.75rem; }
+.extras-legado {
+  margin-top: 1rem; padding-top: 0.75rem;
+  border-top: 1px dashed var(--border);
+}
+.extras-legado-titulo {
+  font-size: 0.8rem; font-weight: 700;
+  color: var(--text-muted); margin-bottom: 0.5rem;
+}
+.cat-sub {
+  padding: 10px 12px; border-radius: 8px; margin-bottom: 8px;
+  background: var(--border-light); border: 1px solid var(--border);
+}
+.cat-sub-header {
+  display: flex; align-items: center; gap: 10px;
+  justify-content: space-between; margin-bottom: 6px;
+}
+.cat-sub-itens { display: flex; flex-wrap: wrap; gap: 6px; }
+.cat-item-chip {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 999px; padding: 2px 10px;
+  font-size: 0.78rem;
+}
+.cat-item-row {
+  display: flex; gap: 6px; margin-bottom: 6px; align-items: center;
+}
+.cat-item-row .extra-name { flex: 1; }
 </style>

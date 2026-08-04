@@ -138,15 +138,79 @@
           <h3>{{ selectedProduct?.nome }}</h3>
           <p class="desc">{{ selectedProduct?.descricao || 'Sem descrição' }}</p>
 
+          <div v-if="selectedOpcoes.length > 0" class="modal-opcoes">
+            <h4 class="modal-extras-title">
+              <i-lucide-list-checks style="width:16px;height:16px" /> Opções do Prato
+            </h4>
+            <div v-for="grupo in selectedOpcoes" :key="grupo.grupo" class="opcao-grupo">
+              <div class="opcao-grupo-titulo">
+                {{ grupo.grupo }}
+                <span v-if="grupo.obrigatoria" class="opcao-obrigatoria" title="Obrigatório escolher">*</span>
+              </div>
+              <label
+                v-for="op in grupo.opcoes"
+                :key="op.id"
+                class="opcao-item"
+                :class="{ selecionada: isOpcaoSelecionada(grupo, op) }"
+              >
+                <input
+                  v-if="grupo.tipo === 'unica'"
+                  type="radio"
+                  :name="'opc-' + grupo.grupo"
+                  :value="op.id"
+                  v-model="chosenOpcoes[grupo.grupo]"
+                />
+                <input
+                  v-else
+                  type="checkbox"
+                  :value="op.id"
+                  v-model="chosenOpcoesMulti[grupo.grupo]"
+                />
+                <span>{{ op.nome }}</span>
+              </label>
+            </div>
+          </div>
+
+          <!-- Talheres obrigatório (Sim/Não) -->
+          <div v-if="selectedProduct?.talheres_obrigatorio" class="opcao-grupo">
+            <div class="opcao-grupo-titulo">
+              Talheres
+              <span class="opcao-obrigatoria" title="Obrigatório escolher">*</span>
+            </div>
+            <label class="opcao-item" :class="{ selecionada: chosenTalheres === true }">
+              <input type="radio" name="talheres" :value="true" v-model="chosenTalheres" />
+              <span>Sim, quero talheres 🍴</span>
+            </label>
+            <label class="opcao-item" :class="{ selecionada: chosenTalheres === false }">
+              <input type="radio" name="talheres" :value="false" v-model="chosenTalheres" />
+              <span>Não, obrigado</span>
+            </label>
+          </div>
+
+          <!-- Observação individual do item -->
+          <div class="form-group" style="margin-top:0.75rem;">
+            <label style="font-size:0.8rem;font-weight:600;color:var(--text-muted);">Observação para este item</label>
+            <textarea
+              v-model="itemObservacao"
+              rows="2"
+              placeholder="Ex: Sem cebola, molho extra, ponto bem passado..."
+              style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:6px;font-family:inherit;font-size:0.85rem;outline:none;transition:var(--transition);"
+              @focus="$event.target.style.borderColor = 'var(--primary)'"
+              @blur="$event.target.style.borderColor = 'var(--border)'"
+            ></textarea>
+          </div>
+
           <div v-if="selectedExtras.length > 0">
             <h4 class="modal-extras-title">
               <i-lucide-plus-circle style="width:16px;height:16px" /> Adicionais (Opcional)
             </h4>
-            <div class="extra-item" v-for="extra in selectedExtras" :key="extra.id">
-              <div class="extra-item-left">
-                <label class="extra-label">
-                  {{ extra.nome }}
-                </label>
+            <div v-for="grupo in extrasGrupos" :key="grupo.nome" class="extra-grupo">
+              <div v-if="grupo.nome !== 'Geral'" class="extra-subcategoria-titulo">{{ grupo.nome }}</div>
+              <div class="extra-item" v-for="extra in grupo.itens" :key="extra.key">
+                <div class="extra-item-left">
+                  <label class="extra-label">
+                    {{ extra.nome }}
+                  </label>
                 <!-- Qty selector for max > 1 or unlimited -->
                 <div v-if="!extra.maximo || extra.maximo > 1" class="extra-qty">
                   <button class="extra-qty-btn" @click="decrementExtra(extra)" :disabled="getExtraQty(extra) <= 0">−</button>
@@ -159,7 +223,8 @@
                   <span>Adicionar</span>
                 </label>
               </div>
-              <span class="extra-price">{{ formatPrice(extra.preco) }}</span>
+                <span class="extra-price">{{ formatPrice(extra.preco) }}</span>
+              </div>
             </div>
           </div>
 
@@ -179,6 +244,7 @@
 import { ref, computed, onMounted, inject } from 'vue'
 import api from '../services/api'
 import BannerCarousel from '../components/BannerCarousel.vue'
+import { PRODUCT_PLACEHOLDER } from '../utils/images'
 
 const addToast = inject('addToast')
 
@@ -215,6 +281,30 @@ const selectedProduct = ref(null)
 const selectedExtras = ref([])
 const chosenExtras = ref([])          // [{extra, qty}] for extras with max > 1
 const chosenExtraSet = ref(new Set()) // Set of extra IDs (simple checkbox mode)
+
+// Opções do prato (gratuitas)
+const selectedOpcoes = ref([])
+const chosenOpcoes = ref({})        // grupo -> op.id (seleção única)
+const chosenOpcoesMulti = ref({})   // grupo -> [op.id, ...] (seleção múltipla)
+
+// Talheres
+const chosenTalheres = ref(null)
+const itemObservacao = ref('')
+
+// Adicionais agrupados por subcategoria (catálogo compartilhado + legado 'Geral')
+const extrasGrupos = computed(() => {
+  const grupos = []
+  const seen = new Map()
+  for (const extra of selectedExtras.value) {
+    const nome = extra.subcategoria || 'Geral'
+    if (!seen.has(nome)) {
+      seen.set(nome, { nome, itens: [] })
+      grupos.push(seen.get(nome))
+    }
+    seen.get(nome).itens.push(extra)
+  }
+  return grupos
+})
 
 // Cart
 const cartItems = inject('cartItems')
@@ -300,7 +390,7 @@ function formatPrice(value) {
 }
 
 function productImgSrc(product) {
-  if (!product) return 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?auto=format&fit=crop&w=600&q=80'
+  if (!product) return PRODUCT_PLACEHOLDER
   if (product.imagem_base64) {
     const b64 = product.imagem_base64
     // Detectar formato pela assinatura base64
@@ -319,22 +409,44 @@ function productImgSrc(product) {
     return 'data:image/jpeg;base64,' + b64
   }
   if (product.imagem_url) return product.imagem_url
-  return 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?auto=format&fit=crop&w=600&q=80'
+  return PRODUCT_PLACEHOLDER
 }
 
 function onImgError(event) {
-  event.target.src = 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?auto=format&fit=crop&w=300&q=80'
+  // Evita loop infinito se o próprio placeholder falhar
+  if (event.target.src.startsWith('data:image/svg+xml')) return
+  event.target.src = PRODUCT_PLACEHOLDER
 }
 
 function selectCategory(slug) {
   activeCategory.value = slug
 }
 
+function buildExtrasList(product) {
+  const list = []
+  // Itens do catálogo (subcategorias ativas) — key prefixada para não colidir com legado
+  for (const sub of product.subcategorias || []) {
+    for (const item of sub.itens || []) {
+      list.push({ key: 's' + item.id, subcategoria: sub.nome, id: item.id, nome: item.nome, preco: Number(item.preco), maximo: item.maximo })
+    }
+  }
+  // Adicionais avulsos (legado) — grupo 'Geral'
+  for (const extra of product.extras || []) {
+    list.push({ key: 'e' + extra.id, subcategoria: 'Geral', id: extra.id, nome: extra.nome, preco: Number(extra.preco), maximo: extra.maximo })
+  }
+  return list
+}
+
 function openProductModal(product) {
   selectedProduct.value = product
-  selectedExtras.value = product.extras || []
+  selectedExtras.value = buildExtrasList(product)
+  selectedOpcoes.value = product.opcoes || []
   chosenExtras.value = []
   chosenExtraSet.value = new Set()
+  chosenOpcoes.value = {}
+  chosenOpcoesMulti.value = {}
+  chosenTalheres.value = null
+  itemObservacao.value = ''
   productModalOpen.value = true
 }
 
@@ -345,13 +457,13 @@ function closeProductModal() {
 
 // ── Extra selection (qty-based) ──
 function getExtraQty(extra) {
-  const found = chosenExtras.value.find(e => e.extra.id === extra.id)
+  const found = chosenExtras.value.find(e => e.extra.key === extra.key)
   return found ? found.qty : 0
 }
 
 function incrementExtra(extra) {
   const max = extra.maximo || 99
-  const found = chosenExtras.value.find(e => e.extra.id === extra.id)
+  const found = chosenExtras.value.find(e => e.extra.key === extra.key)
   if (found) {
     if (found.qty < max) found.qty++
   } else {
@@ -360,7 +472,7 @@ function incrementExtra(extra) {
 }
 
 function decrementExtra(extra) {
-  const idx = chosenExtras.value.findIndex(e => e.extra.id === extra.id)
+  const idx = chosenExtras.value.findIndex(e => e.extra.key === extra.key)
   if (idx >= 0) {
     if (chosenExtras.value[idx].qty <= 1) {
       chosenExtras.value.splice(idx, 1)
@@ -372,17 +484,53 @@ function decrementExtra(extra) {
 
 // ── Extra selection (checkbox-based, max=1) ──
 function hasExtra(extra) {
-  return chosenExtraSet.value.has(extra.id)
+  return chosenExtraSet.value.has(extra.key)
 }
 
 function toggleExtra(extra) {
-  if (chosenExtraSet.value.has(extra.id)) {
-    chosenExtraSet.value.delete(extra.id)
+  if (chosenExtraSet.value.has(extra.key)) {
+    chosenExtraSet.value.delete(extra.key)
   } else {
-    chosenExtraSet.value.add(extra.id)
+    chosenExtraSet.value.add(extra.key)
   }
   // Force reactivity
   chosenExtraSet.value = new Set(chosenExtraSet.value)
+}
+
+// ── Opções do prato (gratuitas) ──
+function isOpcaoSelecionada(grupo, op) {
+  if (grupo.tipo === 'unica') return chosenOpcoes.value[grupo.grupo] === op.id
+  return (chosenOpcoesMulti.value[grupo.grupo] || []).includes(op.id)
+}
+
+function validarOpcoesObrigatorias() {
+  for (const grupo of selectedOpcoes.value) {
+    if (!grupo.obrigatoria) continue
+    const escolhida = grupo.tipo === 'unica'
+      ? chosenOpcoes.value[grupo.grupo]
+      : (chosenOpcoesMulti.value[grupo.grupo] || []).length
+    if (!escolhida) {
+      addToast(`Selecione "${grupo.grupo}" antes de adicionar.`, 'error')
+      return false
+    }
+  }
+  return true
+}
+
+function buildChosenOpcoesArray() {
+  const result = []
+  for (const grupo of selectedOpcoes.value) {
+    if (grupo.tipo === 'unica') {
+      const op = grupo.opcoes.find(o => o.id === chosenOpcoes.value[grupo.grupo])
+      if (op) result.push({ grupo: grupo.grupo, nome: op.nome })
+    } else {
+      for (const id of (chosenOpcoesMulti.value[grupo.grupo] || [])) {
+        const op = grupo.opcoes.find(o => o.id === id)
+        if (op) result.push({ grupo: grupo.grupo, nome: op.nome })
+      }
+    }
+  }
+  return result
 }
 
 // ── Build extra array for cart item ──
@@ -396,7 +544,7 @@ function buildChosenExtrasArray() {
   }
   // Checkbox extras
   for (const extra of selectedExtras.value) {
-    if (chosenExtraSet.value.has(extra.id)) {
+    if (chosenExtraSet.value.has(extra.key)) {
       result.push({ id: extra.id, nome: extra.nome, preco: extra.preco, qty: 1 })
     }
   }
@@ -421,9 +569,22 @@ function addToCart() {
     qty: e.qty
   }))
 
+  // Opções do prato (gratuitas) — grupos obrigatórios bloqueiam a adição
+  if (!validarOpcoesObrigatorias()) return
+  const opcoesArray = buildChosenOpcoesArray()
+
+  // Talheres obrigatório
+  if (selectedProduct.value.talheres_obrigatorio && typeof chosenTalheres.value !== 'boolean') {
+    addToast('Escolha se quer ou não talheres antes de adicionar.', 'error')
+    return
+  }
+
   const existingIndex = cartItems.value.findIndex(
     item => item.produto_id === selectedProduct.value.id &&
-      JSON.stringify(item.extras) === JSON.stringify(extrasLegacy)
+      JSON.stringify(item.extras) === JSON.stringify(extrasLegacy) &&
+      JSON.stringify(item.opcoes || []) === JSON.stringify(opcoesArray) &&
+      item.talheres === chosenTalheres.value &&
+      item.observacao === itemObservacao.value
   )
 
   if (existingIndex >= 0) {
@@ -438,6 +599,9 @@ function addToCart() {
       quantidade: 1,
       preco_unitario: selectedProduct.value.preco,
       extras: extrasLegacy,
+      opcoes: opcoesArray,
+      talheres: chosenTalheres.value,
+      observacao: itemObservacao.value,
       subtotal: itemTotal,
     }
     updateCart([...cartItems.value, newItem])
@@ -450,6 +614,12 @@ function addToCart() {
 }
 
 function quickAdd(product) {
+  // Produtos com subcategorias de adicionais ou opções abrem o modal para escolher
+  if ((product.subcategorias && product.subcategorias.length > 0) ||
+      (product.opcoes && product.opcoes.length > 0)) {
+    openProductModal(product)
+    return
+  }
   const extrasTotal = 0
   const existingIndex = cartItems.value.findIndex(
     item => item.produto_id === product.id && item.extras.length === 0
@@ -467,6 +637,9 @@ function quickAdd(product) {
       quantidade: 1,
       preco_unitario: product.preco,
       extras: [],
+      opcoes: [],
+      talheres: null,
+      observacao: '',
       subtotal: product.preco,
     }
     updateCart([...cartItems.value, newItem])

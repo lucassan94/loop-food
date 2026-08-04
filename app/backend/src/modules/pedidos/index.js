@@ -7,13 +7,14 @@ import { AppError } from '../../middleware/errorHandler.js';
 import { emitPedidoAtualizado, emitNovoPedido, emitEntregaDisponivel } from '../../services/realtime.js';
 import { orderLimiter } from '../../middleware/rateLimiter.js';
 import { validarEntrega } from '../../services/frete.js';
+import { validarItensPedido } from '../../services/itemValidation.js';
 
 const router = Router();
 
 // Schema de criação de pedido
 const createOrderSchema = z.object({
   cliente_id: z.number().optional(),
-  origem: z.enum(['delivery', 'salao']).optional().default('delivery'),
+  origem: z.enum(['delivery', 'salao', 'retirada']).optional().default('delivery'),
   mesa: z.string().optional(),
   nome_cliente: z.string().min(1, 'Nome do cliente é obrigatório.'),
   telefone_cliente: z.string().optional().default(''),
@@ -43,6 +44,12 @@ const createOrderSchema = z.object({
       preco: z.number(),
       qty: z.number().int().positive().optional(),
     })).optional().default([]),
+    opcoes: z.array(z.object({
+      grupo: z.string(),
+      nome: z.string(),
+    })).optional().default([]),
+    talheres: z.boolean().optional(),
+    observacao: z.string().optional().default(''),
     subtotal: z.number().positive(),
   })).min(1, 'Pedido deve ter pelo menos 1 item.'),
 });
@@ -64,6 +71,12 @@ const pdvOrderSchema = z.object({
       preco: z.number(),
       qty: z.number().int().positive().optional(),
     })).optional().default([]),
+    opcoes: z.array(z.object({
+      grupo: z.string(),
+      nome: z.string(),
+    })).optional().default([]),
+    talheres: z.boolean().optional(),
+    observacao: z.string().optional().default(''),
     subtotal: z.number().positive(),
   })).min(1, 'Pedido deve ter pelo menos 1 item.'),
 });
@@ -78,7 +91,18 @@ router.post('/', orderLimiter, optionalAuth, async (req, res, next) => {
 
       // IMPEDIR pedido fora do raio de entrega (validação server-side).
       // Salão (PDV) não tem endereço/frete — validação só para delivery.
-      if (data.origem !== 'salao') {
+      // Retirada: frete sempre zero e não exige endereço/raio.
+      if (data.origem === 'retirada') {
+        const restRetirada = await query(
+          'SELECT retirada_habilitada FROM restaurantes WHERE id = $1',
+          [restaurantId]
+        );
+        if (!restRetirada.rows[0]?.retirada_habilitada) {
+          throw new AppError('A retirada no local está desabilitada. Escolha entrega.', 400);
+        }
+        data.valor_frete = 0;
+        data.total = data.subtotal;
+      } else if (data.origem !== 'salao') {
         await validarEntrega(restaurantId, {
           latitude: data.latitude_cliente,
           longitude: data.longitude_cliente,
@@ -100,6 +124,9 @@ router.post('/', orderLimiter, optionalAuth, async (req, res, next) => {
         if (!loja.rows[0]?.status_loja) {
           throw new AppError('A loja está fechada no momento. Pedidos não podem ser realizados.', 400);
         }
+
+        // Validar itens do pedido (módulos, disponibilidade, talheres, opções)
+        await validarItensPedido(client, data.itens, data.origem);
 
         // Criar o pedido
         const pedido = await client.query(
@@ -128,13 +155,14 @@ router.post('/', orderLimiter, optionalAuth, async (req, res, next) => {
         // Inserir itens
         for (const item of data.itens) {
           await client.query(
-            `INSERT INTO pedido_itens (pedido_id, produto_id, nome_produto, quantidade, preco_unitario, extras, subtotal)
-           VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-            [
-              pedidoCriado.id, item.produto_id, item.nome_produto,
-              item.quantidade, item.preco_unitario,
-              JSON.stringify(item.extras), item.subtotal,
-            ]
+          `INSERT INTO pedido_itens (pedido_id, produto_id, nome_produto, quantidade, preco_unitario, extras, opcoes, observacao, talheres, subtotal)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+          [
+            pedidoCriado.id, item.produto_id, item.nome_produto,
+            item.quantidade, item.preco_unitario,
+            JSON.stringify(item.extras), JSON.stringify(item.opcoes || []),
+            item.observacao || '', item.talheres ?? null, item.subtotal,
+          ]
           );
         }
 
@@ -192,6 +220,9 @@ router.post('/pdv', authenticate, async (req, res, next) => {
         clienteId = novo.rows[0].id;
       }
 
+      // Validar itens do pedido (módulos, disponibilidade, talheres, opções)
+      await validarItensPedido(client, data.itens, 'salao');
+
       // Calcular subtotal e total dos itens
       let subtotalCalculado = 0;
       for (const item of data.itens) {
@@ -227,12 +258,13 @@ router.post('/pdv', authenticate, async (req, res, next) => {
       // Inserir itens
       for (const item of data.itens) {
         await client.query(
-          `INSERT INTO pedido_itens (pedido_id, produto_id, nome_produto, quantidade, preco_unitario, extras, subtotal)
-           VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+          `INSERT INTO pedido_itens (pedido_id, produto_id, nome_produto, quantidade, preco_unitario, extras, opcoes, observacao, talheres, subtotal)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
           [
             pedidoCriado.id, item.produto_id, item.nome_produto,
             item.quantidade, item.preco_unitario,
-            JSON.stringify(item.extras || []),
+            JSON.stringify(item.extras || []), JSON.stringify(item.opcoes || []),
+            item.observacao || '', item.talheres ?? null,
             (item.preco_unitario * item.quantidade) + (item.extras || []).reduce((acc, e) => acc + (e.preco || 0) * (e.qty || 1), 0),
           ]
         );
@@ -279,7 +311,8 @@ router.get('/', authenticate, async (req, res, next) => {
                (SELECT json_agg(json_build_object(
                  'id', pi.id, 'produto_id', pi.produto_id,
                  'nome_produto', pi.nome_produto, 'quantidade', pi.quantidade,
-                 'preco_unitario', pi.preco_unitario, 'extras', pi.extras,
+                 'preco_unitario', pi.preco_unitario, 'extras', pi.extras, 'opcoes', pi.opcoes,
+                 'observacao', pi.observacao, 'talheres', pi.talheres,
                  'subtotal', pi.subtotal
                )) FROM pedido_itens pi WHERE pi.pedido_id = p.id),
                '[]'::json
@@ -295,7 +328,8 @@ router.get('/', authenticate, async (req, res, next) => {
       sql += ' AND p.cliente_id = $' + (params.length + 1);
       params.push(id);
     } else if (role === 'entregador') {
-      sql += ' AND (p.entregador_id = $' + (params.length + 1) + ' OR (p.entregador_id IS NULL AND p.status = $' + (params.length + 2) + '))';
+      // Entregadores só veem ENTREGAS — retirada não entra na fila de entregas
+      sql += " AND p.origem = 'delivery' AND (p.entregador_id = $" + (params.length + 1) + ' OR (p.entregador_id IS NULL AND p.status = $' + (params.length + 2) + '))';
       params.push(id, 'pronto_entrega');
     }
 
@@ -368,7 +402,7 @@ router.get('/:id', authenticate, async (req, res, next) => {
                 (SELECT json_agg(json_build_object(
                   'id', pi.id, 'produto_id', pi.produto_id,
                   'nome_produto', pi.nome_produto, 'quantidade', pi.quantidade,
-                  'preco_unitario', pi.preco_unitario, 'extras', pi.extras,
+                  'preco_unitario', pi.preco_unitario, 'extras', pi.extras, 'opcoes', pi.opcoes,
                   'subtotal', pi.subtotal
                 )) FROM pedido_itens pi WHERE pi.pedido_id = p.id),
                 '[]'::json

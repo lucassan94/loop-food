@@ -170,14 +170,52 @@
             </div>
           </div>
 
-          <div class="extras-modal-body" v-if="extrasList.length > 0">
-            <h4 class="extras-section-title">
-              <i-lucide-plus-circle style="width:16px;height:16px" />
-              Adicionais (Opcional)
-            </h4>
-            <div class="extra-item" v-for="extra in extrasList" :key="extra.id">
-              <div class="extra-item-left">
-                <div class="extra-label">{{ extra.nome }}</div>
+          <div class="extras-modal-body" v-if="extrasList.length > 0 || extrasOpcoesList.length > 0">
+            <div v-if="extrasOpcoesList.length > 0">
+              <h4 class="extras-section-title">
+                <i-lucide-list-checks style="width:16px;height:16px" />
+                Opções do Prato
+              </h4>
+              <div v-for="grupo in extrasOpcoesList" :key="grupo.grupo" style="margin-bottom:0.6rem;">
+                <div style="font-size:0.85rem;font-weight:700;margin-bottom:0.3rem;">
+                  {{ grupo.grupo }}
+                  <span v-if="grupo.obrigatoria" style="color:var(--error);">*</span>
+                </div>
+                <label
+                  v-for="op in grupo.opcoes"
+                  :key="op.id"
+                  class="extra-item"
+                  style="cursor:pointer;padding:0.35rem 0;border:none;gap:8px;"
+                >
+                  <input
+                    v-if="grupo.tipo === 'unica'"
+                    type="radio"
+                    :name="'pdv-opc-' + grupo.grupo"
+                    :value="op.id"
+                    v-model="chosenOpcoes[grupo.grupo]"
+                    style="width:17px;height:17px;accent-color:var(--primary);margin:0;"
+                  />
+                  <input
+                    v-else
+                    type="checkbox"
+                    :value="op.id"
+                    v-model="chosenOpcoesMulti[grupo.grupo]"
+                    style="width:17px;height:17px;accent-color:var(--primary);margin:0;"
+                  />
+                  <span style="font-size:0.9rem;">{{ op.nome }}</span>
+                </label>
+              </div>
+            </div>
+            <div v-if="extrasList.length > 0">
+              <h4 class="extras-section-title">
+                <i-lucide-plus-circle style="width:16px;height:16px" />
+                Adicionais (Opcional)
+              </h4>
+              <div v-for="grupo in extrasGrupos" :key="grupo.nome" class="pdv-extra-grupo">
+                <div v-if="grupo.nome !== 'Geral'" class="pdv-extra-sub-titulo">{{ grupo.nome }}</div>
+                <div class="extra-item" v-for="extra in grupo.itens" :key="extra.key">
+                  <div class="extra-item-left">
+                    <div class="extra-label">{{ extra.nome }}</div>
                 <!-- Qty selector for max > 1 or unlimited -->
                 <div v-if="!extra.maximo || extra.maximo > 1" class="extra-qty-selector">
                   <button
@@ -202,7 +240,9 @@
                   <span>Adicionar</span>
                 </label>
               </div>
-              <span class="extra-price">{{ formatPrice(extra.preco) }}</span>
+                  <span class="extra-price">{{ formatPrice(extra.preco) }}</span>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -226,6 +266,7 @@
 import { ref, computed, onMounted, onUnmounted, inject } from 'vue'
 import api from '../services/api'
 import { connectRealtime, onEvent, offEvent } from '../services/realtime'
+import { PRODUCT_PLACEHOLDER } from '../utils/images'
 
 const globalLoading = inject('globalLoading')
 const loadingMessage = inject('loadingMessage')
@@ -290,7 +331,10 @@ const extrasModalOpen = ref(false)
 const extrasProduct = ref(null)
 const extrasList = ref([])
 const chosenExtras = ref([])          // [{extra, qty}] for qty-based extras
-const chosenExtraSet = ref(new Set()) // Set of extra IDs (simple checkbox mode)
+const chosenExtraSet = ref(new Set()) // Set of extra keys (simple checkbox mode)
+const extrasOpcoesList = ref([])      // grupos de opções do prato (gratuitas)
+const chosenOpcoes = ref({})          // grupo -> op.id (seleção única)
+const chosenOpcoesMulti = ref({})     // grupo -> [op.id, ...] (seleção múltipla)
 
 // Computed
 const filteredProducts = computed(() => {
@@ -312,6 +356,21 @@ const subtotal = computed(() => {
   return cart.value.reduce((acc, item) => acc + item.subtotal, 0)
 })
 
+// Adicionais agrupados por subcategoria (catálogo compartilhado + legado 'Geral')
+const extrasGrupos = computed(() => {
+  const grupos = []
+  const seen = new Map()
+  for (const extra of extrasList.value) {
+    const nome = extra.subcategoria || 'Geral'
+    if (!seen.has(nome)) {
+      seen.set(nome, { nome, itens: [] })
+      grupos.push(seen.get(nome))
+    }
+    seen.get(nome).itens.push(extra)
+  }
+  return grupos
+})
+
 const extrasItemTotal = computed(() => {
   if (!extrasProduct.value) return 0
   // Qty-based extras
@@ -328,7 +387,7 @@ function formatPrice(v) {
 }
 
 function productImgSrc(product) {
-  if (!product) return ''
+  if (!product) return PRODUCT_PLACEHOLDER
   if (product.imagem_base64) {
     const b64 = product.imagem_base64
     if (b64.startsWith('/9j/')) return 'data:image/jpeg;base64,' + b64
@@ -336,11 +395,13 @@ function productImgSrc(product) {
     return 'data:image/jpeg;base64,' + b64
   }
   if (product.imagem_url) return product.imagem_url
-  return ''
+  return PRODUCT_PLACEHOLDER
 }
 
 function onImgError(event) {
-  event.target.src = 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?auto=format&fit=crop&w=300&q=80'
+  // Evita loop infinito se o próprio placeholder falhar
+  if (event.target.src.startsWith('data:image/svg+xml')) return
+  event.target.src = PRODUCT_PLACEHOLDER
 }
 
 function filterProducts() {
@@ -350,8 +411,10 @@ function filterProducts() {
 // ── Cart operations ──
 
 function addToCart(product) {
-  // If product has extras, open modal to choose them
-  if (product.extras && product.extras.length > 0) {
+  // If product has extras, subcategories or options, open modal to choose them
+  if ((product.extras && product.extras.length > 0) ||
+      (product.subcategorias && product.subcategorias.length > 0) ||
+      (product.opcoes && product.opcoes.length > 0)) {
     openExtrasModal(product)
     return
   }
@@ -371,6 +434,7 @@ function addToCart(product) {
       quantidade: 1,
       preco_unitario: Number(product.preco),
       extras: [],
+      opcoes: [],
       subtotal: Number(product.preco),
     })
   }
@@ -408,11 +472,29 @@ function clearCart() {
 
 // ── Extras Modal ──
 
+function buildExtrasList(product) {
+  const list = []
+  // Itens do catálogo (subcategorias ativas) — key prefixada para não colidir com legado
+  for (const sub of product.subcategorias || []) {
+    for (const item of sub.itens || []) {
+      list.push({ key: 's' + item.id, subcategoria: sub.nome, id: item.id, nome: item.nome, preco: Number(item.preco), maximo: item.maximo })
+    }
+  }
+  // Adicionais avulsos (legado) — grupo 'Geral'
+  for (const extra of product.extras || []) {
+    list.push({ key: 'e' + extra.id, subcategoria: 'Geral', id: extra.id, nome: extra.nome, preco: Number(extra.preco), maximo: extra.maximo })
+  }
+  return list
+}
+
 function openExtrasModal(product) {
   extrasProduct.value = product
-  extrasList.value = product.extras || []
+  extrasList.value = buildExtrasList(product)
+  extrasOpcoesList.value = product.opcoes || []
   chosenExtras.value = []
   chosenExtraSet.value = new Set()
+  chosenOpcoes.value = {}
+  chosenOpcoesMulti.value = {}
   extrasModalOpen.value = true
 }
 
@@ -426,13 +508,13 @@ function closeExtrasModal() {
 
 // Qty-based extras (max > 1 or unlimited)
 function getExtraQty(extra) {
-  const found = chosenExtras.value.find(e => e.extra.id === extra.id)
+  const found = chosenExtras.value.find(e => e.extra.key === extra.key)
   return found ? found.qty : 0
 }
 
 function incrementExtra(extra) {
   const max = extra.maximo || 99
-  const found = chosenExtras.value.find(e => e.extra.id === extra.id)
+  const found = chosenExtras.value.find(e => e.extra.key === extra.key)
   if (found) {
     if (found.qty < max) found.qty++
   } else {
@@ -441,7 +523,7 @@ function incrementExtra(extra) {
 }
 
 function decrementExtra(extra) {
-  const idx = chosenExtras.value.findIndex(e => e.extra.id === extra.id)
+  const idx = chosenExtras.value.findIndex(e => e.extra.key === extra.key)
   if (idx >= 0) {
     if (chosenExtras.value[idx].qty <= 1) {
       chosenExtras.value.splice(idx, 1)
@@ -453,14 +535,14 @@ function decrementExtra(extra) {
 
 // Checkbox extras (max = 1)
 function hasExtra(extra) {
-  return chosenExtraSet.value.has(extra.id)
+  return chosenExtraSet.value.has(extra.key)
 }
 
 function toggleExtra(extra) {
-  if (chosenExtraSet.value.has(extra.id)) {
-    chosenExtraSet.value.delete(extra.id)
+  if (chosenExtraSet.value.has(extra.key)) {
+    chosenExtraSet.value.delete(extra.key)
   } else {
-    chosenExtraSet.value.add(extra.id)
+    chosenExtraSet.value.add(extra.key)
   }
   chosenExtraSet.value = new Set(chosenExtraSet.value)
 }
@@ -475,7 +557,7 @@ function buildChosenExtrasArray() {
   }
   // Checkbox extras
   for (const extra of extrasList.value) {
-    if (chosenExtraSet.value.has(extra.id)) {
+    if (chosenExtraSet.value.has(extra.key)) {
       result.push({ id: extra.id, nome: extra.nome, preco: extra.preco, qty: 1 })
     }
   }
@@ -499,10 +581,36 @@ function confirmExtras() {
     qty: e.qty,
   }))
 
+  // Opções do prato (gratuitas) — grupos obrigatórios bloqueiam a adição
+  for (const grupo of extrasOpcoesList.value) {
+    if (!grupo.obrigatoria) continue
+    const escolhida = grupo.tipo === 'unica'
+      ? chosenOpcoes.value[grupo.grupo]
+      : (chosenOpcoesMulti.value[grupo.grupo] || []).length
+    if (!escolhida) {
+      showFeedback(`Selecione "${grupo.grupo}" antes de adicionar.`, 'erro')
+      return
+    }
+  }
+
+  const opcoesArray = []
+  for (const grupo of extrasOpcoesList.value) {
+    if (grupo.tipo === 'unica') {
+      const op = grupo.opcoes.find(o => o.id === chosenOpcoes.value[grupo.grupo])
+      if (op) opcoesArray.push({ grupo: grupo.grupo, nome: op.nome })
+    } else {
+      for (const id of (chosenOpcoesMulti.value[grupo.grupo] || [])) {
+        const op = grupo.opcoes.find(o => o.id === id)
+        if (op) opcoesArray.push({ grupo: grupo.grupo, nome: op.nome })
+      }
+    }
+  }
+
   const product = extrasProduct.value
   const existingIndex = cart.value.findIndex(
     item => item.produto_id === product.id &&
-      JSON.stringify(item.extras) === JSON.stringify(extrasLegacy)
+      JSON.stringify(item.extras) === JSON.stringify(extrasLegacy) &&
+      JSON.stringify(item.opcoes || []) === JSON.stringify(opcoesArray)
   )
 
   if (existingIndex >= 0) {
@@ -515,6 +623,7 @@ function confirmExtras() {
       quantidade: 1,
       preco_unitario: Number(product.preco),
       extras: extrasLegacy,
+      opcoes: opcoesArray,
       subtotal: itemTotal,
     })
   }
@@ -553,6 +662,7 @@ async function createOrder() {
         quantidade: item.quantidade,
         preco_unitario: item.preco_unitario,
         extras: item.extras.map(e => ({ nome: e.nome, preco: e.preco, qty: e.qty || 1 })),
+        opcoes: item.opcoes || [],
         subtotal: item.subtotal,
       })),
     }
@@ -1097,6 +1207,23 @@ onUnmounted(() => {
 
 .extras-modal-body {
   padding: 1rem 1.25rem;
+}
+
+.pdv-extra-grupo {
+  margin-bottom: 0.25rem;
+}
+
+.pdv-extra-sub-titulo {
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  margin: 0.9rem 0 0.15rem;
+}
+
+.pdv-extra-grupo:first-child .pdv-extra-sub-titulo {
+  margin-top: 0;
 }
 
 .extras-section-title {

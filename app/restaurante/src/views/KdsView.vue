@@ -87,6 +87,11 @@
                   + {{ extra.nome }}{{ extra.qty > 1 ? ` (${extra.qty})` : '' }}
                 </span>
               </div>
+              <div v-if="item.opcoes?.length" class="kds-item-extras">
+                <span v-for="op in item.opcoes" :key="op.grupo + op.nome" class="kds-extra-tag kds-opcao-tag">
+                  {{ op.grupo }}: {{ op.nome }}
+                </span>
+              </div>
             </div>
           </div>
         </div>

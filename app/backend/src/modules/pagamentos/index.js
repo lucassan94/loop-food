@@ -17,6 +17,7 @@ import { authenticate, authorize } from '../../middleware/auth.js';
 import { AppError } from '../../middleware/errorHandler.js';
 import { emitNovoPedido } from '../../services/realtime.js';
 import { validarEntrega } from '../../services/frete.js';
+import { validarItensPedido } from '../../services/itemValidation.js';
 import * as rede from '../../services/rede.js';
 import { processarEventoRede } from './redeWebhookHandler.js';
 
@@ -89,6 +90,12 @@ router.post('/criar', authenticate, async (req, res, next) => {
           nome: z.string(),
           preco: z.number(),
         })).optional().default([]),
+        opcoes: z.array(z.object({
+          grupo: z.string(),
+          nome: z.string(),
+        })).optional().default([]),
+        talheres: z.boolean().optional(),
+        observacao: z.string().optional().default(''),
         subtotal: z.number().positive(),
       })).min(1),
       // Checkout transparente (Rede): dados BRUTOS do cartão passam pelo backend
@@ -134,6 +141,7 @@ router.post('/criar', authenticate, async (req, res, next) => {
     // IMPEDIR pedido fora do raio de entrega (online também é entrega).
     // Lança erro se a distância exceder o maior raio cadastrado ou se o
     // valor_frete enviado não conferir com o calculado no servidor.
+    // O pagamento online é sempre delivery (origem não é enviada, default 'delivery')
     await validarEntrega(restaurantId, {
       latitude: data.pedido.latitude,
       longitude: data.pedido.longitude,
@@ -171,15 +179,19 @@ router.post('/criar', authenticate, async (req, res, next) => {
           data.tempo_preparo_estimado || null, data.tempo_entrega_estimado || null,
         ]
       );
+      // Validar itens do pedido (módulos, disponibilidade, talheres, opções)
+      await validarItensPedido(conn, data.itens, 'delivery');
+
       const pedidoCriado = pedido.rows[0];
 
       for (const item of data.itens) {
         await conn.query(
-          `INSERT INTO pedido_itens (pedido_id, produto_id, nome_produto, quantidade, preco_unitario, extras, subtotal)
-           VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+          `INSERT INTO pedido_itens (pedido_id, produto_id, nome_produto, quantidade, preco_unitario, extras, opcoes, observacao, talheres, subtotal)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
           [pedidoCriado.id, item.produto_id, item.nome_produto,
            item.quantidade, item.preco_unitario,
-           JSON.stringify(item.extras), item.subtotal]
+           JSON.stringify(item.extras), JSON.stringify(item.opcoes || []),
+           item.observacao || '', item.talheres ?? null, item.subtotal]
         );
       }
 

@@ -118,6 +118,8 @@ export async function notificarStatusPedido(pedido) {
     em_transito: 'Entregador a caminho 🏍️',
     cheguei_destino: 'Entregador chegou 📍',
     entregue: 'Pedido entregue com sucesso! 🎉',
+    pronto: 'Seu pedido está pronto para retirar 🏪',
+    finalizado: 'Pedido retirado com sucesso! 🎉',
     cancelado: 'Pedido cancelado ❌',
     recusado: 'Pedido recusado',
   };
