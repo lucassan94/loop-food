@@ -1,0 +1,11 @@
+- Substituir placeholder de produto sem imagem por SVG simples e genérico
+---
+- Dificuldade para esvaziar carrinho
+- Opções do prato (ponto da carne)
+- Subcategorias dentro dos adicionais
+- Opção de talheres é obrigatório a escolha
+- Pode puxar toda a categoria de uma vez
+- Grupo de Acompanhametos pré-criados
+- Dias e hórários específicos para disponibilidade de pratos
+- Um campo de observação para cada produto na sacola
+- Acrescentar opção para retirar pessoalmente e deixar como opção parametrizável
