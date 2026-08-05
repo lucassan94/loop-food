@@ -166,6 +166,30 @@
     .inline-form input,.inline-form select{padding:7px 10px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;outline:none;font-family:inherit}
     .inline-form input:focus,.inline-form select:focus{border-color:var(--accent)}
 
+    /* Health beacons */
+    .health-section{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px 20px;margin-bottom:20px}
+    .health-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+    .health-header h3{font-size:15px;font-weight:700}
+    .health-actions{display:flex;align-items:center;gap:10px}
+    .health-updated{font-size:11px;color:var(--text-2)}
+    .health-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+    .health-card{background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;transition:var(--transition)}
+    .health-card-title{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;margin-bottom:8px}
+    .health-dot{width:10px;height:10px;border-radius:50%;display:inline-block;flex-shrink:0}
+    .health-dot.online{background:var(--success);box-shadow:0 0 8px var(--success)}
+    .health-dot.offline{background:var(--danger);box-shadow:0 0 8px var(--danger)}
+    .health-dot.checking{background:var(--warning);box-shadow:0 0 8px var(--warning);animation:pulse 1s ease infinite}
+    @keyframes pulse{50%{opacity:.4}}
+    .health-card-status{font-size:14px;font-weight:600;margin-bottom:8px}
+    .health-card-detail{font-size:12px;color:var(--text-2);line-height:1.7}
+    .health-item{display:flex;align-items:center;gap:8px;padding:3px 0}
+    .health-item .mini-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+    .health-item.ok .mini-dot{background:var(--success)}
+    .health-item.bad .mini-dot{background:var(--danger)}
+    .health-item-name{flex:1;font-weight:600;color:var(--text)}
+    .health-item-meta{font-size:11px;color:var(--text-2);text-align:right}
+    .health-item.bad .health-item-meta{color:var(--danger)}
+    @media(max-width:900px){.health-grid{grid-template-columns:1fr}}
     @media(max-width:768px){.header{padding:12px 16px}.header h1{font-size:15px}.container{padding:16px}.toolbar{flex-direction:column;align-items:stretch}.search-box{width:100%}.form-grid{grid-template-columns:1fr}.modal{max-width:100%;margin:10px}.modal-lg .modal{max-width:100%}}
   </style>
 </head>
@@ -188,6 +212,33 @@
 
   <!-- ==================== MAIN VIEW (Tenant List) ==================== -->
   <main class="container" id="mainView">
+    <!-- Faróis de Saúde da Aplicação -->
+    <div class="health-section" id="healthSection">
+      <div class="health-header">
+        <h3>🩺 Saúde da Aplicação</h3>
+        <div class="health-actions">
+          <span id="healthUpdated" class="health-updated"></span>
+          <button class="btn btn-outline btn-sm" onclick="loadSystemHealth()" id="healthRefreshBtn" title="Atualizar">↻</button>
+        </div>
+      </div>
+      <div class="health-grid">
+        <div class="health-card" id="healthCardDb">
+          <div class="health-card-title"><span class="health-dot" id="healthDotDb"></span> 🗄️ Banco de Dados</div>
+          <div class="health-card-status" id="healthStatusDb">Verificando…</div>
+          <div class="health-card-detail" id="healthDetailDb"></div>
+        </div>
+        <div class="health-card" id="healthCardApis">
+          <div class="health-card-title"><span class="health-dot" id="healthDotApis"></span> 🌐 APIs Online</div>
+          <div class="health-card-status" id="healthStatusApis">Verificando…</div>
+          <div class="health-card-detail" id="healthDetailApis"></div>
+        </div>
+        <div class="health-card" id="healthCardContainers">
+          <div class="health-card-title"><span class="health-dot" id="healthDotContainers"></span> 📦 Containers</div>
+          <div class="health-card-status" id="healthStatusContainers">Verificando…</div>
+          <div class="health-card-detail" id="healthDetailContainers"></div>
+        </div>
+      </div>
+    </div>
     <div class="toolbar">
       <h2>Tenants <small id="totalCount">0</small></h2>
       <div class="toolbar-actions">
@@ -676,6 +727,48 @@
         document.getElementById('dbDot').className = 'db-dot offline';
         document.getElementById('dbLabel').textContent = 'Desconectado';
       }
+    }
+
+    // ─── Saúde da Aplicação (faróis) ──────
+    async function loadSystemHealth() {
+      ['Db','Apis','Containers'].forEach(id => {
+        document.getElementById('healthDot'+id).className = 'health-dot checking';
+        document.getElementById('healthStatus'+id).textContent = 'Verificando…';
+      });
+      try {
+        const r = await fetch('/api/health/system');
+        if (!r.ok) throw new Error(await r.text());
+        renderHealth(await r.json());
+      } catch (err) {
+        setHealthCard('Db', false, 'Sem resposta', '');
+        setHealthCard('Apis', false, 'Sem resposta', '');
+        setHealthCard('Containers', false, 'Sem resposta', '');
+        document.getElementById('healthUpdated').textContent = '';
+      }
+    }
+    function setHealthCard(id, ok, status, detail) {
+      document.getElementById('healthDot'+id).className = 'health-dot ' + (ok ? 'online' : 'offline');
+      document.getElementById('healthStatus'+id).textContent = status;
+      document.getElementById('healthDetail'+id).innerHTML = detail;
+    }
+    function renderHealth(d) {
+      // Banco de Dados
+      setHealthCard('Db', d.db.online,
+        d.db.online ? `🟢 Online (${d.db.latencyMs}ms)` : '🔴 Offline',
+        d.db.online ? '' : `<div class="health-item bad"><span class="mini-dot"></span><span class="health-item-name">Erro</span><span class="health-item-meta">${esc(d.db.error||'')}</span></div>`);
+      // APIs
+      const apisOk = d.apis.every(a => a.ok);
+      const apisItems = d.apis.map(a => `<div class="health-item ${a.ok?'ok':'bad'}"><span class="mini-dot"></span><span class="health-item-name">${esc(a.nome)}</span><span class="health-item-meta">${a.ok ? a.status+' · '+a.latencyMs+'ms' : (a.error||'sem resposta')}</span></div>`).join('');
+      setHealthCard('Apis', apisOk,
+        apisOk ? `🟢 ${d.apis.filter(a=>a.ok).length}/${d.apis.length} respondendo` : `🔴 ${d.apis.filter(a=>a.ok).length}/${d.apis.length} respondendo`,
+        apisItems);
+      // Containers
+      const contOk = d.containers.every(c => c.ok);
+      const contItems = d.containers.map(c => `<div class="health-item ${c.ok?'ok':'bad'}"><span class="mini-dot"></span><span class="health-item-name">:${c.porta}</span><span class="health-item-meta">${c.ok ? c.status+' · '+c.latencyMs+'ms' : (c.error||'sem resposta')}</span></div>`).join('');
+      setHealthCard('Containers', contOk,
+        contOk ? `🟢 ${d.containers.filter(c=>c.ok).length}/${d.containers.length} saudáveis` : `🔴 ${d.containers.filter(c=>c.ok).length}/${d.containers.length} saudáveis`,
+        contItems);
+      document.getElementById('healthUpdated').textContent = 'Atualizado às ' + new Date(d.geradoEm).toLocaleTimeString('pt-BR');
     }
 
     // ─── Load Tenants ──────────
@@ -1683,7 +1776,8 @@
     document.querySelectorAll('.modal-overlay').forEach(el => { el.addEventListener('click', (e) => { if (e.target === el) closeModal(el.id); }); });
 
     // ─── Init ──────────────────
-    checkHealth(); loadTenants();
+    checkHealth(); loadSystemHealth(); loadTenants();
+    setInterval(loadSystemHealth, 30000);
   </script>
 </body>
 </html>

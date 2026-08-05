@@ -50,6 +50,85 @@ app.get('/api/health', (req, res) => {
 });
 
 // ============================================================================
+// FARÓIS DE SAÚDE DA APLICAÇÃO
+// ============================================================================
+// Retorna o status de 3 grupos:
+//   1. db         → conexão com o banco (SELECT 1) + latência
+//   2. apis       → endpoints da API backend (health + rotas públicas)
+//   3. containers → serviços publicados na stack (backend/cliente/router)
+// As URLs podem ser sobrescritas via env: GOD_HEALTH_BASE (IP base dos
+// serviços, default 86.48.18.22) e GOD_HEALTH_PORTS (portas, default 8090,8091,8094).
+// ============================================================================
+
+const HEALTH_BASE = process.env.GOD_HEALTH_BASE || '86.48.18.22';
+const HEALTH_PORTS = (process.env.GOD_HEALTH_PORTS || '8090,8091,8094').split(',').map(Number);
+
+// Probes da API backend (cada entrada: nome + caminho)
+const HEALTH_API_PROBES = [
+  { nome: 'Health', path: '/api/health' },
+  { nome: 'Cardápio', path: '/api/produtos/categorias' },
+  { nome: 'Restaurante', path: '/api/restaurante/' },
+];
+
+async function probeUrl(url, timeoutMs = 4000) {
+  const start = Date.now();
+  try {
+    const ctrl = new AbortController();
+    const to = setTimeout(() => ctrl.abort(), timeoutMs);
+    const r = await fetch(url, { signal: ctrl.signal, redirect: 'manual' });
+    clearTimeout(to);
+    return { online: true, status: r.status, latencyMs: Date.now() - start };
+  } catch (err) {
+    return { online: false, status: null, latencyMs: Date.now() - start, error: err.name === 'AbortError' ? 'timeout' : err.message };
+  }
+}
+
+app.get('/api/health/system', async (req, res) => {
+  const apiBase = `http://${HEALTH_BASE}:${HEALTH_PORTS[0] || 8090}`;
+
+  // 1) Banco de dados (com timeout alinhado aos probes HTTP)
+  let db = { online: false, latencyMs: null };
+  try {
+    const t0 = Date.now();
+    await Promise.race([
+      pool.query('SELECT 1'),
+      new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 4000)),
+    ]);
+    db = { online: true, latencyMs: Date.now() - t0 };
+  } catch (err) {
+    db = { online: false, latencyMs: null, error: err.message };
+  }
+
+  // 2) APIs online (backend)
+  const apiResults = await Promise.all(HEALTH_API_PROBES.map(async (p) => {
+    const r = await probeUrl(apiBase + p.path);
+    return { nome: p.nome, url: apiBase + p.path, ...r };
+  }));
+  const apis = apiResults.map(r => ({
+    ...r,
+    ok: r.online && r.status >= 200 && r.status < 500,
+  }));
+
+  // 3) Containers / serviços publicados
+  const containerResults = await Promise.all(HEALTH_PORTS.map(async (port) => {
+    const base = `http://${HEALTH_BASE}:${port}`;
+    const r = await probeUrl(base + '/');
+    return { porta: port, url: base, ...r };
+  }));
+  const containers = containerResults.map(c => ({
+    ...c,
+    ok: c.online && c.status >= 200 && c.status < 500,
+  }));
+
+  res.json({
+    db,
+    apis,
+    containers,
+    geradoEm: new Date().toISOString(),
+  });
+});
+
+// ============================================================================
 // TENANTS CRUD
 // ============================================================================
 
