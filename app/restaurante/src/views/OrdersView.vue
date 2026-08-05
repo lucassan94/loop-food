@@ -32,6 +32,11 @@
           <i-lucide-truck style="width:14px;height:14px" />
           <span>Delivery</span>
         </label>
+        <label class="origem-radio" :class="{ active: filtroOrigem === 'retirada' }">
+          <input type="radio" name="origemFiltro" value="retirada" v-model="filtroOrigem" @change="loadOrders" />
+          <i-lucide-store style="width:14px;height:14px" />
+          <span>Retirada</span>
+        </label>
       </div>
 
       <div class="date-radio-group">
@@ -79,8 +84,9 @@
             <strong>{{ order.pedido_id }}</strong>
             <span class="origem-badge" :class="order.origem || 'delivery'">
               <i-lucide-store v-if="order.origem === 'salao'" style="width:12px;height:12px" />
+              <i-lucide-store v-else-if="order.origem === 'retirada'" style="width:12px;height:12px" />
               <i-lucide-truck v-else style="width:12px;height:12px" />
-              {{ order.origem === 'salao' ? 'Salão' : 'Delivery' }}
+              {{ order.origem === 'salao' ? 'Salão' : (order.origem === 'retirada' ? 'Retirada' : 'Delivery') }}
             </span>
             — {{ order.nome_cliente }}
             <div style="font-size:0.8rem;color:var(--text-muted);">{{ formatDate(order.criado_em) }}</div>
@@ -136,7 +142,7 @@
           <!-- Preparando: Pronto (admin/gerente/chef) -->
           <template v-if="order.status === 'preparando'">
             <button v-if="order.origem === 'salao' && podeMarcarPronto" class="btn btn-primary btn-sm" @click="changeStatus(order.id, 'pronto')"><i-lucide-circle-check-big style="width:14px;height:14px" /> Pronto para Servir</button>
-            <button v-else-if="podeMarcarPronto" class="btn btn-primary btn-sm" @click="changeStatus(order.id, 'pronto_entrega')"><i-lucide-circle-check-big style="width:14px;height:14px" /> Pronto para Entrega</button>
+            <button v-else-if="podeMarcarPronto" class="btn btn-primary btn-sm" @click="changeStatus(order.id, 'pronto_entrega')"><i-lucide-circle-check-big style="width:14px;height:14px" /> {{ order.origem === 'retirada' ? 'Pronto para Retirada' : 'Pronto para Entrega' }}</button>
           </template>
 
           <!-- Pronto (Salão) - Finalizar Conta -->
@@ -199,7 +205,7 @@
             <td><strong>{{ order.pedido_id }}</strong></td>
             <td>
               <span class="origem-badge" :class="order.origem || 'delivery'" style="font-size:0.7rem;">
-                {{ order.origem === 'salao' ? 'Salão' : 'Delivery' }}
+                {{ order.origem === 'salao' ? 'Salão' : (order.origem === 'retirada' ? 'Retirada' : 'Delivery') }}
               </span>
             </td>
             <td><span v-if="order.mesa" class="mesa-badge">{{ order.mesa }}</span></td>
@@ -234,13 +240,25 @@
         <p style="color:var(--text-muted);margin-bottom:1rem;">{{ formatDate(selectedOrder.criado_em) }}</p>
 
         <div class="profile-section"><div class="profile-section-title">Itens</div>
-          <div v-for="item in selectedOrder.itens" :key="item.id" style="font-size:0.9rem;margin-bottom:4px;">
-            {{ item.quantidade }}x {{ item.nome_produto }} — {{ formatPrice(item.subtotal) }}
+          <div v-for="item in selectedOrder.itens" :key="item.id" style="font-size:0.9rem;margin-bottom:6px;">
+            <div>{{ item.quantidade }}x {{ item.nome_produto }} — {{ formatPrice(item.subtotal) }}</div>
+            <div v-if="item.extras?.length" style="font-size:0.8rem;color:var(--text-secondary);margin-left:1.25rem;">
+              + {{ item.extras.map(e => e.nome + (e.qty > 1 ? ` (${e.qty})` : '')).join(', ') }}
+            </div>
+            <div v-if="item.opcoes?.length" style="font-size:0.8rem;color:var(--text-secondary);margin-left:1.25rem;">
+              {{ item.opcoes.map(o => o.grupo + ': ' + o.nome).join(' • ') }}
+            </div>
+            <div v-if="item.talheres != null" style="font-size:0.8rem;margin-left:1.25rem;">🍴 {{ item.talheres ? 'Com talheres' : 'Sem talheres' }}</div>
+            <div v-if="item.observacao" style="font-size:0.8rem;font-style:italic;color:var(--text-secondary);margin-left:1.25rem;">📝 {{ item.observacao }}</div>
           </div>
         </div>
 
         <div class="profile-section"><div class="profile-section-title">Cliente</div>
-          <p style="font-size:0.85rem;">{{ selectedOrder.nome_cliente }}<br/>{{ selectedOrder.telefone_cliente }}<br/>{{ selectedOrder.endereco_cliente }}, {{ selectedOrder.numero_cliente }}<br/>{{ selectedOrder.bairro_cliente }}</p>
+          <p v-if="selectedOrder.origem === 'retirada'" style="font-size:0.85rem;">
+            {{ selectedOrder.nome_cliente }}<br/>{{ selectedOrder.telefone_cliente }}<br/>
+            <strong style="color:var(--info);">🏪 Retirada no local</strong>
+          </p>
+          <p v-else style="font-size:0.85rem;">{{ selectedOrder.nome_cliente }}<br/>{{ selectedOrder.telefone_cliente }}<br/>{{ selectedOrder.endereco_cliente }}, {{ selectedOrder.numero_cliente }}<br/>{{ selectedOrder.bairro_cliente }}</p>
         </div>
 
         <div class="profile-section"><div class="profile-section-title">Pagamento</div>
@@ -443,7 +461,7 @@ function formatDate(d) {
 }
 
 function statusLabel(s) {
-  const l = { pendente: 'Pendente', preparando: 'Preparando', pronto_entrega: 'Pronto (Delivery)', pronto: 'Pronto (Salão)', finalizado: 'Conta Finalizada', em_transito: 'Em Rota', cheguei_destino: 'No Local', entregue: 'Entregue', cancelado: 'Cancelado', recusado: 'Recusado', aguardando_pagamento: 'Aguardando Pagamento' }
+  const l = { pendente: 'Pendente', preparando: 'Preparando', pronto_entrega: 'Pronto', pronto: 'Pronto (Salão)', finalizado: 'Conta Finalizada', em_transito: 'Em Rota', cheguei_destino: 'No Local', entregue: 'Entregue', cancelado: 'Cancelado', recusado: 'Recusado', aguardando_pagamento: 'Aguardando Pagamento' }
   return l[s] || s
 }
 
@@ -860,6 +878,10 @@ onUnmounted(() => {
 .origem-badge.delivery {
   background: #dbeafe;
   color: #1e40af;
+}
+.origem-badge.retirada {
+  background: #dcfce7;
+  color: #166534;
 }
 .origem-badge svg {
   width: 12px;

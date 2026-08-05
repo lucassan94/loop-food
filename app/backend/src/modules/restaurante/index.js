@@ -63,7 +63,7 @@ router.get('/', async (req, res, next) => {
 router.put('/', authenticate, authorize('admin', 'gerente'), async (req, res, next) => {
   try {
     const restaurantId = req.restaurantId || config.restaurantId;
-    const { nome, endereco, cep, cidade, estado, latitude, longitude, tempo_preparo_min, modo_sem_entregador, formas_pagamento_aceitas, cor_primaria, cor_secundaria, cor_terciaria, features, logo_base64 } = req.body;
+    const { nome, endereco, cep, cidade, estado, latitude, longitude, tempo_preparo_min, modo_sem_entregador, formas_pagamento_aceitas, cor_primaria, cor_secundaria, cor_terciaria, features, logo_base64, retirada_habilitada, horarios_funcionamento } = req.body;
 
     const fields = [];
     const params = [];

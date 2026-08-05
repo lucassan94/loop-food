@@ -133,9 +133,16 @@
             </div>
             <div v-for="item in pedido.itens" :key="item.id" class="checkout-item-row">
               <span class="checkout-item-qty">{{ item.quantidade }}x</span>
-              <span class="checkout-item-name">{{ item.nome_produto }}</span>
-              <span v-if="item.extras?.length" class="checkout-item-extras">
-                <span v-for="e in item.extras" :key="e.nome">+ {{ e.nome }}</span>
+              <span class="checkout-item-name">
+                {{ item.nome_produto }}
+                <span v-if="item.extras?.length" class="checkout-item-extras">
+                  <span v-for="e in item.extras" :key="e.nome">+ {{ e.nome }}</span>
+                </span>
+                <span v-if="item.opcoes?.length" class="checkout-item-extras">
+                  {{ item.opcoes.map(o => o.grupo + ': ' + o.nome).join(' • ') }}
+                </span>
+                <span v-if="item.talheres != null" class="checkout-item-extras" style="color:var(--primary);">🍴 {{ item.talheres ? 'Com talheres' : 'Sem talheres' }}</span>
+                <span v-if="item.observacao" class="checkout-item-extras" style="font-style:italic;">📝 {{ item.observacao }}</span>
               </span>
               <span class="checkout-item-price">{{ formatPrice(item.subtotal) }}</span>
             </div>

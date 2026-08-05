@@ -403,6 +403,7 @@ router.get('/:id', authenticate, async (req, res, next) => {
                   'id', pi.id, 'produto_id', pi.produto_id,
                   'nome_produto', pi.nome_produto, 'quantidade', pi.quantidade,
                   'preco_unitario', pi.preco_unitario, 'extras', pi.extras, 'opcoes', pi.opcoes,
+                  'observacao', pi.observacao, 'talheres', pi.talheres,
                   'subtotal', pi.subtotal
                 )) FROM pedido_itens pi WHERE pi.pedido_id = p.id),
                 '[]'::json

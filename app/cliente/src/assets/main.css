@@ -1111,6 +1111,264 @@ input, textarea, select { font-family: inherit; }
   margin: 0;
 }
 
+/* Talheres (obrigatório por prato) */
+.talheres-grupo {
+  padding: 0.6rem 0;
+  border-bottom: 1px dashed var(--border-light);
+}
+
+.talheres-grupo-titulo {
+  font-size: 0.85rem;
+  font-weight: 700;
+  margin-bottom: 0.4rem;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.talheres-aviso {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
+.talheres-opcoes {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.talheres-opcao {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 10px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.talheres-opcao:hover {
+  border-color: var(--primary);
+}
+
+.talheres-opcao.selecionada {
+  border-color: var(--primary);
+  background: var(--primary-light);
+  color: var(--primary-dark);
+}
+
+.talheres-opcao input[type="radio"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--primary);
+  margin: 0;
+}
+
+/* Observação por item no modal */
+.item-observacao {
+  margin-top: 0.75rem;
+}
+
+.item-observacao label {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 600;
+  margin-bottom: 0.35rem;
+  color: var(--text-secondary);
+}
+
+.item-observacao textarea {
+  width: 100%;
+  min-height: 56px;
+  resize: vertical;
+  padding: 0.6rem 0.75rem;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 0.85rem;
+  outline: none;
+  background: var(--background);
+  transition: var(--transition);
+  font-family: inherit;
+}
+
+.item-observacao textarea:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-light);
+  background: var(--surface);
+}
+
+/* Observação na sacola (checkout) */
+.cart-item-obs {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  font-style: italic;
+  margin-top: 4px;
+  padding: 4px 8px;
+  background: var(--warning-light);
+  border-radius: var(--radius-sm);
+}
+
+.cart-item-obs.editable {
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.cart-item-obs.editable:hover {
+  background: var(--warning-light);
+  filter: brightness(0.97);
+}
+
+.cart-item-obs-input {
+  width: 100%;
+  min-height: 48px;
+  resize: vertical;
+  margin-top: 4px;
+  padding: 0.5rem 0.6rem;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 0.8rem;
+  outline: none;
+  font-family: inherit;
+}
+
+.cart-item-obs-input:focus {
+  border-color: var(--primary);
+}
+
+/* Entrega vs Retirada (checkout) */
+.entrega-tipo {
+  margin-bottom: 1.25rem;
+}
+
+.entrega-tipo-titulo {
+  font-size: 0.85rem;
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.entrega-tipo-opcoes {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.6rem;
+}
+
+.entrega-tipo-opcao {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 0.75rem 0.9rem;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  cursor: pointer;
+  transition: var(--transition);
+  text-align: left;
+}
+
+.entrega-tipo-opcao:hover {
+  border-color: var(--primary);
+}
+
+.entrega-tipo-opcao.selecionada {
+  border-color: var(--primary);
+  background: var(--primary-light);
+  box-shadow: 0 0 0 3px var(--primary-light);
+}
+
+.entrega-tipo-opcao input[type="radio"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--primary);
+  margin: 0;
+}
+
+.entrega-tipo-opcao .tipo-nome {
+  font-weight: 700;
+  font-size: 0.9rem;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.entrega-tipo-opcao .tipo-desc {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  line-height: 1.35;
+}
+
+.retirada-info {
+  background: var(--info-light);
+  border: 1px solid #bfdbfe;
+  border-radius: var(--radius-sm);
+  padding: 0.85rem 1rem;
+  margin-bottom: 1rem;
+  font-size: 0.85rem;
+  color: #1e40af;
+}
+
+.retirada-info strong {
+  display: block;
+  margin-bottom: 2px;
+}
+
+.retirada-info .retirada-endereco {
+  font-weight: 600;
+  margin-top: 4px;
+}
+
+.retirada-info .retirada-aviso {
+  font-size: 0.78rem;
+  opacity: 0.9;
+  margin-top: 4px;
+}
+
+.frete-gratis {
+  color: var(--success) !important;
+  font-weight: 700;
+}
+
+/* Classes usadas no CheckoutPanel.vue para Entrega vs Retirada */
+.entrega-option-radios {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 1rem;
+}
+
+.entrega-option {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 0.75rem 0.9rem;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  cursor: pointer;
+  transition: var(--transition);
+  text-align: left;
+}
+
+.entrega-option:hover {
+  border-color: var(--primary);
+}
+
+.entrega-option.active {
+  border-color: var(--primary);
+  background: var(--primary-light);
+  box-shadow: 0 0 0 3px var(--primary-light);
+}
+
 .modal-footer {
   display: flex;
   align-items: center;

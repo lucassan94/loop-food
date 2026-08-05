@@ -77,6 +77,8 @@
             <div v-if="item.extras?.length" class="pdv-cart-item-extras">
               <span v-for="e in item.extras" :key="e.nome">+ {{ e.nome }} ({{ formatPrice(e.preco * (e.qty || 1)) }})</span>
             </div>
+            <div v-if="item.talheres != null" class="pdv-cart-item-extras" style="color:var(--primary);">🍴 {{ item.talheres ? 'Com talheres' : 'Sem talheres' }}</div>
+            <div v-if="item.observacao" class="pdv-cart-item-extras" style="font-style:italic;">📝 {{ item.observacao }}</div>
           </div>
           <div class="pdv-cart-item-qty">
             <button class="qty-btn" @click="decrementQty(idx)">−</button>
@@ -206,6 +208,36 @@
                 </label>
               </div>
             </div>
+            <div v-if="extrasProduct?.talheres_obrigatorio" style="margin-bottom:0.75rem;">
+              <h4 class="extras-section-title">
+                <i-lucide-utensils style="width:16px;height:16px" />
+                Talheres <span style="color:var(--error);">*</span>
+              </h4>
+              <div style="display:flex;gap:8px;">
+                <label class="pdv-talher-btn" :class="{ ativa: chosenTalheres === true }">
+                  <input type="radio" name="pdv-talheres" :value="true" v-model="chosenTalheres" style="display:none;" />
+                  🍴 Sim, quero talheres
+                </label>
+                <label class="pdv-talher-btn" :class="{ ativa: chosenTalheres === false }">
+                  <input type="radio" name="pdv-talheres" :value="false" v-model="chosenTalheres" style="display:none;" />
+                  Não preciso
+                </label>
+              </div>
+            </div>
+
+            <div style="margin-bottom:0.75rem;">
+              <h4 class="extras-section-title">
+                <i-lucide-pen-line style="width:16px;height:16px" />
+                Observação (opcional)
+              </h4>
+              <textarea
+                v-model="chosenObservacao"
+                rows="2"
+                placeholder="Ex: sem cebola, ponto da carne..."
+                style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:6px;font-size:0.85rem;font-family:inherit;outline:none;resize:vertical;"
+              ></textarea>
+            </div>
+
             <div v-if="extrasList.length > 0">
               <h4 class="extras-section-title">
                 <i-lucide-plus-circle style="width:16px;height:16px" />
@@ -335,6 +367,8 @@ const chosenExtraSet = ref(new Set()) // Set of extra keys (simple checkbox mode
 const extrasOpcoesList = ref([])      // grupos de opções do prato (gratuitas)
 const chosenOpcoes = ref({})          // grupo -> op.id (seleção única)
 const chosenOpcoesMulti = ref({})     // grupo -> [op.id, ...] (seleção múltipla)
+const chosenTalheres = ref(null)      // talheres obrigatório (true/false)
+const chosenObservacao = ref('')      // observação individual do item
 
 // Computed
 const filteredProducts = computed(() => {
@@ -411,10 +445,11 @@ function filterProducts() {
 // ── Cart operations ──
 
 function addToCart(product) {
-  // If product has extras, subcategories or options, open modal to choose them
+  // If product has extras, subcategories, options or mandatory cutlery, open modal to choose them
   if ((product.extras && product.extras.length > 0) ||
       (product.subcategorias && product.subcategorias.length > 0) ||
-      (product.opcoes && product.opcoes.length > 0)) {
+      (product.opcoes && product.opcoes.length > 0) ||
+      product.talheres_obrigatorio) {
     openExtrasModal(product)
     return
   }
@@ -495,6 +530,8 @@ function openExtrasModal(product) {
   chosenExtraSet.value = new Set()
   chosenOpcoes.value = {}
   chosenOpcoesMulti.value = {}
+  chosenTalheres.value = null
+  chosenObservacao.value = ''
   extrasModalOpen.value = true
 }
 
@@ -606,26 +643,38 @@ function confirmExtras() {
     }
   }
 
+  // Talheres obrigatório bloqueia a adição
+  if (extrasProduct.value.talheres_obrigatorio && typeof chosenTalheres.value !== 'boolean') {
+    showFeedback('Escolha se quer ou não talheres antes de adicionar.', 'erro')
+    return
+  }
+
   const product = extrasProduct.value
   const existingIndex = cart.value.findIndex(
     item => item.produto_id === product.id &&
       JSON.stringify(item.extras) === JSON.stringify(extrasLegacy) &&
-      JSON.stringify(item.opcoes || []) === JSON.stringify(opcoesArray)
+      JSON.stringify(item.opcoes || []) === JSON.stringify(opcoesArray) &&
+      item.talheres === chosenTalheres.value &&
+      item.observacao === chosenObservacao.value
   )
+
+  const novoItem = {
+    produto_id: product.id,
+    nome_produto: product.nome,
+    quantidade: 1,
+    preco_unitario: Number(product.preco),
+    extras: extrasLegacy,
+    opcoes: opcoesArray,
+    talheres: product.talheres_obrigatorio ? chosenTalheres.value : null,
+    observacao: chosenObservacao.value,
+    subtotal: itemTotal,
+  }
 
   if (existingIndex >= 0) {
     cart.value[existingIndex].quantidade++
     cart.value[existingIndex].subtotal += itemTotal
   } else {
-    cart.value.push({
-      produto_id: product.id,
-      nome_produto: product.nome,
-      quantidade: 1,
-      preco_unitario: Number(product.preco),
-      extras: extrasLegacy,
-      opcoes: opcoesArray,
-      subtotal: itemTotal,
-    })
+    cart.value.push(novoItem)
   }
 
   cart.value = [...cart.value]
@@ -663,6 +712,8 @@ async function createOrder() {
         preco_unitario: item.preco_unitario,
         extras: item.extras.map(e => ({ nome: e.nome, preco: e.preco, qty: e.qty || 1 })),
         opcoes: item.opcoes || [],
+        talheres: item.talheres ?? undefined,
+        observacao: item.observacao || '',
         subtotal: item.subtotal,
       })),
     }
@@ -698,7 +749,8 @@ onMounted(async () => {
   // Load products with extras
   try {
     const { data } = await api.get('/produtos/com-extras')
-    products.value = data
+    // PDV (Salão) exibe apenas produtos habilitados para o módulo 'salao'
+    products.value = data.filter(p => !Array.isArray(p.modulos) || p.modulos.length === 0 || p.modulos.includes('salao'))
   } catch (err) {
     showFeedback('Erro ao carregar produtos.', 'erro')
   } finally {
@@ -1343,6 +1395,30 @@ onUnmounted(() => {
   padding: 0.65rem 1.25rem;
   font-size: 0.85rem;
   white-space: nowrap;
+}
+
+/* ── Talheres (PDV) ── */
+.pdv-talher-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 9px 10px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-xs);
+  background: var(--surface);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition);
+  color: var(--text-secondary);
+}
+.pdv-talher-btn:hover { border-color: var(--primary); }
+.pdv-talher-btn.ativa {
+  border-color: var(--primary);
+  background: var(--primary-light);
+  color: var(--primary-dark);
 }
 
 /* Feedback toast */

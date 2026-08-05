@@ -60,8 +60,9 @@
             <span class="kds-card-num">{{ order.pedido_id }}</span>
             <span class="kds-card-origin" :class="order.origem">
               <i-lucide-store v-if="order.origem === 'salao'" style="width:14px;height:14px" />
+              <i-lucide-store v-else-if="order.origem === 'retirada'" style="width:14px;height:14px" />
               <i-lucide-truck v-else style="width:14px;height:14px" />
-              {{ order.origem === 'salao' ? 'Salão' : 'Delivery' }}
+              {{ order.origem === 'salao' ? 'Salão' : (order.origem === 'retirada' ? 'Retirada' : 'Delivery') }}
             </span>
           </div>
           <div class="kds-card-timer" :class="{ urgent: isUrgent(order) }">
@@ -92,6 +93,10 @@
                   {{ op.grupo }}: {{ op.nome }}
                 </span>
               </div>
+              <div v-if="item.talheres != null" class="kds-item-extras">
+                <span class="kds-extra-tag kds-talher-tag">🍴 {{ item.talheres ? 'Com talheres' : 'Sem talheres' }}</span>
+              </div>
+              <div v-if="item.observacao" class="kds-item-obs">📝 {{ item.observacao }}</div>
             </div>
           </div>
         </div>
@@ -127,8 +132,9 @@
         <strong>Novo Pedido!</strong>
         <span class="kds-card-origin" :class="newOrderToast.origem" style="margin-left:auto;">
           <i-lucide-store v-if="newOrderToast.origem === 'salao'" style="width:12px;height:12px" />
+          <i-lucide-store v-else-if="newOrderToast.origem === 'retirada'" style="width:12px;height:12px" />
           <i-lucide-truck v-else style="width:12px;height:12px" />
-          {{ newOrderToast.origem === 'salao' ? 'Salão' : 'Delivery' }}
+          {{ newOrderToast.origem === 'salao' ? 'Salão' : (newOrderToast.origem === 'retirada' ? 'Retirada' : 'Delivery') }}
         </span>
       </div>
       <div class="kds-new-order-id">{{ newOrderToast.pedido_id }}</div>
@@ -720,6 +726,20 @@ onUnmounted(() => {
   border-radius: 3px;
   background: var(--border-light);
   color: var(--text-secondary);
+}
+
+.kds-talher-tag {
+  background: #fef3c7;
+  color: #92400e;
+}
+.kds-item-obs {
+  font-size: 0.78rem;
+  font-style: italic;
+  color: #92400e;
+  background: var(--warning-light);
+  border-radius: 3px;
+  padding: 2px 6px;
+  margin-top: 3px;
 }
 
 /* Observações */

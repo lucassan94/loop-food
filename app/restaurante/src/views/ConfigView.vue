@@ -58,6 +58,69 @@
         </div>
       </div>
 
+      <!-- Retirada no Local + Horários de Funcionamento -->
+      <div class="card">
+        <div class="card-header">
+          <i-lucide-store style="width:16px;height:16px" /> Retirada no Local
+        </div>
+        <div class="card-body">
+          <p style="font-size:0.85rem;color:var(--text-muted);margin-bottom:0.85rem;">
+            Permita que clientes retirem os pedidos pessoalmente no restaurante (frete zerado).
+          </p>
+          <div class="modo-entrega-radios" style="max-width:560px;">
+            <label class="modo-radio" :class="{ active: retiradaHabilitada }">
+              <input type="radio" name="retirada" :checked="retiradaHabilitada" @change="retiradaHabilitada = true" />
+              <span class="radio-dot"></span>
+              <div class="modo-radio-info">
+                <strong>Habilitada</strong>
+                <span>Clientes poderão escolher retirar no local no checkout.</span>
+              </div>
+            </label>
+            <label class="modo-radio" :class="{ active: !retiradaHabilitada }">
+              <input type="radio" name="retirada" :checked="!retiradaHabilitada" @change="retiradaHabilitada = false" />
+              <span class="radio-dot"></span>
+              <div class="modo-radio-info">
+                <strong>Desabilitada</strong>
+                <span>Somente entrega (delivery) disponível.</span>
+              </div>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <!-- Horários de Funcionamento por dia da semana -->
+      <div class="card">
+        <div class="card-header">
+          <i-lucide-clock style="width:16px;height:16px" /> Horários de Funcionamento
+        </div>
+        <div class="card-body">
+          <p style="font-size:0.85rem;color:var(--text-muted);margin-bottom:1rem;">
+            Defina os dias e horários em que a loja está aberta. Fora destes horários, novos pedidos são bloqueados.
+          </p>
+          <div class="horario-lista">
+            <div v-for="(dia, i) in horariosFuncionamento" :key="i" class="horario-row">
+              <span class="horario-dia">{{ diasSemana[i] }}</span>
+              <label class="toggle" style="flex-shrink:0;">
+                <input type="checkbox" v-model="dia.aberto" />
+                <span class="slider"></span>
+              </label>
+              <template v-if="dia.aberto">
+                <input v-model="dia.abre" type="time" class="horario-input" />
+                <span style="color:var(--text-muted);">até</span>
+                <input v-model="dia.fecha" type="time" class="horario-input" />
+              </template>
+              <span v-else class="horario-fechado">Fechado</span>
+            </div>
+          </div>
+          <div style="margin-top:1rem;display:flex;gap:8px;align-items:center;">
+            <button class="btn btn-primary" @click="salvarRetiradaHorarios" :disabled="salvandoRetirada">
+              {{ salvandoRetirada ? 'Salvando...' : 'Salvar Configurações' }}
+            </button>
+            <span v-if="retiradaMsg" class="retirada-msg" :class="retiradaMsg.tipo">{{ retiradaMsg.texto }}</span>
+          </div>
+        </div>
+      </div>
+
       <!-- Logo Upload -->
       <div class="card">
         <div class="card-header">
@@ -585,6 +648,13 @@ const cepMsg = ref(null)
 const novoRaio = reactive({ raio_km: '', tempo_min: '', tempo_max: '', custo: '' })
 const novoUsuario = reactive({ nome: '', apelido: '', password: 'senha123', cargo: 'caixa' })
 
+// ── Retirada + Horários ──
+const retiradaHabilitada = ref(false)
+const diasSemana = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado']
+const horariosFuncionamento = ref(Array.from({ length: 7 }, () => ({ aberto: true, abre: '08:00', fecha: '23:00' })))
+const salvandoRetirada = ref(false)
+const retiradaMsg = ref(null)
+
 // ── Mesa Management ──
 const mesas = ref([])
 const editandoMesaId = ref(null)
@@ -683,6 +753,14 @@ async function load() {
   })
   storeOpen.value = r.data.status_loja
   modoSemEntregador.value = r.data.modo_sem_entregador || false
+  retiradaHabilitada.value = r.data.retirada_habilitada || false
+  if (Array.isArray(r.data.horarios_funcionamento) && r.data.horarios_funcionamento.length === 7) {
+    horariosFuncionamento.value = r.data.horarios_funcionamento.map(d => ({
+      aberto: !!d.aberto,
+      abre: d.abre || '08:00',
+      fecha: d.fecha || '23:00',
+    }))
+  }
   formaspagamento.value = r.data.formas_pagamento_aceitas || ['dinheiro', 'credito', 'debito', 'pix', 'pix_online', 'credito_online']
   if (r.data.logo_base64) {
     logoPreview.value = 'data:image/png;base64,' + r.data.logo_base64
@@ -942,6 +1020,24 @@ function hexToRgba(hex, alpha) {
   return `rgba(${r}, ${g}, ${b}, ${alpha})`
 }
 
+async function salvarRetiradaHorarios() {
+  salvandoRetirada.value = true
+  retiradaMsg.value = null
+  try {
+    await api.put('/restaurante', {
+      retirada_habilitada: retiradaHabilitada.value,
+      horarios_funcionamento: horariosFuncionamento.value.map(d => ({
+        aberto: !!d.aberto,
+        abre: d.aberto ? d.abre || '08:00' : '',
+        fecha: d.aberto ? d.fecha || '23:00' : '',
+      })),
+    })
+    retiradaMsg.value = { tipo: 'success', texto: 'Configurações salvas com sucesso!' }
+  } catch (err) {
+    retiradaMsg.value = { tipo: 'error', texto: err.response?.data?.error || 'Erro ao salvar.' }
+  } finally { salvandoRetirada.value = false }
+}
+
 onMounted(() => { load(); carregarBanners(); loadMesas() })
 </script>
 
@@ -1024,6 +1120,21 @@ onMounted(() => { load(); carregarBanners(); loadMesas() })
 .modo-radio-info strong { font-size: 0.85rem; }
 .modo-radio-info span { font-size: 0.75rem; color: var(--text-muted); line-height: 1.35; }
 @media (max-width: 520px) { .modo-entrega-radios { grid-template-columns: 1fr; } }
+
+/* ── Horários de Funcionamento ── */
+.horario-lista { display: grid; gap: 0.5rem; }
+.horario-row { display: flex; align-items: center; gap: 0.85rem; padding: 0.55rem 0.75rem; border: 1px solid var(--border); border-radius: var(--radius-xs); background: var(--background); }
+.horario-dia { width: 90px; font-weight: 600; font-size: 0.85rem; }
+.horario-input { padding: 0.4rem 0.5rem; border: 1.5px solid var(--border); border-radius: var(--radius-xs); font-size: 0.85rem; outline: none; background: var(--surface); font-family: inherit; }
+.horario-input:focus { border-color: var(--primary); }
+.horario-fechado { color: var(--text-muted); font-size: 0.85rem; font-weight: 600; }
+.retirada-msg { font-size: 0.8rem; font-weight: 600; }
+.retirada-msg.success { color: var(--success, #16a34a); }
+.retirada-msg.error { color: var(--error, #ef4444); }
+@media (max-width: 520px) {
+  .horario-row { flex-wrap: wrap; }
+  .horario-dia { width: 100%; }
+}
 
 /* ── Toggle ── */
 .toggle { position: relative; width: 44px; height: 24px; display: inline-block; flex-shrink: 0; }

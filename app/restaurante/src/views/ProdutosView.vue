@@ -51,8 +51,7 @@
           <tr v-for="p in filteredProdutos" :key="p.id">
             <td>
               <div class="table-img-thumb">
-                <img v-if="getImageSrc(p)" :src="getImageSrc(p)" @error="onImageError(p.id)" />
-                <i-lucide-image v-else style="width:18px;height:18px;color:var(--text-muted)" />
+                <img :src="getImageSrc(p)" alt="" @error="onImageError(p.id)" />
               </div>
             </td>
             <td><strong>{{ p.nome }}</strong></td>
@@ -92,6 +91,9 @@
           </button>
           <button class="form-tab" :class="{ active: formTab === 'opcoes' }" @click="formTab = 'opcoes'">
             <i-lucide-list-checks style="width:16px;height:16px" /> Opções
+          </button>
+          <button class="form-tab" :class="{ active: formTab === 'disponibilidade' }" @click="formTab = 'disponibilidade'">
+            <i-lucide-calendar-clock style="width:16px;height:16px" /> Disponibilidade
           </button>
         </div>
 
@@ -257,6 +259,66 @@
           </button>
         </div>
 
+        <!-- Tab: Disponibilidade (talheres, modulos, dias e horarios) -->
+        <div v-show="formTab === 'disponibilidade'">
+          <div class="card-inline">
+            <div style="flex:1;">
+              <strong style="font-size:0.9rem;">🍴 Talheres obrigatório</strong>
+              <p style="font-size:0.8rem;color:var(--text-muted);margin-top:4px;">
+                Quando ativo, o cliente é obrigado a escolher entre "Sim" ou "Não" querer talheres antes de adicionar ao carrinho.
+              </p>
+            </div>
+            <label class="toggle">
+              <input type="checkbox" v-model="form.talheres_obrigatorio" />
+              <span class="slider"></span>
+            </label>
+          </div>
+
+          <div class="card-inline" style="flex-direction:column;align-items:flex-start;gap:0.5rem;">
+            <div>
+              <strong style="font-size:0.9rem;">🏪 Módulos onde o prato é vendido</strong>
+              <p style="font-size:0.8rem;color:var(--text-muted);margin-top:4px;">
+                Escolha em quais módulos o prato aparece. Ex: "Salão + Delivery", somente "Salão" ou somente "Delivery".
+              </p>
+            </div>
+            <div class="modulos-chips">
+              <label class="modulo-chip" :class="{ ativa: form.modulos.includes('salao') }">
+                <input type="checkbox" value="salao" v-model="form.modulos" />
+                <i-lucide-table-2 style="width:14px;height:14px" /> Salão
+              </label>
+              <label class="modulo-chip" :class="{ ativa: form.modulos.includes('delivery') }">
+                <input type="checkbox" value="delivery" v-model="form.modulos" />
+                <i-lucide-bike style="width:14px;height:14px" /> Delivery
+              </label>
+            </div>
+          </div>
+
+          <div class="card-inline" style="flex-direction:column;align-items:flex-start;gap:0.75rem;">
+            <div>
+              <strong style="font-size:0.9rem;">🕒 Dias e horários disponíveis</strong>
+              <p style="font-size:0.8rem;color:var(--text-muted);margin-top:4px;">
+                Fora do range selecionado, o prato fica automaticamente pausado no cardápio. Deixe todos os dias marcados e os horários vazios para ficar sempre disponível.
+              </p>
+            </div>
+            <div class="dias-grid">
+              <label v-for="(nome, idx) in diasSemana" :key="idx" class="dia-chip" :class="{ ativa: form.dias_semana.includes(idx) }">
+                <input type="checkbox" :value="idx" v-model="form.dias_semana" />
+                {{ nome }}
+              </label>
+            </div>
+            <div class="form-row" style="max-width:420px;">
+              <div class="form-group">
+                <label>Disponível a partir de</label>
+                <input v-model="form.horario_inicio" type="time" />
+              </div>
+              <div class="form-group">
+                <label>Até</label>
+                <input v-model="form.horario_fim" type="time" />
+              </div>
+            </div>
+          </div>
+        </div>
+
         <div style="display:flex;gap:8px;margin-top:1.5rem;padding-top:1rem;border-top:1px solid var(--border);">
           <button class="btn btn-primary" style="flex:1;" @click="salvar" :disabled="salvando">
             <i-lucide-loader v-if="salvando" class="spinning" style="width:16px;height:16px" />
@@ -381,6 +443,7 @@
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue'
 import api from '../services/api'
+import { PRODUCT_PLACEHOLDER } from '../utils/images'
 
 const produtos = ref([])
 const categorias = ref([])
@@ -418,12 +481,20 @@ function getImageSrc(prod) {
     return 'data:image/jpeg;base64,' + b64
   }
   if (prod.imagem_url && !brokenImages.value.has(prod.id)) return prod.imagem_url
-  return null
+  // Produto sem imagem (ou imagem quebrada) → placeholder SVG genérico
+  return PRODUCT_PLACEHOLDER
 }
+
+const diasSemana = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
 
 const form = reactive({
   nome: '', categoria_id: '', preco: 0, descricao: '',
-  imagem_url: '', imagem_base64: '', ativo: true, extras: [], opcoes: [], subcategorias: []
+  imagem_url: '', imagem_base64: '', ativo: true, extras: [], opcoes: [], subcategorias: [],
+  talheres_obrigatorio: false,
+  modulos: ['salao', 'delivery'],
+  dias_semana: [0, 1, 2, 3, 4, 5, 6],
+  horario_inicio: '',
+  horario_fim: '',
 })
 
 // Catálogo compartilhado de subcategorias de adicionais
@@ -475,7 +546,7 @@ function resetForm() {
   editingId.value = null
   formTab.value = 'dados'
   previewImage.value = ''
-  Object.assign(form, { nome: '', categoria_id: '', preco: 0, descricao: '', imagem_url: '', imagem_base64: '', ativo: true, extras: [], opcoes: [], subcategorias: [] })
+  Object.assign(form, { nome: '', categoria_id: '', preco: 0, descricao: '', imagem_url: '', imagem_base64: '', ativo: true, extras: [], opcoes: [], subcategorias: [], talheres_obrigatorio: false, modulos: ['salao', 'delivery'], dias_semana: [0, 1, 2, 3, 4, 5, 6], horario_inicio: '', horario_fim: '' })
 }
 
 function novoProduto() { resetForm(); showForm.value = true }
@@ -548,6 +619,11 @@ async function editar(p) {
       opcoes: g.opcoes.map(o => o.nome),
     }))
     form.subcategorias = (data.subcategorias || []).map(s => s.id)
+    form.talheres_obrigatorio = !!data.talheres_obrigatorio
+    form.modulos = Array.isArray(data.modulos) && data.modulos.length ? data.modulos : ['salao', 'delivery']
+    form.dias_semana = Array.isArray(data.dias_semana) && data.dias_semana.length ? data.dias_semana : [0, 1, 2, 3, 4, 5, 6]
+    form.horario_inicio = data.horario_inicio ? String(data.horario_inicio).substring(0, 5) : ''
+    form.horario_fim = data.horario_fim ? String(data.horario_fim).substring(0, 5) : ''
   } catch { form.extras = [] }
   showForm.value = true
 }
@@ -580,6 +656,11 @@ async function salvar() {
           opcoes: g.opcoes.map(o => o.trim()).filter(Boolean),
         })),
       subcategorias: form.subcategorias,
+      talheres_obrigatorio: form.talheres_obrigatorio,
+      modulos: form.modulos.length ? form.modulos : ['salao', 'delivery'],
+      dias_semana: form.dias_semana.length ? form.dias_semana : null,
+      horario_inicio: form.horario_inicio || null,
+      horario_fim: form.horario_fim || null,
     }
     if (editingId.value) await api.put(`/produtos/${editingId.value}`, payload)
     else await api.post('/produtos', payload)
@@ -726,6 +807,24 @@ onMounted(() => { load(); carregarCatalogo() })
 .extra-fields input { padding: 6px 8px; border: 1.5px solid var(--border); border-radius: 4px; font-size: 0.85rem; outline: none; transition: var(--transition); }
 .extra-fields input:focus { border-color: var(--primary); }
 .extras-header { margin-bottom: 0.75rem; padding-bottom: 0.5rem; border-bottom: 1px solid var(--border); }
+
+/* ── Disponibilidade ── */
+.card-inline {
+  display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+  padding: 0.85rem 1rem; border-radius: var(--radius-xs);
+  background: var(--border-light); border: 1px solid var(--border);
+  margin-bottom: 0.75rem;
+}
+.modulos-chips, .dias-grid { display: flex; flex-wrap: wrap; gap: 6px; }
+.modulo-chip, .dia-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 12px; border-radius: 999px; cursor: pointer;
+  border: 1.5px solid var(--border); background: var(--surface);
+  font-size: 0.82rem; font-weight: 600; transition: var(--transition);
+}
+.modulo-chip:hover, .dia-chip:hover { border-color: var(--primary); }
+.modulo-chip.ativa, .dia-chip.ativa { border-color: var(--primary); background: var(--primary-light); color: var(--primary-dark); }
+.modulo-chip input, .dia-chip input { width: 15px; height: 15px; accent-color: var(--primary); margin: 0; }
 
 /* Categoria List */
 .categoria-list { margin-bottom: 1rem; }

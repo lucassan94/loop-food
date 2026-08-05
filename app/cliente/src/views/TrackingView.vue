@@ -84,6 +84,12 @@
           <span>Previsão: <strong>{{ estimatedTime }}</strong></span>
         </div>
 
+        <!-- Retirada: aviso -->
+        <div v-if="isRetirada()" class="retirada-tracking">
+          <strong>🏪 Retirada no restaurante</strong>
+          <p>Seu pedido estará pronto para retirada. Você tem até o horário de fechamento para buscá-lo.</p>
+        </div>
+
         <!-- Progress Bar -->
         <div class="progress-bar">
           <div
@@ -208,20 +214,35 @@ const refundLabel = computed(() => {
   return '⏳ Aguardando estorno'
 })
 
-const timelineSteps = computed(() => [
-  { label: 'Pagamento', desc: order.value?.status === 'aguardando_pagamento' ? 'Aguardando pagamento ⏳' : 'Pagamento confirmado ✅', status: getStepStatus(0) },
-  { label: 'Confirmação', desc: 'Aguardando confirmação do restaurante', status: getStepStatus(1) },
-  { label: 'Preparando', desc: 'Seu pedido está na cozinha 🍳', status: getStepStatus(2) },
-  { label: 'Saiu para Entrega', desc: 'Pedido pronto, saindo do restaurante 📦', status: getStepStatus(3) },
-  { label: 'Entregador', desc: 'A caminho do seu endereço 🏍️', status: getStepStatus(4) },
-  { label: 'Entregue', desc: 'Pedido entregue com sucesso! 🎉', status: getStepStatus(5) },
-])
+const isRetirada = () => order.value?.origem === 'retirada'
+
+const timelineSteps = computed(() => {
+  if (isRetirada()) {
+    return [
+      { label: 'Pagamento', desc: order.value?.status === 'aguardando_pagamento' ? 'Aguardando pagamento ⏳' : 'Pagamento confirmado ✅', status: getStepStatus(0) },
+      { label: 'Confirmação', desc: 'Aguardando confirmação do restaurante', status: getStepStatus(1) },
+      { label: 'Preparando', desc: 'Seu pedido está na cozinha 🍳', status: getStepStatus(2) },
+      { label: 'Pronto para Retirada', desc: 'Seu pedido está pronto! Pode retirar no restaurante 🏪', status: getStepStatus(3) },
+      { label: 'Retirado', desc: 'Pedido retirado com sucesso! 🎉', status: getStepStatus(4) },
+    ]
+  }
+  return [
+    { label: 'Pagamento', desc: order.value?.status === 'aguardando_pagamento' ? 'Aguardando pagamento ⏳' : 'Pagamento confirmado ✅', status: getStepStatus(0) },
+    { label: 'Confirmação', desc: 'Aguardando confirmação do restaurante', status: getStepStatus(1) },
+    { label: 'Preparando', desc: 'Seu pedido está na cozinha 🍳', status: getStepStatus(2) },
+    { label: 'Saiu para Entrega', desc: 'Pedido pronto, saindo do restaurante 📦', status: getStepStatus(3) },
+    { label: 'Entregador', desc: 'A caminho do seu endereço 🏍️', status: getStepStatus(4) },
+    { label: 'Entregue', desc: 'Pedido entregue com sucesso! 🎉', status: getStepStatus(5) },
+  ]
+})
 
 const statusOrder = ['aguardando_pagamento', 'pendente', 'preparando', 'pronto_entrega', 'em_transito', 'cheguei_destino', 'entregue']
+const statusOrderRetirada = ['aguardando_pagamento', 'pendente', 'preparando', 'pronto_entrega', 'entregue']
 
 function getStepStatus(stepIndex) {
   if (!order.value) return 'pending'
-  const currentIndex = statusOrder.indexOf(order.value.status)
+  const lista = isRetirada() ? statusOrderRetirada : statusOrder
+  const currentIndex = lista.indexOf(order.value.status)
   if (currentIndex < 0) return 'pending'
   if (stepIndex < currentIndex) return 'completed'
   if (stepIndex === currentIndex) return 'active'
@@ -230,9 +251,10 @@ function getStepStatus(stepIndex) {
 
 const progressPercent = computed(() => {
   if (!order.value) return 0
-  const currentIndex = statusOrder.indexOf(order.value.status)
+  const lista = isRetirada() ? statusOrderRetirada : statusOrder
+  const currentIndex = lista.indexOf(order.value.status)
   if (currentIndex < 0) return 0
-  return ((currentIndex + 1) / statusOrder.length) * 100
+  return ((currentIndex + 1) / lista.length) * 100
 })
 
 const progressClass = computed(() => {
@@ -248,7 +270,7 @@ const estimatedTime = computed(() => {
   if (!order.value?.criado_em) return '—'
   const preparo = parseInt(order.value.tempo_preparo_estimado) || 20
   const entrega = parseInt(order.value.tempo_entrega_estimado) || 25
-  const totalMin = preparo + entrega
+  const totalMin = isRetirada() ? preparo : preparo + entrega
   const criado = new Date(order.value.criado_em)
   const previsao = new Date(criado.getTime() + totalMin * 60 * 1000)
   return previsao.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
@@ -261,7 +283,7 @@ const countdownText = computed(() => {
   }
   const preparo = parseInt(order.value.tempo_preparo_estimado) || 20
   const entrega = parseInt(order.value.tempo_entrega_estimado) || 25
-  const totalMin = preparo + entrega
+  const totalMin = isRetirada() ? preparo : preparo + entrega
   const mins = Math.max(0, totalMin - Math.floor(elapsedTime.value / 60))
   if (mins === 0) return 'Saindo agora! 🚀'
   return `~${mins} minutos`
@@ -272,10 +294,10 @@ function statusLabel(status) {
     aguardando_pagamento: 'Aguardando pagamento ⏳',
     pendente: 'Aguardando confirmação',
     preparando: 'Preparando seu pedido 🍳',
-    pronto_entrega: 'Saiu para entrega 📦',
+    pronto_entrega: isRetirada() ? 'Pronto para retirada 🏪' : 'Saiu para entrega 📦',
     em_transito: 'Entregador a caminho 🏍️',
     cheguei_destino: 'Entregador chegou 📍',
-    entregue: 'Entregue com sucesso! 🎉',
+    entregue: isRetirada() ? 'Retirado com sucesso! 🎉' : 'Entregue com sucesso! 🎉',
     cancelado: 'Pedido cancelado ❌',
     recusado: 'Pedido recusado ❌',
   }
@@ -458,4 +480,15 @@ onUnmounted(() => {
   color: #92400e;
   border: 1px solid #fde68a;
 }
+
+/* Retirada no local */
+.retirada-tracking {
+  margin-top: 10px;
+  padding: 10px 12px;
+  background: var(--info-light);
+  border-radius: 8px;
+  font-size: 0.85rem;
+  color: #1e40af;
+}
+.retirada-tracking p { margin-top: 2px; }
 </style>

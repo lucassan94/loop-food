@@ -276,6 +276,7 @@ router.get('/', async (req, res, next) => {
     let sql = `
       SELECT p.id, p.nome, p.descricao, p.preco, p.imagem_url, p.imagem_base64, p.ativo, p.destaque,
              p.categoria_id, c.nome as categoria_nome, c.slug as categoria_slug,
+             p.talheres_obrigatorio, p.modulos, p.dias_semana, p.horario_inicio, p.horario_fim,
              (SELECT COUNT(*) FROM produtos_extras pe WHERE pe.produto_id = p.id)
                + (SELECT COUNT(*) FROM extra_subcategoria_itens esi
                   JOIN produto_extra_subcategorias pes ON pes.subcategoria_id = esi.subcategoria_id
@@ -466,7 +467,7 @@ router.put('/extra-subcategorias/:id', authenticate, authorize('admin', 'gerente
       if (data.nome) {
         await client.query('UPDATE extra_subcategorias SET nome = $1 WHERE id = $2', [data.nome.trim(), id]);
       }
-      if (data.itens !== undefined) {
+      if ('itens' in req.body) {
         await client.query('DELETE FROM extra_subcategoria_itens WHERE subcategoria_id = $1', [id]);
         let ordem = 0;
         for (const item of data.itens) {
@@ -603,6 +604,13 @@ router.put('/:id', authenticate, authorize('admin', 'gerente', 'chef'), async (r
     const { id } = req.params;
     const data = productSchema.partial().parse(req.body);
 
+    // Remover campos NÃO enviados: o Zod .partial() mantém os defaults do schema
+    // (ex.: talheres_obrigatorio=false, ativo=true), o que sobrescreveria dados
+    // existentes em updates parciais. Só aplicamos o que veio no corpo.
+    for (const key of Object.keys(data)) {
+      if (!(key in req.body)) delete data[key];
+    }
+
     // Imagem em base64 → salvar na tabela imagens (banco) e usar a URL pública
     if (data.imagem_base64 && data.imagem_base64.length > 50) {
       // Remover imagem anterior (banco + disco) antes de substituir
@@ -636,8 +644,8 @@ router.put('/:id', authenticate, authorize('admin', 'gerente', 'chef'), async (r
 
       // Campos JSONB precisam ser serializados (pg serializa arrays JS como
       // arrays do Postgres, não como JSONB)
-      if (data.modulos !== undefined) data.modulos = JSON.stringify(data.modulos);
-      if (data.dias_semana !== undefined) data.dias_semana = JSON.stringify(data.dias_semana);
+      if ('modulos' in req.body) data.modulos = JSON.stringify(data.modulos);
+      if ('dias_semana' in req.body) data.dias_semana = JSON.stringify(data.dias_semana);
 
       for (const [key, value] of Object.entries(data)) {
         // extras/opcoes/subcategorias são relacionamentos — tratados abaixo
@@ -656,8 +664,8 @@ router.put('/:id', authenticate, authorize('admin', 'gerente', 'chef'), async (r
         );
       }
 
-      // Atualizar extras se fornecido (usando parâmetros seguros)
-      if (data.extras !== undefined) {
+      // Atualizar extras somente se enviado explicitamente
+      if ('extras' in req.body) {
         await client.query('DELETE FROM produtos_extras WHERE produto_id = $1', [id]);
 
         for (const extra of data.extras) {
@@ -668,14 +676,14 @@ router.put('/:id', authenticate, authorize('admin', 'gerente', 'chef'), async (r
         }
       }
 
-      // Atualizar opções do prato se fornecido
-      if (data.opcoes !== undefined) {
+      // Atualizar opções do prato somente se enviado explicitamente
+      if ('opcoes' in req.body) {
         await client.query('DELETE FROM produto_opcoes WHERE produto_id = $1', [id]);
         await inserirOpcoes(client, id, data.opcoes);
       }
 
-      // Atualizar subcategorias de adicionais se fornecido
-      if (data.subcategorias !== undefined) {
+      // Atualizar subcategorias de adicionais somente se enviado explicitamente
+      if ('subcategorias' in req.body) {
         await validarSubcategoriasDoRestaurante(client, restaurantId, data.subcategorias);
         await substituirSubcategoriasDoProduto(client, id, data.subcategorias);
       }

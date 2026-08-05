@@ -23,9 +23,12 @@
             <div class="order-number">{{ order.pedido_id }}</div>
             <div class="order-date">{{ formatDate(order.criado_em) }}</div>
           </div>
-          <span class="status-badge" :class="order.status">
-            {{ statusLabel(order.status) }}
-          </span>
+          <div style="text-align:right;">
+            <span v-if="order.origem === 'retirada'" class="retirada-badge">🏪 Retirada no local</span>
+            <span class="status-badge" :class="order.status">
+              {{ statusLabel(order.status, order.origem) }}
+            </span>
+          </div>
         </div>
 
         <!-- Kitchen Messages -->
@@ -38,6 +41,9 @@
         <div class="order-items-preview">
           {{ order.itens?.slice(0, 3).map(i => `${i.quantidade}x ${i.nome_produto}`).join(', ') }}
           <span v-if="order.itens?.length > 3">e mais {{ order.itens.length - 3 }} item(ns)</span>
+        </div>
+        <div v-if="order.itens?.some(i => i.observacao)" class="order-items-obs">
+          📝 {{ order.itens.filter(i => i.observacao).map(i => `${i.nome_produto}: ${i.observacao}`).join(' | ') }}
         </div>
 
         <div class="order-info">
@@ -141,15 +147,16 @@ function formatDate(dateStr) {
   })
 }
 
-function statusLabel(status) {
+function statusLabel(status, origem = 'delivery') {
+  const isRet = origem === 'retirada'
   const labels = {
     aguardando_pagamento: 'Aguardando Pagamento ⏳',
     pendente: 'Pendente',
     preparando: 'Preparando',
-    pronto_entrega: 'Saiu para Entrega',
+    pronto_entrega: isRet ? 'Pronto para Retirada' : 'Saiu para Entrega',
     em_transito: 'Em Trânsito',
     cheguei_destino: 'Entregador no Local',
-    entregue: 'Entregue',
+    entregue: isRet ? 'Retirado' : 'Entregue',
     cancelado: 'Cancelado',
     recusado: 'Recusado',
   }
@@ -234,6 +241,28 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+/* Retirada badge */
+.retirada-badge {
+  display: inline-block;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: var(--info-light);
+  color: #1e40af;
+  font-size: 0.72rem;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.order-items-obs {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  font-style: italic;
+  margin-bottom: 0.5rem;
+  background: var(--warning-light);
+  border-radius: 6px;
+  padding: 4px 8px;
+}
+
 /* Refund badge no cliente */
 .refund-badge-cliente {
   font-size: 0.8rem;
