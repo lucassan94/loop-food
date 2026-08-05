@@ -6,6 +6,15 @@
       Loja Fechada no momento — novos pedidos não podem ser realizados
     </div>
 
+    <!-- Countdown Banner (5 min antes de fechar) -->
+    <div v-if="mostrarContagemRegressiva" class="countdown-banner">
+      <div class="countdown-pulse"></div>
+      <i-lucide-alarm-clock style="width:18px;height:18px;flex-shrink:0;" />
+      <span class="countdown-text">
+        ⏰ A loja fecha em <strong>{{ tempoRestanteFormatado }}</strong>! Faça seu pedido agora.
+      </span>
+    </div>
+
     <!-- Main Content -->
     <main :class="{ 'main-cart-open': showCart }">
       <router-view
@@ -141,14 +150,48 @@ function restauranteAbertoAgora(horarios) {
   return minutosAgora >= minutosAbre && minutosAgora <= minutosFecha
 }
 
+// ── Contagem regressiva para fechar ──
+const minutosRestantes = ref(null)
+const mostrarContagemRegressiva = computed(() => {
+  return storeOpen.value && minutosRestantes.value !== null && minutosRestantes.value <= 5 && minutosRestantes.value > 0
+})
+const tempoRestanteFormatado = computed(() => {
+  if (minutosRestantes.value === null || minutosRestantes.value <= 0) return ''
+  const mins = minutosRestantes.value
+  if (mins <= 1) return 'menos de 1 minuto'
+  return `${mins} minuto${mins > 1 ? 's' : ''}`
+})
+
+function calcularMinutosAteFechar(horarios) {
+  if (!Array.isArray(horarios) || horarios.length !== 7) return null
+  const agora = new Date()
+  const diaSemana = agora.getDay()
+  const dia = horarios[diaSemana]
+  if (!dia || !dia.aberto) return 0
+  const fecha = dia.fecha || '23:00'
+  const [fh, fm] = fecha.split(':').map(Number)
+  const minutosAgora = agora.getHours() * 60 + agora.getMinutes()
+  const minutosFecha = (fh || 0) * 60 + (fm || 0)
+  // Overnight: se agora > fecha, loja já fechou
+  if (minutosFecha <= (dia.abre || '08:00').split(':').reduce((h, m) => parseInt(h) * 60 + parseInt(m), 0)) {
+    // Fecha amanhã → calcular a partir de agora até meia-noite + fecha
+    if (minutosAgora > minutosFecha) {
+      return (1440 - minutosAgora) + minutosFecha // até meia-noite + hora de fechar
+    }
+    return minutosFecha - minutosAgora
+  }
+  return minutosFecha - minutosAgora
+}
+
 let horariosInterval = null
 function iniciarVerificacaoHorarios() {
   if (horariosInterval) clearInterval(horariosInterval)
   horariosInterval = setInterval(() => {
     if (restaurantData.value.horarios_funcionamento.length === 7) {
       storeOpen.value = restauranteAbertoAgora(restaurantData.value.horarios_funcionamento)
+      minutosRestantes.value = calcularMinutosAteFechar(restaurantData.value.horarios_funcionamento)
     }
-  }, 60000) // Verifica a cada 1 minuto
+  }, 30000) // Verifica a cada 30 segundos (precisão para contagem regressiva)
 }
 
 // Navbar scroll hide
@@ -340,6 +383,7 @@ onMounted(async () => {
       // senão, usar o toggle manual status_loja
       if (Array.isArray(data.horarios_funcionamento) && data.horarios_funcionamento.length === 7) {
         storeOpen.value = restauranteAbertoAgora(data.horarios_funcionamento)
+        minutosRestantes.value = calcularMinutosAteFechar(data.horarios_funcionamento)
         iniciarVerificacaoHorarios()
       } else {
         storeOpen.value = data.status_loja
