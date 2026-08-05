@@ -299,7 +299,7 @@
           </div>
         </div>
         <div v-for="(op, oi) in opPadraoForm.opcoes" :key="oi" class="cat-item-row">
-          <input v-model="op" placeholder="Opção (ex: Ao ponto)" class="extra-name" />
+          <input :value="op" @input="opPadraoForm.opcoes[oi] = $event.target.value" placeholder="Opção (ex: Ao ponto)" class="extra-name" />
           <button class="btn btn-sm btn-danger" @click="opPadraoForm.opcoes.splice(oi, 1)">
             <i-lucide-x style="width:14px;height:14px" />
           </button>
