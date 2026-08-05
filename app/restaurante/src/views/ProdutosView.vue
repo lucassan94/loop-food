@@ -1,11 +1,26 @@
 <template>
   <div>
+    <!-- Abas do Cardápio: Produtos | Categorias | Subcategorias | Opções Padrão -->
+    <div class="cardapio-tabs">
+      <button class="cardapio-tab" :class="{ active: mainTab === 'produtos' }" @click="mainTab = 'produtos'">
+        <i-lucide-hamburger style="width:16px;height:16px" /> Produtos
+      </button>
+      <button class="cardapio-tab" :class="{ active: mainTab === 'categorias' }" @click="switchToCategorias">
+        <i-lucide-tags style="width:16px;height:16px" /> Categorias
+      </button>
+      <button class="cardapio-tab" :class="{ active: mainTab === 'subcategorias' }" @click="switchToSubcategorias">
+        <i-lucide-folder-tree style="width:16px;height:16px" /> Subcategorias Adicionais
+      </button>
+      <button class="cardapio-tab" :class="{ active: mainTab === 'opcoesPadrao' }" @click="switchToOpcoesPadrao">
+        <i-lucide-list-checks style="width:16px;height:16px" /> Opções Padrão
+      </button>
+    </div>
+
+    <!-- ─────────── Aba: PRODUTOS ─────────── -->
+    <div v-show="mainTab === 'produtos'">
     <div style="display:flex;justify-content:space-between;margin-bottom:1rem;align-items:center;">
       <h2 style="font-size:1.2rem;">Gerenciar Produtos</h2>
       <div style="display:flex;gap:8px;">
-        <button class="btn btn-secondary" @click="showCategoriasModal = true">
-          <i-lucide-tags style="width:16px;height:16px" /> Categorias
-        </button>
         <button class="btn btn-primary" @click="novoProduto">+ Novo Produto</button>
       </div>
     </div>
@@ -71,6 +86,234 @@
           </tr>
         </tbody>
       </table>
+    </div>
+    </div> <!-- /aba produtos -->
+
+    <!-- ─────────── Aba: CATEGORIAS ─────────── -->
+    <div v-show="mainTab === 'categorias'" class="cardapio-section">
+      <div class="cardapio-header">
+        <div>
+          <h2 style="font-size:1.2rem;">🏷️ Categorias do Cardápio</h2>
+          <p class="cardapio-sub">Crie, edite ou remova as categorias usadas para organizar os produtos e também como subcategorias de adicionais (ex: usar a categoria "Bebidas" inteira como grupo de adicionais).</p>
+        </div>
+      </div>
+
+      <div class="card" style="padding:1rem;">
+        <div class="categoria-list">
+          <div v-for="cat in categorias" :key="cat.id" class="categoria-row">
+            <div class="categoria-info">
+              <span class="cat-order">{{ cat.ordem }}</span>
+              <strong>{{ cat.nome }}</strong>
+              <code style="font-size:0.75rem;color:var(--text-muted);">{{ cat.slug }}</code>
+              <span class="cat-prod-count" v-if="cat.produto_count > 0">{{ cat.produto_count }} produto(s)</span>
+            </div>
+            <div class="categoria-actions">
+              <button class="btn btn-sm btn-secondary" @click="editarCategoria(cat)">
+                <i-lucide-pencil style="width:14px;height:14px" />
+              </button>
+              <button class="btn btn-sm btn-danger" @click="excluirCategoria(cat)">
+                <i-lucide-trash-2 style="width:14px;height:14px" />
+              </button>
+            </div>
+          </div>
+          <p v-if="categorias.length === 0" style="color:var(--text-muted);font-size:0.85rem;">Nenhuma categoria cadastrada.</p>
+        </div>
+
+        <div style="margin-top:1rem;padding-top:1rem;border-top:1px solid var(--border);">
+          <h4 style="font-size:0.9rem;margin-bottom:0.5rem;">
+            {{ editandoCategoria ? '✏️ Editar Categoria' : '➕ Nova Categoria' }}
+          </h4>
+          <div style="display:flex;gap:8px;">
+            <input v-model="catForm.nome" placeholder="Nome da categoria" style="flex:1;padding:8px 12px;border:1.5px solid var(--border);border-radius:6px;font-size:0.9rem;" @keyup.enter="salvarCategoria" />
+            <button class="btn btn-primary btn-sm" @click="salvarCategoria" :disabled="!catForm.nome.trim() || salvandoCat">
+              {{ salvandoCat ? '...' : editandoCategoria ? 'Atualizar' : 'Criar' }}
+            </button>
+            <button v-if="editandoCategoria" class="btn btn-secondary btn-sm" @click="cancelarEditCategoria">Cancelar</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─────────── Aba: SUBCATEGORIAS DE ADICIONAIS ─────────── -->
+    <div v-show="mainTab === 'subcategorias'" class="cardapio-section">
+      <div class="cardapio-header">
+        <div>
+          <h2 style="font-size:1.2rem;">📂 Subcategorias de Adicionais</h2>
+          <p class="cardapio-sub">Grupos pré-cadastrados que aparecem no modal de cada produto. Cada item pode ter imagem e descrição próprias. Ou use uma categoria do cardápio inteira (ex: Bebidas) — os produtos ativos dela viram os itens, com o preço do próprio produto.</p>
+        </div>
+        <button class="btn btn-primary" @click="novaCatalogoSub">
+          <i-lucide-plus style="width:16px;height:16px" /> Nova Subcategoria
+        </button>
+      </div>
+
+      <div class="card" style="padding:1rem;">
+        <div v-for="sub in subcategoriasCatalogo" :key="sub.id" class="cat-sub">
+          <div class="cat-sub-header">
+            <div style="display:flex;align-items:center;gap:8px;">
+              <strong>{{ sub.nome }}</strong>
+              <span v-if="sub.tipo === 'categoria'" class="badge badge-info" title="Usa produtos de uma categoria do cardápio">
+                <i-lucide-tags style="width:12px;height:12px" /> {{ sub.categoria_nome || 'Categoria' }}
+              </span>
+              <span v-else class="badge">Manual</span>
+            </div>
+            <span style="font-size:0.75rem;color:var(--text-muted);">{{ sub.itens.length }} itens</span>
+            <div style="display:flex;gap:4px;">
+              <button class="btn btn-sm btn-secondary" @click="editarCatalogoSub(sub)">Editar</button>
+              <button class="btn btn-sm btn-danger" @click="excluirCatalogoSub(sub)">Excluir</button>
+            </div>
+          </div>
+          <div class="cat-sub-itens">
+            <span v-for="item in sub.itens" :key="item.id" class="cat-item-chip" :title="item.descricao || ''">
+              <img v-if="itemImgSrc(item)" :src="itemImgSrc(item)" class="cat-item-img" alt="" />
+              {{ item.nome }} — {{ formatPrice(item.preco) }}
+            </span>
+            <span v-if="sub.itens.length === 0" style="font-size:0.8rem;color:var(--text-muted);">sem itens</span>
+          </div>
+        </div>
+        <p v-if="subcategoriasCatalogo.length === 0" style="color:var(--text-muted);font-size:0.85rem;">
+          Nenhuma subcategoria cadastrada.
+        </p>
+      </div>
+
+      <!-- Form nova/edição -->
+      <div v-if="catalogForm.nome !== '' || catalogEditId || novaCatAberta" class="card" style="padding:1rem;margin-top:1rem;">
+        <h4 style="font-size:0.9rem;margin-bottom:0.75rem;">
+          {{ catalogEditId ? '✏️ Editar subcategoria' : '➕ Nova subcategoria' }}
+        </h4>
+        <div class="form-row" style="margin-bottom:0.5rem;">
+          <div class="form-group" style="flex:1;">
+            <label>Nome (ex: Porções)</label>
+            <input v-model="catalogForm.nome" placeholder="Nome da subcategoria" />
+          </div>
+          <div class="form-group" style="flex:1;">
+            <label>Tipo</label>
+            <select v-model="catalogForm.tipo">
+              <option value="manual">Itens manuais</option>
+              <option value="categoria">Categoria do cardápio inteira</option>
+            </select>
+          </div>
+        </div>
+        <div v-if="catalogForm.tipo === 'categoria'" class="form-group" style="margin-bottom:0.5rem;">
+          <label>Categoria do cardápio (os produtos ativos dela viram os itens)</label>
+          <select v-model="catalogForm.categoria_id">
+            <option value="">Selecione...</option>
+            <option v-for="c in categorias" :key="c.id" :value="c.id">{{ c.nome }}</option>
+          </select>
+        </div>
+
+        <template v-if="catalogForm.tipo === 'manual'">
+          <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:0.5rem;">
+            Cada item pode ter <strong>imagem</strong> e <strong>descrição</strong> próprias (opcional).
+          </p>
+          <div v-for="(item, i) in catalogForm.itens" :key="i" class="cat-item-row" style="flex-wrap:wrap;">
+            <input v-model="item.nome" placeholder="Item (ex: Arroz)" class="extra-name" />
+            <input v-model.number="item.preco" type="number" step="0.50" min="0" placeholder="0,00" style="width:80px;" />
+            <input v-model.number="item.maximo" type="number" min="0" placeholder="Máx" style="width:56px;" title="Máximo por item (1 = checkbox, >1 = quantidade)" />
+            <div class="item-edit-actions">
+              <label class="btn btn-sm btn-secondary" style="cursor:pointer;margin:0;">
+                <i-lucide-image style="width:14px;height:14px" />
+                {{ item.imagem_base64 || item.imagem_url ? 'Trocar img' : 'Imagem' }}
+                <input type="file" accept="image/png,image/jpeg,image/webp" style="display:none" @change="onItemImageSelected($event, item)" />
+              </label>
+              <input v-model="item.descricao" placeholder="Descrição (opcional)" style="flex:1;min-width:140px;" />
+              <button class="btn btn-sm btn-danger" @click="catalogForm.itens.splice(i, 1)">
+                <i-lucide-x style="width:14px;height:14px" />
+              </button>
+            </div>
+          </div>
+          <button class="btn btn-secondary btn-sm" @click="catalogForm.itens.push({ nome: '', preco: 0, maximo: 1, descricao: '', imagem_url: '', imagem_base64: '' })">
+            <i-lucide-plus style="width:14px;height:14px" /> Item
+          </button>
+        </template>
+        <p v-else style="font-size:0.8rem;color:var(--text-muted);">
+          Os itens são os produtos <strong>ativos</strong> da categoria selecionada, com o preço de cada produto. Sempre sincronizado com o cardápio.
+        </p>
+
+        <div style="display:flex;gap:8px;margin-top:1rem;">
+          <button class="btn btn-primary btn-sm" @click="salvarCatalogoSub" :disabled="!catalogForm.nome.trim() || (catalogForm.tipo === 'categoria' && !catalogForm.categoria_id)">
+            {{ catalogEditId ? 'Atualizar' : 'Criar' }}
+          </button>
+          <button v-if="catalogEditId || novaCatAberta" class="btn btn-secondary btn-sm" @click="cancelarCatalogoEdit">Cancelar</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─────────── Aba: OPÇÕES PADRÃO DO PRATO ─────────── -->
+    <div v-show="mainTab === 'opcoesPadrao'" class="cardapio-section">
+      <div class="cardapio-header">
+        <div>
+          <h2 style="font-size:1.2rem;">✅ Opções Padrão do Prato</h2>
+          <p class="cardapio-sub">Grupos de opções gratuitas reutilizáveis (ex: "Ponto da carne"). Cadastre uma vez e vincule a vários produtos — <strong>vínculo ao vivo</strong>: editar o grupo aqui atualiza todos os produtos que o usam.</p>
+        </div>
+        <button class="btn btn-primary" @click="novaOpcaoPadrao">
+          <i-lucide-plus style="width:16px;height:16px" /> Novo Grupo Padrão
+        </button>
+      </div>
+
+      <div class="card" style="padding:1rem;">
+        <div v-for="grupo in opcoesPadraoCatalogo" :key="grupo.id" class="cat-sub">
+          <div class="cat-sub-header">
+            <div style="display:flex;align-items:center;gap:8px;">
+              <strong>{{ grupo.grupo }}</strong>
+              <span class="badge" :class="grupo.obrigatoria ? 'badge-danger' : 'badge-info'">{{ grupo.obrigatoria ? 'Obrigatória' : 'Opcional' }}</span>
+              <span class="badge">{{ grupo.tipo === 'unica' ? 'Seleção única' : 'Seleção múltipla' }}</span>
+            </div>
+            <div style="display:flex;gap:4px;">
+              <button class="btn btn-sm btn-secondary" @click="editarOpcaoPadrao(grupo)">Editar</button>
+              <button class="btn btn-sm btn-danger" @click="excluirOpcaoPadrao(grupo)">Excluir</button>
+            </div>
+          </div>
+          <div class="cat-sub-itens">
+            <span v-for="op in grupo.opcoes" :key="op.id" class="cat-item-chip">{{ op.nome }}</span>
+            <span v-if="grupo.opcoes.length === 0" style="font-size:0.8rem;color:var(--text-muted);">sem opções</span>
+          </div>
+        </div>
+        <p v-if="opcoesPadraoCatalogo.length === 0" style="color:var(--text-muted);font-size:0.85rem;">
+          Nenhum grupo padrão cadastrado.
+        </p>
+      </div>
+
+      <!-- Form nova/edição -->
+      <div v-if="opPadraoFormAberto" class="card" style="padding:1rem;margin-top:1rem;">
+        <h4 style="font-size:0.9rem;margin-bottom:0.75rem;">
+          {{ opPadraoEditId ? '✏️ Editar grupo padrão' : '➕ Novo grupo padrão' }}
+        </h4>
+        <div class="form-row" style="margin-bottom:0.5rem;">
+          <div class="form-group" style="flex:1.5;">
+            <label>Nome do grupo (ex: Ponto da carne)</label>
+            <input v-model="opPadraoForm.grupo" placeholder="Ex: Ponto da carne" />
+          </div>
+          <div class="form-group" style="flex:1;">
+            <label>Tipo de seleção</label>
+            <select v-model="opPadraoForm.tipo">
+              <option value="unica">Seleção única (radio)</option>
+              <option value="multipla">Seleção múltipla (checkbox)</option>
+            </select>
+          </div>
+          <div class="form-group" style="flex:1;">
+            <label>Obrigatória</label>
+            <label class="toggle" style="margin-top:8px;">
+              <input type="checkbox" v-model="opPadraoForm.obrigatoria" />
+              <span class="slider"></span>
+            </label>
+          </div>
+        </div>
+        <div v-for="(op, oi) in opPadraoForm.opcoes" :key="oi" class="cat-item-row">
+          <input v-model="op" placeholder="Opção (ex: Ao ponto)" class="extra-name" />
+          <button class="btn btn-sm btn-danger" @click="opPadraoForm.opcoes.splice(oi, 1)">
+            <i-lucide-x style="width:14px;height:14px" />
+          </button>
+        </div>
+        <button class="btn btn-secondary btn-sm" @click="opPadraoForm.opcoes.push('')">
+          <i-lucide-plus style="width:14px;height:14px" /> Opção
+        </button>
+        <div style="display:flex;gap:8px;margin-top:1rem;">
+          <button class="btn btn-primary btn-sm" @click="salvarOpcaoPadrao" :disabled="!opPadraoForm.grupo.trim() || !opPadraoForm.opcoes.some(o => o.trim())">
+            {{ opPadraoEditId ? 'Atualizar' : 'Criar' }}
+          </button>
+          <button class="btn btn-secondary btn-sm" @click="fecharOpcaoPadrao">Cancelar</button>
+        </div>
+      </div>
     </div>
 
     <!-- Product Form Modal -->
@@ -187,7 +430,7 @@
           <p v-else style="color:var(--text-muted);font-size:0.85rem;">
             Nenhuma subcategoria cadastrada ainda — clique em "Gerenciar catálogo" para pré-cadastrar.
           </p>
-          <button class="btn btn-secondary btn-sm" style="margin-top:0.5rem;" @click="openCatalogoModal">
+          <button class="btn btn-secondary btn-sm" style="margin-top:0.5rem;" @click="gerenciarCatalogoDoForm">
             <i-lucide-list-checks style="width:14px;height:14px" /> Gerenciar catálogo de adicionais
           </button>
 
@@ -223,9 +466,35 @@
 
         <!-- Tab: Opções do Prato (gratuitas) -->
         <div v-show="formTab === 'opcoes'">
+          <div v-if="opcoesPadraoCatalogo.length > 0" class="card-inline" style="flex-direction:column;align-items:flex-start;gap:0.5rem;margin-bottom:1rem;">
+            <div>
+              <strong style="font-size:0.9rem;">📋 Grupos padrão do catálogo (vínculo ao vivo)</strong>
+              <p style="font-size:0.8rem;color:var(--text-muted);margin-top:4px;">
+                Marque os grupos padrão pré-cadastrados que este produto usa. Editar o grupo na aba "Opções Padrão" atualiza todos os produtos vinculados.
+              </p>
+            </div>
+            <div class="subcats-grid">
+              <label
+                v-for="g in opcoesPadraoCatalogo"
+                :key="g.id"
+                class="subcat-check"
+                :class="{ ativa: form.opcoes_padrao.includes(g.id) }"
+              >
+                <input type="checkbox" :value="g.id" v-model="form.opcoes_padrao" />
+                <span>
+                  <strong>{{ g.grupo }}</strong>
+                  <small>{{ g.obrigatoria ? 'Obrigatória' : 'Opcional' }} · {{ g.opcoes.length }} opções</small>
+                </span>
+              </label>
+            </div>
+            <button class="btn btn-secondary btn-sm" @click="gerenciarOpcoesPadraoDoForm">
+              <i-lucide-list-checks style="width:14px;height:14px" /> Gerenciar grupos padrão
+            </button>
+          </div>
+
           <div class="extras-header">
             <p style="color:var(--text-muted);font-size:0.85rem;">
-              Opções <strong>gratuitas</strong> que o cliente escolhe (ex: ponto da carne, com/sem açúcar).
+              Ou crie opções <strong>avulsas deste produto</strong> (gratuitas, ex: ponto da carne, com/sem açúcar).
               Não alteram o preço. <strong>Seleção única</strong> = radio; <strong>Seleção múltipla</strong> = checkbox.
               Marque <strong>Obrigatória</strong> para exigir a escolha antes de adicionar ao carrinho.
             </p>
@@ -458,8 +727,11 @@ const formTab = ref('dados')
 const previewImage = ref('')
 const fileInput = ref(null)
 
-// Categories modal
-const showCategoriasModal = ref(false)
+// Abas do cardápio
+const mainTab = ref('produtos')
+const novaCatAberta = ref(false)
+
+// Categories (aba)
 const editandoCategoria = ref(null)
 const salvandoCat = ref(false)
 const catForm = reactive({ nome: '' })
@@ -489,7 +761,7 @@ const diasSemana = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
 
 const form = reactive({
   nome: '', categoria_id: '', preco: 0, descricao: '',
-  imagem_url: '', imagem_base64: '', ativo: true, extras: [], opcoes: [], subcategorias: [],
+  imagem_url: '', imagem_base64: '', ativo: true, extras: [], opcoes: [], opcoes_padrao: [], subcategorias: [],
   talheres_obrigatorio: false,
   modulos: ['salao', 'delivery'],
   dias_semana: [0, 1, 2, 3, 4, 5, 6],
@@ -499,9 +771,14 @@ const form = reactive({
 
 // Catálogo compartilhado de subcategorias de adicionais
 const subcategoriasCatalogo = ref([])
-const showCatalogoModal = ref(false)
 const catalogEditId = ref(null)
-const catalogForm = reactive({ nome: '', itens: [] })
+const catalogForm = reactive({ nome: '', tipo: 'manual', categoria_id: '', itens: [] })
+
+// Catálogo de Opções Padrão do Prato (vínculo ao vivo)
+const opcoesPadraoCatalogo = ref([])
+const opPadraoEditId = ref(null)
+const opPadraoFormAberto = ref(false)
+const opPadraoForm = reactive({ grupo: '', tipo: 'unica', obrigatoria: false, opcoes: [''] })
 
 function formatPrice(v) { return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v) }
 
@@ -546,12 +823,24 @@ function resetForm() {
   editingId.value = null
   formTab.value = 'dados'
   previewImage.value = ''
-  Object.assign(form, { nome: '', categoria_id: '', preco: 0, descricao: '', imagem_url: '', imagem_base64: '', ativo: true, extras: [], opcoes: [], subcategorias: [], talheres_obrigatorio: false, modulos: ['salao', 'delivery'], dias_semana: [0, 1, 2, 3, 4, 5, 6], horario_inicio: '', horario_fim: '' })
+  Object.assign(form, { nome: '', categoria_id: '', preco: 0, descricao: '', imagem_url: '', imagem_base64: '', ativo: true, extras: [], opcoes: [], opcoes_padrao: [], subcategorias: [], talheres_obrigatorio: false, modulos: ['salao', 'delivery'], dias_semana: [0, 1, 2, 3, 4, 5, 6], horario_inicio: '', horario_fim: '' })
 }
 
 function novoProduto() { resetForm(); showForm.value = true }
 function addExtra() { form.extras.push({ nome: '', preco: 0, maximo: 1 }) }
 function addOpcaoGrupo() { form.opcoes.push({ grupo: '', tipo: 'unica', obrigatoria: false, opcoes: [''] }) }
+
+// ── Navegação entre abas ──
+function switchToCategorias() { mainTab.value = 'categorias'; carregarCategorias() }
+function switchToSubcategorias() { mainTab.value = 'subcategorias'; carregarCatalogo() }
+function switchToOpcoesPadrao() { mainTab.value = 'opcoesPadrao'; carregarOpcoesPadrao() }
+
+async function carregarCategorias() {
+  try {
+    const { data } = await api.get('/produtos/categorias')
+    categorias.value = data
+  } catch { /* ignore */ }
+}
 
 // ── Catálogo de subcategorias de adicionais ──
 async function carregarCatalogo() {
@@ -561,35 +850,76 @@ async function carregarCatalogo() {
   } catch { subcategoriasCatalogo.value = [] }
 }
 
-function openCatalogoModal() {
+function novaCatalogoSub() {
   cancelarCatalogoEdit()
-  carregarCatalogo()
-  showCatalogoModal.value = true
+  novaCatAberta.value = true
 }
 
 function editarCatalogoSub(sub) {
+  novaCatAberta.value = true
   catalogEditId.value = sub.id
   catalogForm.nome = sub.nome
-  catalogForm.itens = sub.itens.map(i => ({ nome: i.nome, preco: Number(i.preco), maximo: i.maximo ?? 1 }))
+  catalogForm.tipo = sub.tipo || 'manual'
+  catalogForm.categoria_id = sub.categoria_id ? String(sub.categoria_id) : ''
+  catalogForm.itens = (sub.itens || []).map(i => ({
+    nome: i.nome, preco: Number(i.preco), maximo: i.maximo ?? 1,
+    descricao: i.descricao || '', imagem_url: i.imagem_url || '', imagem_base64: i.imagem_base64 || '',
+  }))
 }
 
 function cancelarCatalogoEdit() {
   catalogEditId.value = null
+  novaCatAberta.value = false
   catalogForm.nome = ''
+  catalogForm.tipo = 'manual'
+  catalogForm.categoria_id = ''
   catalogForm.itens = []
+}
+
+// Imagem de item do catálogo (base64 — sem upload de arquivo)
+function onItemImageSelected(event, item) {
+  const file = event.target.files[0]
+  if (!file) return
+  if (file.size > 2 * 1024 * 1024) { alert('Imagem muito grande! Máximo 2MB.'); return }
+  const reader = new FileReader()
+  reader.onload = (e) => {
+    item.imagem_base64 = e.target.result.split(',')[1]
+    item.imagem_url = ''
+  }
+  reader.readAsDataURL(file)
+  event.target.value = ''
+}
+
+function itemImgSrc(item) {
+  if (item?.imagem_base64) {
+    const b64 = item.imagem_base64
+    if (b64.startsWith('/9j/')) return 'data:image/jpeg;base64,' + b64
+    if (b64.startsWith('iVBORw0KGgo')) return 'data:image/png;base64,' + b64
+    if (b64.startsWith('R0lGOD')) return 'data:image/gif;base64,' + b64
+    if (b64.startsWith('UklGR')) return 'data:image/webp;base64,' + b64
+    try { const d = atob(b64.substring(0, 20)); if (d.startsWith('<svg')) return 'data:image/svg+xml;base64,' + b64 } catch {}
+    return 'data:image/jpeg;base64,' + b64
+  }
+  return item?.imagem_url || ''
 }
 
 async function salvarCatalogoSub() {
   const nome = catalogForm.nome.trim()
   if (!nome) return
+  const tipo = catalogForm.tipo || 'manual'
+  const categoria_id = tipo === 'categoria' ? (catalogForm.categoria_id ? Number(catalogForm.categoria_id) : null) : null
   const itens = catalogForm.itens
     .filter(i => i.nome.trim())
-    .map(i => ({ nome: i.nome.trim(), preco: i.preco || 0, maximo: i.maximo ?? 1 }))
+    .map(i => ({
+      nome: i.nome.trim(), preco: i.preco || 0, maximo: i.maximo ?? 1,
+      descricao: i.descricao || '', imagem_url: i.imagem_url || '', imagem_base64: i.imagem_base64 || '',
+    }))
   try {
-    if (catalogEditId.value) await api.put(`/produtos/extra-subcategorias/${catalogEditId.value}`, { nome, itens })
-    else await api.post('/produtos/extra-subcategorias', { nome, itens })
+    if (catalogEditId.value) await api.put(`/produtos/extra-subcategorias/${catalogEditId.value}`, { nome, tipo, categoria_id, itens })
+    else await api.post('/produtos/extra-subcategorias', { nome, tipo, categoria_id, itens })
     cancelarCatalogoEdit()
     await carregarCatalogo()
+    await load()
   } catch (err) { alert(err.response?.data?.error || 'Erro ao salvar subcategoria.') }
 }
 
@@ -600,6 +930,62 @@ async function excluirCatalogoSub(sub) {
     form.subcategorias = form.subcategorias.filter(id => id !== sub.id)
     await carregarCatalogo()
   } catch (err) { alert(err.response?.data?.error || 'Erro ao excluir subcategoria.') }
+}
+
+// ── Opções Padrão do Prato (catálogo compartilhado) ──
+async function carregarOpcoesPadrao() {
+  try {
+    const { data } = await api.get('/produtos/opcoes-padrao')
+    opcoesPadraoCatalogo.value = data
+  } catch { opcoesPadraoCatalogo.value = [] }
+}
+
+function novaOpcaoPadrao() {
+  opPadraoEditId.value = null
+  opPadraoForm.grupo = ''
+  opPadraoForm.tipo = 'unica'
+  opPadraoForm.obrigatoria = false
+  opPadraoForm.opcoes = ['']
+  opPadraoFormAberto.value = true
+}
+
+function editarOpcaoPadrao(grupo) {
+  opPadraoEditId.value = grupo.id
+  opPadraoForm.grupo = grupo.grupo
+  opPadraoForm.tipo = grupo.tipo || 'unica'
+  opPadraoForm.obrigatoria = !!grupo.obrigatoria
+  opPadraoForm.opcoes = grupo.opcoes.map(o => o.nome)
+  opPadraoFormAberto.value = true
+}
+
+function fecharOpcaoPadrao() {
+  opPadraoFormAberto.value = false
+  opPadraoEditId.value = null
+}
+
+async function salvarOpcaoPadrao() {
+  const grupo = opPadraoForm.grupo.trim()
+  if (!grupo) return
+  const payload = {
+    grupo,
+    tipo: opPadraoForm.tipo,
+    obrigatoria: !!opPadraoForm.obrigatoria,
+    opcoes: opPadraoForm.opcoes.map(o => o.trim()).filter(Boolean),
+  }
+  try {
+    if (opPadraoEditId.value) await api.put(`/produtos/opcoes-padrao/${opPadraoEditId.value}`, payload)
+    else await api.post('/produtos/opcoes-padrao', payload)
+    fecharOpcaoPadrao()
+    await carregarOpcoesPadrao()
+  } catch (err) { alert(err.response?.data?.error || 'Erro ao salvar grupo padrão.') }
+}
+
+async function excluirOpcaoPadrao(grupo) {
+  if (!confirm(`Excluir o grupo padrão "${grupo.grupo}"? Produtos vinculados deixarão de exibir estas opções.`)) return
+  try {
+    await api.delete(`/produtos/opcoes-padrao/${grupo.id}`)
+    await carregarOpcoesPadrao()
+  } catch (err) { alert(err.response?.data?.error || 'Erro ao excluir grupo padrão.') }
 }
 
 async function editar(p) {
@@ -618,6 +1004,10 @@ async function editar(p) {
       obrigatoria: !!g.obrigatoria,
       opcoes: g.opcoes.map(o => o.nome),
     }))
+    // Grupos padrão vinculados (separar dos avulsos para não duplicar na edição)
+    const padraoIds = new Set(data.opcoes_padrao || [])
+    form.opcoes_padrao = [...padraoIds]
+    form.opcoes = form.opcoes.filter(g => !padraoIds.has(g.id))
     form.subcategorias = (data.subcategorias || []).map(s => s.id)
     form.talheres_obrigatorio = !!data.talheres_obrigatorio
     form.modulos = Array.isArray(data.modulos) && data.modulos.length ? data.modulos : ['salao', 'delivery']
@@ -655,6 +1045,7 @@ async function salvar() {
           obrigatoria: !!g.obrigatoria,
           opcoes: g.opcoes.map(o => o.trim()).filter(Boolean),
         })),
+      opcoes_padrao: form.opcoes_padrao,
       subcategorias: form.subcategorias,
       talheres_obrigatorio: form.talheres_obrigatorio,
       modulos: form.modulos.length ? form.modulos : ['salao', 'delivery'],

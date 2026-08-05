@@ -119,6 +119,38 @@ const unreadMessages = ref(0)
 // Restaurant data for pickup (retirada)
 const restaurantData = ref({ endereco: '', cidade: '', estado: '', retirada_habilitada: false, horarios_funcionamento: [] })
 
+// ── Verificação automática de horários de funcionamento ──
+function restauranteAbertoAgora(horarios) {
+  if (!Array.isArray(horarios) || horarios.length !== 7) return true // sem dados = aberto
+  const agora = new Date()
+  const diaSemana = agora.getDay() // 0=Domingo
+  const dia = horarios[diaSemana]
+  if (!dia || !dia.aberto) return false
+  const abre = dia.abre || '08:00'
+  const fecha = dia.fecha || '23:00'
+  // Converter HH:MM para minutos
+  const [ah, am] = abre.split(':').map(Number)
+  const [fh, fm] = fecha.split(':').map(Number)
+  const minutosAgora = agora.getHours() * 60 + agora.getMinutes()
+  const minutosAbre = (ah || 0) * 60 + (am || 0)
+  const minutosFecha = (fh || 0) * 60 + (fm || 0)
+  // Se fecha <= abre (ex: 22:00 às 02:00), considera overnight
+  if (minutosFecha <= minutosAbre) {
+    return minutosAgora >= minutosAbre || minutosAgora <= minutosFecha
+  }
+  return minutosAgora >= minutosAbre && minutosAgora <= minutosFecha
+}
+
+let horariosInterval = null
+function iniciarVerificacaoHorarios() {
+  if (horariosInterval) clearInterval(horariosInterval)
+  horariosInterval = setInterval(() => {
+    if (restaurantData.value.horarios_funcionamento.length === 7) {
+      storeOpen.value = restauranteAbertoAgora(restaurantData.value.horarios_funcionamento)
+    }
+  }, 60000) // Verifica a cada 1 minuto
+}
+
 // Navbar scroll hide
 const navHidden = ref(false)
 let lastScrollY = 0
@@ -297,13 +329,20 @@ onMounted(async () => {
   })    // Check store status & apply theme colors
     try {
       const { data } = await api.get('/restaurante')
-      storeOpen.value = data.status_loja
       restaurantData.value = {
         endereco: data.endereco || '',
         cidade: data.cidade || '',
         estado: data.estado || '',
         retirada_habilitada: data.retirada_habilitada || false,
         horarios_funcionamento: data.horarios_funcionamento || [],
+      }
+      // Verificar horários de funcionamento: se horários configurados, usar eles;
+      // senão, usar o toggle manual status_loja
+      if (Array.isArray(data.horarios_funcionamento) && data.horarios_funcionamento.length === 7) {
+        storeOpen.value = restauranteAbertoAgora(data.horarios_funcionamento)
+        iniciarVerificacaoHorarios()
+      } else {
+        storeOpen.value = data.status_loja
       }
 
     // Aplicar cores do tema dinamicamente (CWE-79: validar formato hex antes de injetar no CSS)
@@ -374,6 +413,7 @@ function statusLabel(status) {
 
 onUnmounted(() => {
   window.removeEventListener('scroll', handleScroll)
+  if (horariosInterval) clearInterval(horariosInterval)
 })
 
 // ── Helpers de cor (CWE-79: validar formato hex antes de usar) ──

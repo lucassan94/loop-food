@@ -31,6 +31,8 @@ const productSchema = z.object({
     obrigatoria: z.boolean().optional().default(false),
     opcoes: z.array(z.string().min(1)).min(1, 'Cada grupo precisa de ao menos 1 opção.'),
   })).optional().default([]),
+  // Grupos padrão vinculados (ids do catálogo opcoes_padrao — vínculo ao vivo)
+  opcoes_padrao: z.array(z.number().int()).optional().default([]),
   subcategorias: z.array(z.number().int()).optional().default([]),
   // Talheres obrigatório: o cliente deve escolher Sim/Não antes de adicionar
   talheres_obrigatorio: z.boolean().optional().default(false),
@@ -45,11 +47,26 @@ const productSchema = z.object({
 // Schema do catálogo de subcategorias de adicionais (compartilhado)
 const subcategoriaSchema = z.object({
   nome: z.string().min(1, 'Nome da subcategoria é obrigatório.'),
+  // 'manual' = itens pré-cadastrados; 'categoria' = usa produtos ativos de uma
+  // categoria do cardápio inteira (ex: Bebidas) com o preço do próprio produto
+  tipo: z.enum(['manual', 'categoria']).optional().default('manual'),
+  categoria_id: z.number().int().nullable().optional(),
   itens: z.array(z.object({
     nome: z.string().min(1, 'Nome do item é obrigatório.'),
     preco: z.number().min(0).optional().default(0),
     maximo: z.number().int().min(0).optional().default(1),
+    descricao: z.string().optional().default(''),
+    imagem_url: z.string().optional().default(''),
+    imagem_base64: z.string().optional().default(''),
   })).optional().default([]),
+});
+
+// Schema do catálogo de Opções Padrão do Prato (compartilhado)
+const opcaoPadraoSchema = z.object({
+  grupo: z.string().min(1, 'Nome do grupo é obrigatório.'),
+  tipo: z.enum(['unica', 'multipla']).optional().default('unica'),
+  obrigatoria: z.boolean().optional().default(false),
+  opcoes: z.array(z.string().min(1)).min(1, 'Cada grupo precisa de ao menos 1 opção.'),
 });
 
 // ============================
@@ -99,6 +116,93 @@ async function buscarOpcoes(db, produtoId) {
 }
 
 // ============================
+// Helpers — Opções Padrão (catálogo compartilhado, vínculo ao vivo)
+// ============================
+
+// Insere os grupos/opções padrão (tabela própria) dentro de transação/query
+async function inserirOpcoesPadrao(db, grupoId, opcoes) {
+  let ordem = 0;
+  for (const nome of opcoes) {
+    await db.query(
+      `INSERT INTO opcoes_padrao_itens (opcao_padrao_id, nome, ordem)
+       VALUES ($1, $2, $3)`,
+      [grupoId, nome, ordem++]
+    );
+  }
+}
+
+// Agrupa linhas de opcoes_padrao_itens em [{id, grupo, tipo, obrigatoria, opcoes:[{id, nome}]}]
+function agruparOpcoesPadrao(rows) {
+  const map = {};
+  const grupos = [];
+  for (const o of rows) {
+    if (!map[o.opcao_padrao_id]) {
+      map[o.opcao_padrao_id] = { id: o.opcao_padrao_id, grupo: o.grupo, tipo: o.tipo, obrigatoria: o.obrigatoria, opcoes: [] };
+      grupos.push(map[o.opcao_padrao_id]);
+    }
+    map[o.opcao_padrao_id].opcoes.push({ id: o.id, nome: o.nome });
+  }
+  return grupos;
+}
+
+// Busca grupos padrão (com itens) por ids — aceita `query` ou `client`
+async function buscarOpcoesPadrao(db, ids) {
+  const run = typeof db === 'function' ? db : (sql, params) => db.query(sql, params);
+  if (!ids || ids.length === 0) return [];
+  const result = await run(
+    `SELECT op.id, op.grupo, op.tipo, op.obrigatoria, op.ordem, oi.id as item_id, oi.nome
+     FROM opcoes_padrao op
+     LEFT JOIN opcoes_padrao_itens oi ON oi.opcao_padrao_id = op.id
+     WHERE op.id = ANY($1)
+     ORDER BY op.ordem, oi.ordem, oi.id`,
+    [ids]
+  );
+  return agruparOpcoesPadrao(result.rows);
+}
+
+// Busca os grupos padrão VINCULADOS a um produto (produto_opcoes_padrao)
+async function buscarOpcoesPadraoDoProduto(db, produtoId) {
+  const run = typeof db === 'function' ? db : (sql, params) => db.query(sql, params);
+  const link = await run(
+    'SELECT opcao_padrao_id FROM produto_opcoes_padrao WHERE produto_id = $1 ORDER BY id',
+    [produtoId]
+  );
+  const ids = link.rows.map(r => r.opcao_padrao_id);
+  return buscarOpcoesPadrao(run, ids);
+}
+
+// Substitui os vínculos de grupos padrão de um produto
+async function substituirOpcoesPadraoDoProduto(db, produtoId, ids) {
+  await db.query('DELETE FROM produto_opcoes_padrao WHERE produto_id = $1', [produtoId]);
+  for (const gid of ids || []) {
+    await db.query(
+      'INSERT INTO produto_opcoes_padrao (produto_id, opcao_padrao_id) VALUES ($1, $2)',
+      [produtoId, gid]
+    );
+  }
+}
+
+// Valida que os ids de grupos padrão pertencem ao restaurante (anti cross-tenant)
+async function validarOpcoesPadraoDoRestaurante(db, restaurantId, ids) {
+  if (!ids || ids.length === 0) return;
+  const result = await db.query(
+    'SELECT id FROM opcoes_padrao WHERE restaurant_id = $1 AND id = ANY($2)',
+    [restaurantId, ids]
+  );
+  if (result.rows.length !== ids.length) {
+    throw new AppError('Um ou mais grupos padrão não pertencem ao restaurante.', 400);
+  }
+}
+
+// Mescla as opções de um produto: avulsas (produto_opcoes) + grupos padrão
+// vinculados (vínculo ao vivo). Grupos padrão vêm DEPOIS dos avulsos.
+async function buscarOpcoesComPadrao(db, produtoId) {
+  const avulsas = await buscarOpcoes(db, produtoId);
+  const padrao = await buscarOpcoesPadraoDoProduto(db, produtoId);
+  return [...avulsas, ...padrao];
+}
+
+// ============================
 // Helpers — Subcategorias de adicionais (catálogo compartilhado)
 // ============================
 
@@ -125,6 +229,56 @@ async function substituirSubcategoriasDoProduto(db, produtoId, subcategoriaIds) 
   }
 }
 
+// Resolve os itens de um conjunto de subcategorias.
+// Subcategorias 'manual' → itens pré-cadastrados (com imagem/descrição).
+// Subcategorias 'categoria' → produtos ATIVOS da categoria do cardápio,
+// com o preço do próprio produto (sincronizado com o cardápio).
+// Retorna { [subcategoria_id]: {id, nome, tipo, categoria_id, itens:[...]} }
+async function resolverSubcategorias(db, subIds) {
+  const run = typeof db === 'function' ? db : (sql, params) => db.query(sql, params);
+  if (!subIds || subIds.length === 0) return {};
+  const subResult = await run(
+    'SELECT id, nome, tipo, categoria_id FROM extra_subcategorias WHERE id = ANY($1)',
+    [subIds]
+  );
+  const subMap = {};
+  for (const s of subResult.rows) subMap[s.id] = { id: s.id, nome: s.nome, tipo: s.tipo || 'manual', categoria_id: s.categoria_id, itens: [] };
+
+  const manualIds = subResult.rows.filter(s => (s.tipo || 'manual') === 'manual').map(s => s.id);
+  if (manualIds.length > 0) {
+    const itemResult = await run(
+      'SELECT id, subcategoria_id, nome, preco, maximo, descricao, imagem_url, imagem_base64, ordem FROM extra_subcategoria_itens WHERE subcategoria_id = ANY($1) ORDER BY ordem, id',
+      [manualIds]
+    );
+    for (const i of itemResult.rows) {
+      subMap[i.subcategoria_id].itens.push({
+        id: i.id, nome: i.nome, preco: i.preco, maximo: i.maximo,
+        descricao: i.descricao || '', imagem_url: i.imagem_url || '', imagem_base64: i.imagem_base64 || '',
+      });
+    }
+  }
+
+  // Subcategorias do tipo categoria: itens = produtos ATIVOS da categoria
+  const catIds = [...new Set(subResult.rows.filter(s => (s.tipo || 'manual') === 'categoria' && s.categoria_id).map(s => s.categoria_id))];
+  if (catIds.length > 0) {
+    const produtos = await run(
+      `SELECT id, categoria_id, nome, preco, descricao, imagem_url, imagem_base64
+       FROM produtos WHERE categoria_id = ANY($1) AND ativo = true ORDER BY nome`,
+      [catIds]
+    );
+    for (const sub of subResult.rows.filter(s => (s.tipo || 'manual') === 'categoria')) {
+      subMap[sub.id].itens = produtos.rows
+        .filter(p => p.categoria_id === sub.categoria_id)
+        .map(p => ({
+          id: p.id, nome: p.nome, preco: p.preco, maximo: 1,
+          descricao: p.descricao || '', imagem_url: p.imagem_url || '', imagem_base64: p.imagem_base64 || '',
+          produto_fonte: true,
+        }));
+    }
+  }
+  return subMap;
+}
+
 // Resolve as subcategorias ATIVAS de produtos → { [produto_id]: [{id, nome, itens:[...]}] }
 async function buscarSubcategoriasDeProdutos(db, produtoIds) {
   const run = typeof db === 'function' ? db : (sql, params) => db.query(sql, params);
@@ -141,21 +295,7 @@ async function buscarSubcategoriasDeProdutos(db, produtoIds) {
     subIds.add(l.subcategoria_id);
   }
   if (subIds.size === 0) return {};
-  const subResult = await run(
-    'SELECT id, nome FROM extra_subcategorias WHERE id = ANY($1)',
-    [[...subIds]]
-  );
-  const itemResult = await run(
-    'SELECT id, subcategoria_id, nome, preco, maximo, ordem FROM extra_subcategoria_itens WHERE subcategoria_id = ANY($1) ORDER BY ordem, id',
-    [[...subIds]]
-  );
-  const itemMap = {};
-  for (const i of itemResult.rows) {
-    if (!itemMap[i.subcategoria_id]) itemMap[i.subcategoria_id] = [];
-    itemMap[i.subcategoria_id].push({ id: i.id, nome: i.nome, preco: i.preco, maximo: i.maximo });
-  }
-  const subMap = {};
-  for (const s of subResult.rows) subMap[s.id] = { id: s.id, nome: s.nome, itens: itemMap[s.id] || [] };
+  const subMap = await resolverSubcategorias(run, [...subIds]);
   const result = {};
   for (const [pid, ids] of Object.entries(linkMap)) {
     result[pid] = ids.map(sid => subMap[sid]).filter(Boolean);
@@ -371,12 +511,32 @@ router.get('/com-extras', optionalAuth, async (req, res, next) => {
       extrasMap[extra.produto_id].push({ id: extra.id, nome: extra.nome, preco: extra.preco, maximo: extra.maximo });
     }
 
-    // Query 3: Todas as opções do prato de uma vez
+    // Query 3: Todas as opções do prato de uma vez (avulsas + grupos padrão vinculados)
     const opcoesResult = await query(
       'SELECT produto_id, id, grupo, nome, tipo, obrigatoria, ordem FROM produto_opcoes WHERE produto_id = ANY($1) ORDER BY ordem, id',
       [produtoIds]
     );
     const opcoesMap = agruparOpcoesPorProduto(opcoesResult.rows);
+
+    // Grupos padrão vinculados (vínculo ao vivo) — adiciona após as avulsas
+    const padraoLinkResult = await query(
+      'SELECT produto_id, opcao_padrao_id FROM produto_opcoes_padrao WHERE produto_id = ANY($1) ORDER BY id',
+      [produtoIds]
+    );
+    if (padraoLinkResult.rows.length > 0) {
+      const padraoIds = [...new Set(padraoLinkResult.rows.map(r => r.opcao_padrao_id))];
+      const padraoGrupos = await buscarOpcoesPadrao(query, padraoIds);
+      const padraoById = {};
+      for (const g of padraoGrupos) padraoById[g.id] = g;
+      const padraoPorProduto = {};
+      for (const r of padraoLinkResult.rows) {
+        if (!padraoPorProduto[r.produto_id]) padraoPorProduto[r.produto_id] = [];
+        padraoPorProduto[r.produto_id].push(padraoById[r.opcao_padrao_id]);
+      }
+      for (const [pid, grupos] of Object.entries(padraoPorProduto)) {
+        opcoesMap[pid] = [...(opcoesMap[pid] || []), ...grupos.filter(Boolean)];
+      }
+    }
 
     // Query 4: Subcategorias de adicionais ativas (catálogo compartilhado)
     const subcategoriasMap = await buscarSubcategoriasDeProdutos(query, produtoIds);
@@ -408,21 +568,23 @@ router.get('/extra-subcategorias', async (req, res, next) => {
   try {
     const restaurantId = req.restaurantId || config.restaurantId;
     const subs = await query(
-      'SELECT id, nome, ordem FROM extra_subcategorias WHERE restaurant_id = $1 ORDER BY ordem, id',
+      'SELECT id, nome, tipo, categoria_id, ordem FROM extra_subcategorias WHERE restaurant_id = $1 ORDER BY ordem, id',
       [restaurantId]
     );
     if (subs.rows.length === 0) return res.json([]);
     const subIds = subs.rows.map(s => s.id);
-    const itens = await query(
-      'SELECT id, subcategoria_id, nome, preco, maximo, ordem FROM extra_subcategoria_itens WHERE subcategoria_id = ANY($1) ORDER BY ordem, id',
-      [subIds]
+    const resolvidas = await resolverSubcategorias(query, subIds);
+    // Retornar também o nome da categoria vinculada (para sub do tipo categoria)
+    const catResult = await query(
+      'SELECT id, nome FROM categorias WHERE id = ANY($1)',
+      [subs.rows.map(s => s.categoria_id).filter(Boolean)]
     );
-    const map = {};
-    for (const i of itens.rows) {
-      if (!map[i.subcategoria_id]) map[i.subcategoria_id] = [];
-      map[i.subcategoria_id].push({ id: i.id, nome: i.nome, preco: i.preco, maximo: i.maximo });
-    }
-    res.json(subs.rows.map(s => ({ ...s, itens: map[s.id] || [] })));
+    const catNome = {};
+    for (const c of catResult.rows) catNome[c.id] = c.nome;
+    res.json(subs.rows.map(s => {
+      const r = resolvidas[s.id] || { id: s.id, nome: s.nome, tipo: s.tipo, categoria_id: s.categoria_id, itens: [] };
+      return { ...r, ordem: s.ordem, categoria_nome: catNome[s.categoria_id] || null };
+    }));
   } catch (err) { next(err); }
 });
 
@@ -430,22 +592,30 @@ router.post('/extra-subcategorias', authenticate, authorize('admin', 'gerente'),
   try {
     const restaurantId = req.restaurantId || config.restaurantId;
     const data = subcategoriaSchema.parse(req.body);
+    const tipo = data.tipo || 'manual';
+    if (tipo === 'categoria') {
+      if (!data.categoria_id) throw new AppError('Selecione a categoria do cardápio para a subcategoria.', 400);
+      const cat = await query('SELECT id FROM categorias WHERE id = $1 AND restaurant_id = $2', [data.categoria_id, restaurantId]);
+      if (cat.rows.length === 0) throw new AppError('Categoria não pertence ao restaurante.', 400);
+    }
     const result = await transaction(async (client) => {
       const ordemRes = await client.query(
         'SELECT COALESCE(MAX(ordem), 0) + 1 as o FROM extra_subcategorias WHERE restaurant_id = $1',
         [restaurantId]
       );
       const sub = await client.query(
-        'INSERT INTO extra_subcategorias (restaurant_id, nome, ordem) VALUES ($1, $2, $3) RETURNING *',
-        [restaurantId, data.nome.trim(), ordemRes.rows[0].o]
+        'INSERT INTO extra_subcategorias (restaurant_id, nome, tipo, categoria_id, ordem) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+        [restaurantId, data.nome.trim(), tipo, tipo === 'categoria' ? data.categoria_id : null, ordemRes.rows[0].o]
       );
-      let ordem = 0;
-      for (const item of data.itens) {
-        await client.query(
-          `INSERT INTO extra_subcategoria_itens (subcategoria_id, nome, preco, maximo, ordem)
-           VALUES ($1, $2, $3, $4, $5)`,
-          [sub.rows[0].id, item.nome, item.preco, item.maximo, ordem++]
-        );
+      if (tipo === 'manual') {
+        let ordem = 0;
+        for (const item of data.itens) {
+          await client.query(
+            `INSERT INTO extra_subcategoria_itens (subcategoria_id, nome, preco, maximo, descricao, imagem_url, imagem_base64, ordem)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+            [sub.rows[0].id, item.nome, item.preco, item.maximo, item.descricao || '', item.imagem_url || '', item.imagem_base64 || '', ordem++]
+          );
+        }
       }
       return sub.rows[0];
     });
@@ -467,19 +637,111 @@ router.put('/extra-subcategorias/:id', authenticate, authorize('admin', 'gerente
       if (data.nome) {
         await client.query('UPDATE extra_subcategorias SET nome = $1 WHERE id = $2', [data.nome.trim(), id]);
       }
-      if ('itens' in req.body) {
+      // Tipo / categoria vinculada
+      if ('tipo' in req.body || 'categoria_id' in req.body) {
+        const tipo = data.tipo || existing.rows[0].tipo || 'manual';
+        const catId = data.categoria_id !== undefined ? data.categoria_id : null;
+        if (tipo === 'categoria') {
+          if (!catId) throw new AppError('Selecione a categoria do cardápio para a subcategoria.', 400);
+          const cat = await client.query('SELECT id FROM categorias WHERE id = $1 AND restaurant_id = $2', [catId, restaurantId]);
+          if (cat.rows.length === 0) throw new AppError('Categoria não pertence ao restaurante.', 400);
+        }
+        await client.query('UPDATE extra_subcategorias SET tipo = $1, categoria_id = $2 WHERE id = $3', [tipo, tipo === 'categoria' ? catId : null, id]);
+        // Ao trocar para 'categoria', itens manuais são descartados
+        if (tipo === 'categoria') {
+          await client.query('DELETE FROM extra_subcategoria_itens WHERE subcategoria_id = $1', [id]);
+        }
+      }
+      if ('itens' in req.body && (data.tipo || existing.rows[0].tipo || 'manual') !== 'categoria') {
         await client.query('DELETE FROM extra_subcategoria_itens WHERE subcategoria_id = $1', [id]);
         let ordem = 0;
         for (const item of data.itens) {
           await client.query(
-            `INSERT INTO extra_subcategoria_itens (subcategoria_id, nome, preco, maximo, ordem)
-             VALUES ($1, $2, $3, $4, $5)`,
-            [id, item.nome, item.preco, item.maximo, ordem++]
+            `INSERT INTO extra_subcategoria_itens (subcategoria_id, nome, preco, maximo, descricao, imagem_url, imagem_base64, ordem)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+            [id, item.nome, item.preco, item.maximo, item.descricao || '', item.imagem_url || '', item.imagem_base64 || '', ordem++]
           );
         }
       }
     });
     res.json({ message: 'Subcategoria atualizada.', id: parseInt(id) });
+  } catch (err) { next(err); }
+});
+
+// ============================
+// OPÇÕES PADRÃO DO PRATO (catálogo compartilhado — vínculo ao vivo)
+// ============================
+router.get('/opcoes-padrao', async (req, res, next) => {
+  try {
+    const restaurantId = req.restaurantId || config.restaurantId;
+    const grupos = await query(
+      'SELECT id, grupo, tipo, obrigatoria, ordem FROM opcoes_padrao WHERE restaurant_id = $1 ORDER BY ordem, id',
+      [restaurantId]
+    );
+    if (grupos.rows.length === 0) return res.json([]);
+    const ids = grupos.rows.map(g => g.id);
+    const comItens = await buscarOpcoesPadrao(query, ids);
+    const byId = {};
+    for (const g of comItens) byId[g.id] = g;
+    res.json(grupos.rows.map(g => byId[g.id] || { ...g, opcoes: [] }));
+  } catch (err) { next(err); }
+});
+
+router.post('/opcoes-padrao', authenticate, authorize('admin', 'gerente'), async (req, res, next) => {
+  try {
+    const restaurantId = req.restaurantId || config.restaurantId;
+    const data = opcaoPadraoSchema.parse(req.body);
+    const result = await transaction(async (client) => {
+      const ordemRes = await client.query(
+        'SELECT COALESCE(MAX(ordem), 0) + 1 as o FROM opcoes_padrao WHERE restaurant_id = $1',
+        [restaurantId]
+      );
+      const grupo = await client.query(
+        'INSERT INTO opcoes_padrao (restaurant_id, grupo, tipo, obrigatoria, ordem) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+        [restaurantId, data.grupo.trim(), data.tipo, data.obrigatoria, ordemRes.rows[0].o]
+      );
+      await inserirOpcoesPadrao(client, grupo.rows[0].id, data.opcoes);
+      return grupo.rows[0];
+    });
+    res.status(201).json(result);
+  } catch (err) { next(err); }
+});
+
+router.put('/opcoes-padrao/:id', authenticate, authorize('admin', 'gerente'), async (req, res, next) => {
+  try {
+    const restaurantId = req.restaurantId || config.restaurantId;
+    const { id } = req.params;
+    const data = opcaoPadraoSchema.partial().parse(req.body);
+    await transaction(async (client) => {
+      const existing = await client.query(
+        'SELECT id FROM opcoes_padrao WHERE id = $1 AND restaurant_id = $2',
+        [id, restaurantId]
+      );
+      if (existing.rows.length === 0) throw new AppError('Grupo padrão não encontrado.', 404);
+      if (data.grupo) {
+        await client.query('UPDATE opcoes_padrao SET grupo = $1 WHERE id = $2', [data.grupo.trim(), id]);
+      }
+      if ('tipo' in req.body) await client.query('UPDATE opcoes_padrao SET tipo = $1 WHERE id = $2', [data.tipo, id]);
+      if ('obrigatoria' in req.body) await client.query('UPDATE opcoes_padrao SET obrigatoria = $1 WHERE id = $2', [data.obrigatoria, id]);
+      if ('opcoes' in req.body) {
+        await client.query('DELETE FROM opcoes_padrao_itens WHERE opcao_padrao_id = $1', [id]);
+        await inserirOpcoesPadrao(client, id, data.opcoes);
+      }
+    });
+    res.json({ message: 'Grupo padrão atualizado.', id: parseInt(id) });
+  } catch (err) { next(err); }
+});
+
+router.delete('/opcoes-padrao/:id', authenticate, authorize('admin', 'gerente'), async (req, res, next) => {
+  try {
+    const restaurantId = req.restaurantId || config.restaurantId;
+    const { id } = req.params;
+    const result = await query(
+      'DELETE FROM opcoes_padrao WHERE id = $1 AND restaurant_id = $2 RETURNING id',
+      [id, restaurantId]
+    );
+    if (result.rows.length === 0) throw new AppError('Grupo padrão não encontrado.', 404);
+    res.json({ message: 'Grupo padrão excluído.', id: parseInt(id) });
   } catch (err) { next(err); }
 });
 
@@ -521,13 +783,18 @@ router.get('/:id', async (req, res, next) => {
       [id]
     );
 
-    const opcoes = await buscarOpcoes(query, id);
+    const opcoes = await buscarOpcoesComPadrao(query, id);
     const subcategorias = (await buscarSubcategoriasDeProdutos(query, [id]))[id] || [];
+    const padraoVinculados = (await query(
+      'SELECT opcao_padrao_id FROM produto_opcoes_padrao WHERE produto_id = $1 ORDER BY id',
+      [id]
+    )).rows.map(r => r.opcao_padrao_id);
 
     res.json({
       ...productResult.rows[0],
       extras: extrasResult.rows,
       opcoes,
+      opcoes_padrao: padraoVinculados,
       subcategorias,
     });
   } catch (err) {
@@ -580,6 +847,10 @@ router.post('/', authenticate, authorize('admin', 'gerente', 'chef'), async (req
 
       // Inserir opções do prato (gratuitas)
       await inserirOpcoes(client, produto.id, data.opcoes);
+
+      // Vincular grupos padrão de opções (catálogo compartilhado — vínculo ao vivo)
+      await validarOpcoesPadraoDoRestaurante(client, restaurantId, data.opcoes_padrao);
+      await substituirOpcoesPadraoDoProduto(client, produto.id, data.opcoes_padrao);
 
       // Vincular subcategorias de adicionais (catálogo compartilhado)
       await validarSubcategoriasDoRestaurante(client, restaurantId, data.subcategorias);
@@ -648,8 +919,8 @@ router.put('/:id', authenticate, authorize('admin', 'gerente', 'chef'), async (r
       if ('dias_semana' in req.body) data.dias_semana = JSON.stringify(data.dias_semana);
 
       for (const [key, value] of Object.entries(data)) {
-        // extras/opcoes/subcategorias são relacionamentos — tratados abaixo
-        if (key === 'extras' || key === 'opcoes' || key === 'subcategorias') continue;
+        // extras/opcoes/opcoes_padrao/subcategorias são relacionamentos — tratados abaixo
+        if (key === 'extras' || key === 'opcoes' || key === 'opcoes_padrao' || key === 'subcategorias') continue;
         if (value !== undefined) {
           fields.push(`${key} = $${paramIndex}`);
           params.push(value);
@@ -682,6 +953,12 @@ router.put('/:id', authenticate, authorize('admin', 'gerente', 'chef'), async (r
         await inserirOpcoes(client, id, data.opcoes);
       }
 
+      // Atualizar grupos padrão vinculados somente se enviado explicitamente
+      if ('opcoes_padrao' in req.body) {
+        await validarOpcoesPadraoDoRestaurante(client, restaurantId, data.opcoes_padrao);
+        await substituirOpcoesPadraoDoProduto(client, id, data.opcoes_padrao);
+      }
+
       // Atualizar subcategorias de adicionais somente se enviado explicitamente
       if ('subcategorias' in req.body) {
         await validarSubcategoriasDoRestaurante(client, restaurantId, data.subcategorias);
@@ -701,10 +978,14 @@ router.put('/:id', authenticate, authorize('admin', 'gerente', 'chef'), async (r
         [id]
       );
 
-      const opcoes = await buscarOpcoes(client, id);
+      const opcoes = await buscarOpcoesComPadrao(client, id);
       const subcategorias = (await buscarSubcategoriasDeProdutos(client, [id]))[id] || [];
+      const padraoVinculados = (await client.query(
+        'SELECT opcao_padrao_id FROM produto_opcoes_padrao WHERE produto_id = $1 ORDER BY id',
+        [id]
+      )).rows.map(r => r.opcao_padrao_id);
 
-      return { ...updated.rows[0], extras: extras.rows, opcoes, subcategorias };
+      return { ...updated.rows[0], extras: extras.rows, opcoes, opcoes_padrao: padraoVinculados, subcategorias };
     });
 
     emitToRestaurant('produto:atualizado', result, restaurantId);
