@@ -123,11 +123,13 @@ async function buscarOpcoes(db, produtoId) {
 async function inserirOpcoesPadrao(db, grupoId, opcoes) {
   let ordem = 0;
   for (const nome of opcoes) {
-    await db.query(
-      `INSERT INTO opcoes_padrao_itens (opcao_padrao_id, nome, ordem)
-       VALUES ($1, $2, $3)`,
-      [grupoId, nome, ordem++]
-    );
+    try {
+      await db.query(
+        `INSERT INTO opcoes_padrao_itens (opcao_padrao_id, nome, ordem)
+         VALUES ($1, $2, $3)`,
+        [grupoId, nome, ordem++]
+      );
+    } catch (e) { /* tabela pode não existir ainda */ }
   }
 }
 
@@ -149,48 +151,59 @@ function agruparOpcoesPadrao(rows) {
 async function buscarOpcoesPadrao(db, ids) {
   const run = typeof db === 'function' ? db : (sql, params) => db.query(sql, params);
   if (!ids || ids.length === 0) return [];
-  const result = await run(
-    `SELECT op.id, op.grupo, op.tipo, op.obrigatoria, op.ordem, oi.id as item_id, oi.nome
-     FROM opcoes_padrao op
-     LEFT JOIN opcoes_padrao_itens oi ON oi.opcao_padrao_id = op.id
-     WHERE op.id = ANY($1)
-     ORDER BY op.ordem, oi.ordem, oi.id`,
-    [ids]
-  );
-  return agruparOpcoesPadrao(result.rows);
+  try {
+    const result = await run(
+      `SELECT op.id, op.grupo, op.tipo, op.obrigatoria, op.ordem, oi.id as item_id, oi.nome
+       FROM opcoes_padrao op
+       LEFT JOIN opcoes_padrao_itens oi ON oi.opcao_padrao_id = op.id
+       WHERE op.id = ANY($1)
+       ORDER BY op.ordem, oi.ordem, oi.id`,
+      [ids]
+    );
+    return agruparOpcoesPadrao(result.rows);
+  } catch (e) { return []; }
 }
 
 // Busca os grupos padrão VINCULADOS a um produto (produto_opcoes_padrao)
 async function buscarOpcoesPadraoDoProduto(db, produtoId) {
   const run = typeof db === 'function' ? db : (sql, params) => db.query(sql, params);
-  const link = await run(
-    'SELECT opcao_padrao_id FROM produto_opcoes_padrao WHERE produto_id = $1 ORDER BY id',
-    [produtoId]
-  );
-  const ids = link.rows.map(r => r.opcao_padrao_id);
-  return buscarOpcoesPadrao(run, ids);
+  try {
+    const link = await run(
+      'SELECT opcao_padrao_id FROM produto_opcoes_padrao WHERE produto_id = $1 ORDER BY id',
+      [produtoId]
+    );
+    const ids = link.rows.map(r => r.opcao_padrao_id);
+    return buscarOpcoesPadrao(run, ids);
+  } catch (e) { return []; }
 }
 
 // Substitui os vínculos de grupos padrão de um produto
 async function substituirOpcoesPadraoDoProduto(db, produtoId, ids) {
-  await db.query('DELETE FROM produto_opcoes_padrao WHERE produto_id = $1', [produtoId]);
-  for (const gid of ids || []) {
-    await db.query(
-      'INSERT INTO produto_opcoes_padrao (produto_id, opcao_padrao_id) VALUES ($1, $2)',
-      [produtoId, gid]
-    );
-  }
+  try {
+    await db.query('DELETE FROM produto_opcoes_padrao WHERE produto_id = $1', [produtoId]);
+    for (const gid of ids || []) {
+      await db.query(
+        'INSERT INTO produto_opcoes_padrao (produto_id, opcao_padrao_id) VALUES ($1, $2)',
+        [produtoId, gid]
+      );
+    }
+  } catch (e) { /* tabela pode não existir ainda */ }
 }
 
 // Valida que os ids de grupos padrão pertencem ao restaurante (anti cross-tenant)
 async function validarOpcoesPadraoDoRestaurante(db, restaurantId, ids) {
   if (!ids || ids.length === 0) return;
-  const result = await db.query(
-    'SELECT id FROM opcoes_padrao WHERE restaurant_id = $1 AND id = ANY($2)',
-    [restaurantId, ids]
-  );
-  if (result.rows.length !== ids.length) {
-    throw new AppError('Um ou mais grupos padrão não pertencem ao restaurante.', 400);
+  try {
+    const result = await db.query(
+      'SELECT id FROM opcoes_padrao WHERE restaurant_id = $1 AND id = ANY($2)',
+      [restaurantId, ids]
+    );
+    if (result.rows.length !== ids.length) {
+      throw new AppError('Um ou mais grupos padrão não pertencem ao restaurante.', 400);
+    }
+  } catch (e) {
+    if (e instanceof AppError) throw e;
+    // Tabela pode não existir ainda — ignorar validação
   }
 }
 
@@ -237,24 +250,50 @@ async function substituirSubcategoriasDoProduto(db, produtoId, subcategoriaIds) 
 async function resolverSubcategorias(db, subIds) {
   const run = typeof db === 'function' ? db : (sql, params) => db.query(sql, params);
   if (!subIds || subIds.length === 0) return {};
-  const subResult = await run(
-    'SELECT id, nome, tipo, categoria_id FROM extra_subcategorias WHERE id = ANY($1)',
-    [subIds]
-  );
+  // Tentar buscar com colunas novas (tipo, categoria_id); se falhar, usar fallback
+  let subResult;
+  try {
+    subResult = await run(
+      'SELECT id, nome, tipo, categoria_id FROM extra_subcategorias WHERE id = ANY($1)',
+      [subIds]
+    );
+  } catch (e) {
+    // Colunas tipo/categoria_id não existem — buscar só id/nome
+    subResult = await run(
+      'SELECT id, nome FROM extra_subcategorias WHERE id = ANY($1)',
+      [subIds]
+    );
+    // Adicionar campos default
+    for (const r of subResult.rows) { r.tipo = 'manual'; r.categoria_id = null; }
+  }
   const subMap = {};
   for (const s of subResult.rows) subMap[s.id] = { id: s.id, nome: s.nome, tipo: s.tipo || 'manual', categoria_id: s.categoria_id, itens: [] };
 
   const manualIds = subResult.rows.filter(s => (s.tipo || 'manual') === 'manual').map(s => s.id);
   if (manualIds.length > 0) {
-    const itemResult = await run(
-      'SELECT id, subcategoria_id, nome, preco, maximo, descricao, imagem_url, imagem_base64, ordem FROM extra_subcategoria_itens WHERE subcategoria_id = ANY($1) ORDER BY ordem, id',
-      [manualIds]
-    );
-    for (const i of itemResult.rows) {
-      subMap[i.subcategoria_id].itens.push({
-        id: i.id, nome: i.nome, preco: i.preco, maximo: i.maximo,
-        descricao: i.descricao || '', imagem_url: i.imagem_url || '', imagem_base64: i.imagem_base64 || '',
-      });
+    try {
+      const itemResult = await run(
+        'SELECT id, subcategoria_id, nome, preco, maximo, descricao, imagem_url, imagem_base64, ordem FROM extra_subcategoria_itens WHERE subcategoria_id = ANY($1) ORDER BY ordem, id',
+        [manualIds]
+      );
+      for (const i of itemResult.rows) {
+        subMap[i.subcategoria_id].itens.push({
+          id: i.id, nome: i.nome, preco: i.preco, maximo: i.maximo,
+          descricao: i.descricao || '', imagem_url: i.imagem_url || '', imagem_base64: i.imagem_base64 || '',
+        });
+      }
+    } catch (e) {
+      // Colunas descricao/imagem podem não existir — buscar só id/nome/preco/maximo
+      const itemResult = await run(
+        'SELECT id, subcategoria_id, nome, preco, maximo, ordem FROM extra_subcategoria_itens WHERE subcategoria_id = ANY($1) ORDER BY ordem, id',
+        [manualIds]
+      );
+      for (const i of itemResult.rows) {
+        subMap[i.subcategoria_id].itens.push({
+          id: i.id, nome: i.nome, preco: i.preco, maximo: i.maximo,
+          descricao: '', imagem_url: '', imagem_base64: '',
+        });
+      }
     }
   }
 
@@ -519,24 +558,26 @@ router.get('/com-extras', optionalAuth, async (req, res, next) => {
     const opcoesMap = agruparOpcoesPorProduto(opcoesResult.rows);
 
     // Grupos padrão vinculados (vínculo ao vivo) — adiciona após as avulsas
-    const padraoLinkResult = await query(
-      'SELECT produto_id, opcao_padrao_id FROM produto_opcoes_padrao WHERE produto_id = ANY($1) ORDER BY id',
-      [produtoIds]
-    );
-    if (padraoLinkResult.rows.length > 0) {
-      const padraoIds = [...new Set(padraoLinkResult.rows.map(r => r.opcao_padrao_id))];
-      const padraoGrupos = await buscarOpcoesPadrao(query, padraoIds);
-      const padraoById = {};
-      for (const g of padraoGrupos) padraoById[g.id] = g;
-      const padraoPorProduto = {};
-      for (const r of padraoLinkResult.rows) {
-        if (!padraoPorProduto[r.produto_id]) padraoPorProduto[r.produto_id] = [];
-        padraoPorProduto[r.produto_id].push(padraoById[r.opcao_padrao_id]);
+    try {
+      const padraoLinkResult = await query(
+        'SELECT produto_id, opcao_padrao_id FROM produto_opcoes_padrao WHERE produto_id = ANY($1) ORDER BY id',
+        [produtoIds]
+      );
+      if (padraoLinkResult.rows.length > 0) {
+        const padraoIds = [...new Set(padraoLinkResult.rows.map(r => r.opcao_padrao_id))];
+        const padraoGrupos = await buscarOpcoesPadrao(query, padraoIds);
+        const padraoById = {};
+        for (const g of padraoGrupos) padraoById[g.id] = g;
+        const padraoPorProduto = {};
+        for (const r of padraoLinkResult.rows) {
+          if (!padraoPorProduto[r.produto_id]) padraoPorProduto[r.produto_id] = [];
+          padraoPorProduto[r.produto_id].push(padraoById[r.opcao_padrao_id]);
+        }
+        for (const [pid, grupos] of Object.entries(padraoPorProduto)) {
+          opcoesMap[pid] = [...(opcoesMap[pid] || []), ...grupos.filter(Boolean)];
+        }
       }
-      for (const [pid, grupos] of Object.entries(padraoPorProduto)) {
-        opcoesMap[pid] = [...(opcoesMap[pid] || []), ...grupos.filter(Boolean)];
-      }
-    }
+    } catch (e) { /* tabela produto_opcoes_padrao pode não existir ainda */ }
 
     // Query 4: Subcategorias de adicionais ativas (catálogo compartilhado)
     const subcategoriasMap = await buscarSubcategoriasDeProdutos(query, produtoIds);
@@ -573,7 +614,10 @@ router.get('/extra-subcategorias', async (req, res, next) => {
     );
     if (subs.rows.length === 0) return res.json([]);
     const subIds = subs.rows.map(s => s.id);
-    const resolvidas = await resolverSubcategorias(query, subIds);
+    let resolvidas = {};
+    try {
+      resolvidas = await resolverSubcategorias(query, subIds);
+    } catch (e) { /* colunas tipo/categoria_id podem não existir ainda */ }
     // Retornar também o nome da categoria vinculada (para sub do tipo categoria)
     const catResult = await query(
       'SELECT id, nome FROM categorias WHERE id = ANY($1)',
@@ -582,7 +626,7 @@ router.get('/extra-subcategorias', async (req, res, next) => {
     const catNome = {};
     for (const c of catResult.rows) catNome[c.id] = c.nome;
     res.json(subs.rows.map(s => {
-      const r = resolvidas[s.id] || { id: s.id, nome: s.nome, tipo: s.tipo, categoria_id: s.categoria_id, itens: [] };
+      const r = resolvidas[s.id] || { id: s.id, nome: s.nome, tipo: s.tipo || 'manual', categoria_id: s.categoria_id, itens: [] };
       return { ...r, ordem: s.ordem, categoria_nome: catNome[s.categoria_id] || null };
     }));
   } catch (err) { next(err); }
@@ -603,18 +647,35 @@ router.post('/extra-subcategorias', authenticate, authorize('admin', 'gerente'),
         'SELECT COALESCE(MAX(ordem), 0) + 1 as o FROM extra_subcategorias WHERE restaurant_id = $1',
         [restaurantId]
       );
-      const sub = await client.query(
-        'INSERT INTO extra_subcategorias (restaurant_id, nome, tipo, categoria_id, ordem) VALUES ($1, $2, $3, $4, $5) RETURNING *',
-        [restaurantId, data.nome.trim(), tipo, tipo === 'categoria' ? data.categoria_id : null, ordemRes.rows[0].o]
-      );
+      let sub;
+      try {
+        sub = await client.query(
+          'INSERT INTO extra_subcategorias (restaurant_id, nome, tipo, categoria_id, ordem) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+          [restaurantId, data.nome.trim(), tipo, tipo === 'categoria' ? data.categoria_id : null, ordemRes.rows[0].o]
+        );
+      } catch (e) {
+        // Colunas tipo/categoria_id podem não existir — inserir sem elas
+        sub = await client.query(
+          'INSERT INTO extra_subcategorias (restaurant_id, nome, ordem) VALUES ($1, $2, $3) RETURNING *',
+          [restaurantId, data.nome.trim(), ordemRes.rows[0].o]
+        );
+      }
       if (tipo === 'manual') {
         let ordem = 0;
         for (const item of data.itens) {
-          await client.query(
-            `INSERT INTO extra_subcategoria_itens (subcategoria_id, nome, preco, maximo, descricao, imagem_url, imagem_base64, ordem)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-            [sub.rows[0].id, item.nome, item.preco, item.maximo, item.descricao || '', item.imagem_url || '', item.imagem_base64 || '', ordem++]
-          );
+          try {
+            await client.query(
+              `INSERT INTO extra_subcategoria_itens (subcategoria_id, nome, preco, maximo, descricao, imagem_url, imagem_base64, ordem)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+              [sub.rows[0].id, item.nome, item.preco, item.maximo, item.descricao || '', item.imagem_url || '', item.imagem_base64 || '', ordem++]
+            );
+          } catch (e) {
+            await client.query(
+              `INSERT INTO extra_subcategoria_itens (subcategoria_id, nome, preco, maximo, ordem)
+               VALUES ($1, $2, $3, $4, $5)`,
+              [sub.rows[0].id, item.nome, item.preco, item.maximo, ordem++]
+            );
+          }
         }
       }
       return sub.rows[0];
@@ -637,30 +698,39 @@ router.put('/extra-subcategorias/:id', authenticate, authorize('admin', 'gerente
       if (data.nome) {
         await client.query('UPDATE extra_subcategorias SET nome = $1 WHERE id = $2', [data.nome.trim(), id]);
       }
-      // Tipo / categoria vinculada
+      // Tipo / categoria vinculada (só se colunas existirem)
       if ('tipo' in req.body || 'categoria_id' in req.body) {
-        const tipo = data.tipo || existing.rows[0].tipo || 'manual';
+        const tipo = data.tipo || 'manual';
         const catId = data.categoria_id !== undefined ? data.categoria_id : null;
         if (tipo === 'categoria') {
           if (!catId) throw new AppError('Selecione a categoria do cardápio para a subcategoria.', 400);
           const cat = await client.query('SELECT id FROM categorias WHERE id = $1 AND restaurant_id = $2', [catId, restaurantId]);
           if (cat.rows.length === 0) throw new AppError('Categoria não pertence ao restaurante.', 400);
         }
-        await client.query('UPDATE extra_subcategorias SET tipo = $1, categoria_id = $2 WHERE id = $3', [tipo, tipo === 'categoria' ? catId : null, id]);
-        // Ao trocar para 'categoria', itens manuais são descartados
-        if (tipo === 'categoria') {
-          await client.query('DELETE FROM extra_subcategoria_itens WHERE subcategoria_id = $1', [id]);
-        }
+        try {
+          await client.query('UPDATE extra_subcategorias SET tipo = $1, categoria_id = $2 WHERE id = $3', [tipo, tipo === 'categoria' ? catId : null, id]);
+          if (tipo === 'categoria') {
+            await client.query('DELETE FROM extra_subcategoria_itens WHERE subcategoria_id = $1', [id]);
+          }
+        } catch (e) { /* colunas tipo/categoria_id podem não existir */ }
       }
-      if ('itens' in req.body && (data.tipo || existing.rows[0].tipo || 'manual') !== 'categoria') {
+      if ('itens' in req.body && (data.tipo || 'manual') !== 'categoria') {
         await client.query('DELETE FROM extra_subcategoria_itens WHERE subcategoria_id = $1', [id]);
         let ordem = 0;
         for (const item of data.itens) {
-          await client.query(
-            `INSERT INTO extra_subcategoria_itens (subcategoria_id, nome, preco, maximo, descricao, imagem_url, imagem_base64, ordem)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-            [id, item.nome, item.preco, item.maximo, item.descricao || '', item.imagem_url || '', item.imagem_base64 || '', ordem++]
-          );
+          try {
+            await client.query(
+              `INSERT INTO extra_subcategoria_itens (subcategoria_id, nome, preco, maximo, descricao, imagem_url, imagem_base64, ordem)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+              [id, item.nome, item.preco, item.maximo, item.descricao || '', item.imagem_url || '', item.imagem_base64 || '', ordem++]
+            );
+          } catch (e) {
+            await client.query(
+              `INSERT INTO extra_subcategoria_itens (subcategoria_id, nome, preco, maximo, ordem)
+               VALUES ($1, $2, $3, $4, $5)`,
+              [id, item.nome, item.preco, item.maximo, ordem++]
+            );
+          }
         }
       }
     });
@@ -674,16 +744,18 @@ router.put('/extra-subcategorias/:id', authenticate, authorize('admin', 'gerente
 router.get('/opcoes-padrao', async (req, res, next) => {
   try {
     const restaurantId = req.restaurantId || config.restaurantId;
-    const grupos = await query(
-      'SELECT id, grupo, tipo, obrigatoria, ordem FROM opcoes_padrao WHERE restaurant_id = $1 ORDER BY ordem, id',
-      [restaurantId]
-    );
-    if (grupos.rows.length === 0) return res.json([]);
-    const ids = grupos.rows.map(g => g.id);
-    const comItens = await buscarOpcoesPadrao(query, ids);
-    const byId = {};
-    for (const g of comItens) byId[g.id] = g;
-    res.json(grupos.rows.map(g => byId[g.id] || { ...g, opcoes: [] }));
+    try {
+      const grupos = await query(
+        'SELECT id, grupo, tipo, obrigatoria, ordem FROM opcoes_padrao WHERE restaurant_id = $1 ORDER BY ordem, id',
+        [restaurantId]
+      );
+      if (grupos.rows.length === 0) return res.json([]);
+      const ids = grupos.rows.map(g => g.id);
+      const comItens = await buscarOpcoesPadrao(query, ids);
+      const byId = {};
+      for (const g of comItens) byId[g.id] = g;
+      res.json(grupos.rows.map(g => byId[g.id] || { ...g, opcoes: [] }));
+    } catch (e) { res.json([]); }
   } catch (err) { next(err); }
 });
 
@@ -704,7 +776,12 @@ router.post('/opcoes-padrao', authenticate, authorize('admin', 'gerente'), async
       return grupo.rows[0];
     });
     res.status(201).json(result);
-  } catch (err) { next(err); }
+  } catch (err) {
+    if (err.code === '42P01') {
+      return next(new AppError('Tabela de Opções Padrão não existe. Execute a migration 033_catalogo_cardapio.sql primeiro.', 500));
+    }
+    next(err);
+  }
 });
 
 router.put('/opcoes-padrao/:id', authenticate, authorize('admin', 'gerente'), async (req, res, next) => {
@@ -729,18 +806,28 @@ router.put('/opcoes-padrao/:id', authenticate, authorize('admin', 'gerente'), as
       }
     });
     res.json({ message: 'Grupo padrão atualizado.', id: parseInt(id) });
-  } catch (err) { next(err); }
+  } catch (err) {
+    if (err.code === '42P01') {
+      return next(new AppError('Tabela de Opções Padrão não existe. Execute a migration 033_catalogo_cardapio.sql primeiro.', 500));
+    }
+    next(err);
+  }
 });
 
 router.delete('/opcoes-padrao/:id', authenticate, authorize('admin', 'gerente'), async (req, res, next) => {
   try {
     const restaurantId = req.restaurantId || config.restaurantId;
     const { id } = req.params;
-    const result = await query(
-      'DELETE FROM opcoes_padrao WHERE id = $1 AND restaurant_id = $2 RETURNING id',
-      [id, restaurantId]
-    );
-    if (result.rows.length === 0) throw new AppError('Grupo padrão não encontrado.', 404);
+    try {
+      const result = await query(
+        'DELETE FROM opcoes_padrao WHERE id = $1 AND restaurant_id = $2 RETURNING id',
+        [id, restaurantId]
+      );
+      if (result.rows.length === 0) throw new AppError('Grupo padrão não encontrado.', 404);
+    } catch (e) {
+      if (e instanceof AppError) throw e;
+      throw new AppError('Grupo padrão não encontrado.', 404);
+    }
     res.json({ message: 'Grupo padrão excluído.', id: parseInt(id) });
   } catch (err) { next(err); }
 });
@@ -785,15 +872,20 @@ router.get('/:id', async (req, res, next) => {
 
     const opcoes = await buscarOpcoesComPadrao(query, id);
     const subcategorias = (await buscarSubcategoriasDeProdutos(query, [id]))[id] || [];
-    const padraoVinculados = (await query(
-      'SELECT opcao_padrao_id FROM produto_opcoes_padrao WHERE produto_id = $1 ORDER BY id',
-      [id]
-    )).rows.map(r => r.opcao_padrao_id);
+    let padraoVinculados = [];
+    try {
+      padraoVinculados = (await query(
+        'SELECT opcao_padrao_id FROM produto_opcoes_padrao WHERE produto_id = $1 ORDER BY id',
+        [id]
+      )).rows.map(r => r.opcao_padrao_id);
+    } catch (e) { /* tabela pode não existir ainda */ }
+    // Garantir que opcoes não tenha undefined/erros
+    const opcoesSeguro = Array.isArray(opcoes) ? opcoes : [];
 
     res.json({
       ...productResult.rows[0],
       extras: extrasResult.rows,
-      opcoes,
+      opcoes: opcoesSeguro,
       opcoes_padrao: padraoVinculados,
       subcategorias,
     });
@@ -849,8 +941,10 @@ router.post('/', authenticate, authorize('admin', 'gerente', 'chef'), async (req
       await inserirOpcoes(client, produto.id, data.opcoes);
 
       // Vincular grupos padrão de opções (catálogo compartilhado — vínculo ao vivo)
-      await validarOpcoesPadraoDoRestaurante(client, restaurantId, data.opcoes_padrao);
-      await substituirOpcoesPadraoDoProduto(client, produto.id, data.opcoes_padrao);
+      try {
+        await validarOpcoesPadraoDoRestaurante(client, restaurantId, data.opcoes_padrao);
+        await substituirOpcoesPadraoDoProduto(client, produto.id, data.opcoes_padrao);
+      } catch (e) { /* tabela pode não existir ainda */ }
 
       // Vincular subcategorias de adicionais (catálogo compartilhado)
       await validarSubcategoriasDoRestaurante(client, restaurantId, data.subcategorias);
@@ -955,8 +1049,10 @@ router.put('/:id', authenticate, authorize('admin', 'gerente', 'chef'), async (r
 
       // Atualizar grupos padrão vinculados somente se enviado explicitamente
       if ('opcoes_padrao' in req.body) {
-        await validarOpcoesPadraoDoRestaurante(client, restaurantId, data.opcoes_padrao);
-        await substituirOpcoesPadraoDoProduto(client, id, data.opcoes_padrao);
+        try {
+          await validarOpcoesPadraoDoRestaurante(client, restaurantId, data.opcoes_padrao);
+          await substituirOpcoesPadraoDoProduto(client, id, data.opcoes_padrao);
+        } catch (e) { /* tabela pode não existir ainda */ }
       }
 
       // Atualizar subcategorias de adicionais somente se enviado explicitamente
@@ -980,12 +1076,16 @@ router.put('/:id', authenticate, authorize('admin', 'gerente', 'chef'), async (r
 
       const opcoes = await buscarOpcoesComPadrao(client, id);
       const subcategorias = (await buscarSubcategoriasDeProdutos(client, [id]))[id] || [];
-      const padraoVinculados = (await client.query(
-        'SELECT opcao_padrao_id FROM produto_opcoes_padrao WHERE produto_id = $1 ORDER BY id',
-        [id]
-      )).rows.map(r => r.opcao_padrao_id);
+      let padraoVinculados = [];
+      try {
+        padraoVinculados = (await client.query(
+          'SELECT opcao_padrao_id FROM produto_opcoes_padrao WHERE produto_id = $1 ORDER BY id',
+          [id]
+        )).rows.map(r => r.opcao_padrao_id);
+      } catch (e) { /* tabela pode não existir ainda */ }
+      const opcoesSeguro = Array.isArray(opcoes) ? opcoes : [];
 
-      return { ...updated.rows[0], extras: extras.rows, opcoes, opcoes_padrao: padraoVinculados, subcategorias };
+      return { ...updated.rows[0], extras: extras.rows, opcoes: opcoesSeguro, opcoes_padrao: padraoVinculados, subcategorias };
     });
 
     emitToRestaurant('produto:atualizado', result, restaurantId);
