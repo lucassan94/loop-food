@@ -6,6 +6,7 @@ import { authenticate, authorize, optionalAuth } from '../../middleware/auth.js'
 import { AppError } from '../../middleware/errorHandler.js';
 import { emitToRestaurant } from '../../services/realtime.js';
 import { saveBase64AsFile, deleteUploadFile, gerarNomeArquivo } from '../../config/upload.js';
+import { TZ_RESTAURANTE } from '../../services/horarios.js';
 import { produtoDisponivelAgora, produtoNoModulo } from '../../services/itemValidation.js';
 
 const router = Router();
@@ -348,8 +349,13 @@ async function buscarSubcategoriasDeProdutos(db, produtoIds) {
 router.get('/categorias', async (req, res, next) => {
   try {
     const restaurantId = req.restaurantId || config.restaurantId;
+    // Inclui produto_count (quantos produtos usam a categoria) para o painel
     const result = await query(
-      'SELECT id, nome, slug, ordem FROM categorias WHERE restaurant_id = $1 ORDER BY ordem ASC',
+      `SELECT c.id, c.nome, c.slug, c.ordem,
+              (SELECT COUNT(*) FROM produtos p WHERE p.categoria_id = c.id AND p.restaurant_id = c.restaurant_id)::int AS produto_count
+       FROM categorias c
+       WHERE c.restaurant_id = $1
+       ORDER BY c.ordem ASC`,
       [restaurantId]
     );
     res.json(result.rows);
@@ -594,8 +600,17 @@ router.get('/com-extras', optionalAuth, async (req, res, next) => {
 
     // Filtro de DISPONIBILIDADE (dias/horários): aplicado apenas no cardápio
     // público (cliente). Staff (PDV) continua vendo todos os pratos do módulo.
+    // Avaliado no fuso do restaurante (coluna timezone, migration 034).
     if (!isStaff) {
-      result = result.filter(p => produtoDisponivelAgora(p));
+      let timezone = TZ_RESTAURANTE;
+      try {
+        const tzResult = await query(
+          'SELECT timezone FROM restaurantes WHERE id = $1',
+          [restaurantId]
+        );
+        timezone = tzResult.rows[0]?.timezone || TZ_RESTAURANTE;
+      } catch { /* coluna pode não existir ainda */ }
+      result = result.filter(p => produtoDisponivelAgora(p, new Date(), timezone));
     }
 
     res.json(result);

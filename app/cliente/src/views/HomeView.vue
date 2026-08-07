@@ -208,9 +208,17 @@
               <div v-if="grupo.nome !== 'Geral'" class="extra-subcategoria-titulo">{{ grupo.nome }}</div>
               <div class="extra-item" v-for="extra in grupo.itens" :key="extra.key">
                 <div class="extra-item-left">
-                  <label class="extra-label">
-                    {{ extra.nome }}
-                  </label>
+                  <img
+                    v-if="extraImgSrc(extra)"
+                    :src="extraImgSrc(extra)"
+                    :alt="extra.nome"
+                    class="extra-item-img"
+                    @error="$event.target.style.display = 'none'"
+                  />
+                  <div class="extra-item-info">
+                    <span class="extra-label">{{ extra.nome }}</span>
+                    <span v-if="extra.descricao" class="extra-item-desc">{{ extra.descricao }}</span>
+                  </div>
                 <!-- Qty selector for max > 1 or unlimited -->
                 <div v-if="!extra.maximo || extra.maximo > 1" class="extra-qty">
                   <button class="extra-qty-btn" @click="decrementExtra(extra)" :disabled="getExtraQty(extra) <= 0">−</button>
@@ -359,8 +367,9 @@ const productTotal = computed(() => {
   // Extras com quantidade (max > 1)
   const qtyExtrasTotal = chosenExtras.value.reduce((acc, e) => acc + (e.extra.preco * e.qty), 0)
   // Extras checkbox (max = 1)
+  // ATENÇÃO: chosenExtraSet guarda extra.key (ex: 's123'), não o id — comparar com .key
   const setExtrasTotal = selectedExtras.value
-    .filter(e => chosenExtraSet.value.has(e.id))
+    .filter(e => chosenExtraSet.value.has(e.key))
     .reduce((acc, e) => acc + e.preco, 0)
   return selectedProduct.value.preco + qtyExtrasTotal + setExtrasTotal
 })
@@ -427,7 +436,13 @@ function buildExtrasList(product) {
   // Itens do catálogo (subcategorias ativas) — key prefixada para não colidir com legado
   for (const sub of product.subcategorias || []) {
     for (const item of sub.itens || []) {
-      list.push({ key: 's' + item.id, subcategoria: sub.nome, id: item.id, nome: item.nome, preco: Number(item.preco), maximo: item.maximo })
+      list.push({
+        key: 's' + item.id, subcategoria: sub.nome, id: item.id, nome: item.nome,
+        preco: Number(item.preco), maximo: item.maximo,
+        descricao: item.descricao || '',
+        imagem_base64: item.imagem_base64 || '',
+        imagem_url: item.imagem_url || '',
+      })
     }
   }
   // Adicionais avulsos (legado) — grupo 'Geral'
@@ -435,6 +450,23 @@ function buildExtrasList(product) {
     list.push({ key: 'e' + extra.id, subcategoria: 'Geral', id: extra.id, nome: extra.nome, preco: Number(extra.preco), maximo: extra.maximo })
   }
   return list
+}
+
+// Imagem do item adicional (subcategoria) — base64 ou URL
+function extraImgSrc(extra) {
+  if (!extra) return ''
+  const b64 = extra.imagem_base64
+  if (b64) {
+    if (b64.startsWith('/9j/')) return 'data:image/jpeg;base64,' + b64
+    if (b64.startsWith('iVBORw0KGgo')) return 'data:image/png;base64,' + b64
+    if (b64.startsWith('R0lGOD')) return 'data:image/gif;base64,' + b64
+    if (b64.startsWith('UklGR')) return 'data:image/webp;base64,' + b64
+    try {
+      if (atob(b64.substring(0, 20)).startsWith('<svg')) return 'data:image/svg+xml;base64,' + b64
+    } catch {}
+    return 'data:image/jpeg;base64,' + b64
+  }
+  return extra.imagem_url || ''
 }
 
 function openProductModal(product) {

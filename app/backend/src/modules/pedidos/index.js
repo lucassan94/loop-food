@@ -8,6 +8,7 @@ import { emitPedidoAtualizado, emitNovoPedido, emitEntregaDisponivel } from '../
 import { orderLimiter } from '../../middleware/rateLimiter.js';
 import { validarEntrega } from '../../services/frete.js';
 import { validarItensPedido } from '../../services/itemValidation.js';
+import { TZ_RESTAURANTE, lojaAbertaAgora, agoraNoFusoDoRestaurante } from '../../services/horarios.js';
 
 const router = Router();
 
@@ -118,42 +119,32 @@ router.post('/', orderLimiter, optionalAuth, async (req, res, next) => {
       const result = await transaction(async (client) => {
         // Verificar se a loja está aberta (toggle manual)
         const loja = await client.query(
-          'SELECT status_loja, horarios_funcionamento FROM restaurantes WHERE id = $1',
+          'SELECT status_loja, horarios_funcionamento, timezone FROM restaurantes WHERE id = $1',
           [restaurantId]
         );
         if (!loja.rows[0]?.status_loja) {
           throw new AppError('A loja está fechada no momento. Pedidos não podem ser realizados.', 400);
         }
-        // Verificar horários de funcionamento (se configurados)
+        // Verificar horários de funcionamento (se configurados) — sempre no
+        // FUSO DO RESTAURANTE (coluna timezone, default America/Sao_Paulo),
+        // nunca no UTC do servidor
         const horarios = loja.rows[0]?.horarios_funcionamento;
+        const timezone = loja.rows[0]?.timezone || TZ_RESTAURANTE;
         if (Array.isArray(horarios) && horarios.length === 7) {
-          const agora = new Date();
-          const diaSemana = agora.getDay();
+          const { diaSemana } = agoraNoFusoDoRestaurante(new Date(), timezone);
           const dia = horarios[diaSemana];
           if (!dia || !dia.aberto) {
             throw new AppError('A loja está fechada hoje. Confira os horários de funcionamento.', 400);
           }
-          const abre = dia.abre || '08:00';
-          const fecha = dia.fecha || '23:00';
-          const [ah, am] = abre.split(':').map(Number);
-          const [fh, fm] = fecha.split(':').map(Number);
-          const minutosAgora = agora.getHours() * 60 + agora.getMinutes();
-          const minutosAbre = (ah || 0) * 60 + (am || 0);
-          const minutosFecha = (fh || 0) * 60 + (fm || 0);
-          let dentroHorario = false;
-          if (minutosFecha <= minutosAbre) {
-            // Overnight (ex: 22:00 às 02:00)
-            dentroHorario = minutosAgora >= minutosAbre || minutosAgora <= minutosFecha;
-          } else {
-            dentroHorario = minutosAgora >= minutosAbre && minutosAgora <= minutosFecha;
-          }
-          if (!dentroHorario) {
+          if (!lojaAbertaAgora(horarios, new Date(), timezone)) {
+            const abre = dia.abre || '08:00';
+            const fecha = dia.fecha || '23:00';
             throw new AppError(`A loja está fechada neste horário. Funcionamento: ${abre} às ${fecha}.`, 400);
           }
         }
 
         // Validar itens do pedido (módulos, disponibilidade, talheres, opções)
-        await validarItensPedido(client, data.itens, data.origem);
+        await validarItensPedido(client, data.itens, data.origem, timezone);
 
         // Criar o pedido
         const pedido = await client.query(

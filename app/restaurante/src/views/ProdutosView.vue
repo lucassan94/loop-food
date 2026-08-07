@@ -599,113 +599,6 @@
       </div>
     </div>
 
-    <!-- Catalog Modal (subcategorias de adicionais) -->
-    <div v-if="showCatalogoModal" class="modal-overlay" @click.self="showCatalogoModal = false">
-      <div class="modal-content" style="max-width:640px;">
-        <h3>📂 Catálogo de Adicionais</h3>
-        <p style="color:var(--text-muted);font-size:0.85rem;margin:0.5rem 0 1rem;">
-          Subcategorias pré-cadastradas com seus itens e preços. Depois, em cada produto, basta marcar quais aparecem.
-        </p>
-
-        <div v-for="sub in subcategoriasCatalogo" :key="sub.id" class="cat-sub">
-          <div class="cat-sub-header">
-            <strong>{{ sub.nome }}</strong>
-            <span style="font-size:0.75rem;color:var(--text-muted);">{{ sub.itens.length }} itens</span>
-            <div style="display:flex;gap:4px;">
-              <button class="btn btn-sm btn-secondary" @click="editarCatalogoSub(sub)">Editar</button>
-              <button class="btn btn-sm btn-danger" @click="excluirCatalogoSub(sub)">Excluir</button>
-            </div>
-          </div>
-          <div class="cat-sub-itens">
-            <span v-for="item in sub.itens" :key="item.id" class="cat-item-chip">
-              {{ item.nome }} — {{ formatPrice(item.preco) }}
-            </span>
-            <span v-if="sub.itens.length === 0" style="font-size:0.8rem;color:var(--text-muted);">sem itens</span>
-          </div>
-        </div>
-        <p v-if="subcategoriasCatalogo.length === 0" style="color:var(--text-muted);font-size:0.85rem;">
-          Nenhuma subcategoria cadastrada.
-        </p>
-
-        <!-- Form nova/edição -->
-        <div style="margin-top:1rem;padding-top:1rem;border-top:1px solid var(--border);">
-          <h4 style="font-size:0.9rem;margin-bottom:0.5rem;">
-            {{ catalogEditId ? '✏️ Editar subcategoria' : '➕ Nova subcategoria' }}
-          </h4>
-          <input
-            v-model="catalogForm.nome"
-            placeholder="Nome (ex: Porções)"
-            style="width:100%;padding:8px 12px;border:1.5px solid var(--border);border-radius:6px;font-size:0.9rem;margin-bottom:0.5rem;"
-          />
-          <div v-for="(item, i) in catalogForm.itens" :key="i" class="cat-item-row">
-            <input v-model="item.nome" placeholder="Item (ex: Arroz)" class="extra-name" />
-            <input v-model.number="item.preco" type="number" step="0.50" min="0" placeholder="0,00" style="width:80px;" />
-            <input v-model.number="item.maximo" type="number" min="0" placeholder="Máx" style="width:56px;" title="Máximo por item (1 = checkbox, >1 = quantidade)" />
-            <button class="btn btn-sm btn-danger" @click="catalogForm.itens.splice(i, 1)">
-              <i-lucide-x style="width:14px;height:14px" />
-            </button>
-          </div>
-          <button class="btn btn-secondary btn-sm" @click="catalogForm.itens.push({ nome: '', preco: 0, maximo: 1 })">
-            <i-lucide-plus style="width:14px;height:14px" /> Item
-          </button>
-          <div style="display:flex;gap:8px;margin-top:1rem;">
-            <button class="btn btn-primary btn-sm" @click="salvarCatalogoSub" :disabled="!catalogForm.nome.trim()">
-              {{ catalogEditId ? 'Atualizar' : 'Criar' }}
-            </button>
-            <button v-if="catalogEditId" class="btn btn-secondary btn-sm" @click="cancelarCatalogoEdit">Cancelar edição</button>
-          </div>
-        </div>
-
-        <div style="margin-top:1rem;text-align:right;">
-          <button class="btn btn-secondary" @click="showCatalogoModal = false">Fechar</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Categories Modal -->
-    <div v-if="showCategoriasModal" class="modal-overlay" @click.self="showCategoriasModal = false">
-      <div class="modal-content" style="max-width:500px;">
-        <h3>🏷️ Gerenciar Categorias</h3>
-        <p style="color:var(--text-muted);font-size:0.85rem;margin:0.5rem 0 1rem;">
-          Crie, edite ou remova categorias para organizar seus produtos.
-        </p>
-
-        <div class="categoria-list">
-          <div v-for="cat in categorias" :key="cat.id" class="categoria-row">
-            <div class="categoria-info">
-              <span class="cat-order">{{ cat.ordem }}</span>
-              <strong>{{ cat.nome }}</strong>
-              <code style="font-size:0.75rem;color:var(--text-muted);">{{ cat.slug }}</code>
-            </div>
-            <div class="categoria-actions">
-              <button class="btn btn-sm btn-secondary" @click="editarCategoria(cat)">
-                <i-lucide-pencil style="width:14px;height:14px" />
-              </button>
-              <button class="btn btn-sm btn-danger" @click="excluirCategoria(cat)">
-                <i-lucide-trash-2 style="width:14px;height:14px" />
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <div style="margin-top:1rem;padding-top:1rem;border-top:1px solid var(--border);">
-          <h4 style="font-size:0.9rem;margin-bottom:0.5rem;">
-            {{ editandoCategoria ? '✏️ Editar Categoria' : '➕ Nova Categoria' }}
-          </h4>
-          <div style="display:flex;gap:8px;">
-            <input v-model="catForm.nome" placeholder="Nome da categoria" style="flex:1;padding:8px 12px;border:1.5px solid var(--border);border-radius:6px;font-size:0.9rem;" @keyup.enter="salvarCategoria" />
-            <button class="btn btn-primary btn-sm" @click="salvarCategoria" :disabled="!catForm.nome.trim() || salvandoCat">
-              {{ salvandoCat ? '...' : editandoCategoria ? 'Atualizar' : 'Criar' }}
-            </button>
-            <button v-if="editandoCategoria" class="btn btn-secondary btn-sm" @click="cancelarEditCategoria">Cancelar</button>
-          </div>
-        </div>
-
-        <div style="margin-top:1rem;text-align:right;">
-          <button class="btn btn-secondary" @click="showCategoriasModal = false">Fechar</button>
-        </div>
-      </div>
-    </div>
   </div>
 </template>
 
@@ -801,17 +694,9 @@ async function load() {
     const [p, c] = await Promise.all([
       api.get('/produtos'), api.get('/produtos/categorias')
     ])
-    const produtosData = p.data
+    // O backend já retorna extras_count (avulsos + itens de subcategorias) no GET /produtos
+    produtos.value = p.data
     categorias.value = c.data
-    if (!produtosData.length) { produtos.value = []; return }
-
-    const extrasPromises = produtosData.map(prod =>
-      api.get(`/produtos/${prod.id}`)
-        .then(({ data }) => { prod.extras_count = data.extras?.length || 0 })
-        .catch(() => { prod.extras_count = 0 })
-    )
-    await Promise.allSettled(extrasPromises)
-    produtos.value = produtosData
   } catch (err) {
     erroLoad.value = 'Erro ao carregar produtos. Verifique se o servidor está rodando.'
     console.error('Erro ao carregar produtos:', err)
@@ -834,6 +719,19 @@ function addOpcaoGrupo() { form.opcoes.push({ grupo: '', tipo: 'unica', obrigato
 function switchToCategorias() { mainTab.value = 'categorias'; carregarCategorias() }
 function switchToSubcategorias() { mainTab.value = 'subcategorias'; carregarCatalogo() }
 function switchToOpcoesPadrao() { mainTab.value = 'opcoesPadrao'; carregarOpcoesPadrao() }
+
+// Botões "Gerenciar catálogo"/"Gerenciar grupos padrão" dentro do form de produto:
+// fecha o form e leva direto para a aba correspondente
+function gerenciarCatalogoDoForm() {
+  showForm.value = false
+  mainTab.value = 'subcategorias'
+  carregarCatalogo()
+}
+function gerenciarOpcoesPadraoDoForm() {
+  showForm.value = false
+  mainTab.value = 'opcoesPadrao'
+  carregarOpcoesPadrao()
+}
 
 async function carregarCategorias() {
   try {

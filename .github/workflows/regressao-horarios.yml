@@ -1,0 +1,39 @@
+# =============================================================================
+# Regressão de fuso horário (CI — gate antes do deploy via Portainer)
+# =============================================================================
+# Roda automaticamente a cada push/PR que altere backend ou migrations.
+# O teste `src/test-horarios.js` valida o cálculo de horários de funcionamento
+# no fuso do restaurante — a regressão que bloqueava pedidos à noite (21h-23h
+# local = dia seguinte em UTC). Falha aqui = código não deve ir para produção.
+#
+# Complementa o gate de BUILD no Dockerfile do backend (RUN node src/test-horarios.js),
+# que falha o build da imagem no Portainer.
+# =============================================================================
+name: Regressão de horários
+
+on:
+  push:
+    paths:
+      - 'app/backend/**'
+      - 'migrations/**'
+  pull_request:
+    paths:
+      - 'app/backend/**'
+      - 'migrations/**'
+
+jobs:
+  test-horarios:
+    name: Teste de fuso horário
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # O teste é autocontido (só Intl/Date — não depende do banco nem de deps)
+      - name: Rodar teste de regressão (horários de funcionamento)
+        run: node app/backend/src/test-horarios.js

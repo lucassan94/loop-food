@@ -35,6 +35,10 @@ services:
       - stack.env
     environment:
       - NODE_ENV=production
+      # Fuso do restaurante: horários de funcionamento são locais (BRT).
+      # O código usa Intl (America/Sao_Paulo) independente disto, mas ter o
+      # TZ no container mantém logs/agendamentos consistentes.
+      - TZ=America/Sao_Paulo
       - DB_HOST=${DB_HOST:-86.48.18.22}
       - DB_PORT=${DB_PORT:-5432}
       - DB_NAME=${DB_NAME:-delivery}

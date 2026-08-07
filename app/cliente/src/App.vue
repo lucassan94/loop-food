@@ -119,28 +119,50 @@ const authStore = useAuthStore()
 const $router = useRouter()
 
 // Store state
-const storeOpen = ref(true)
+// Estado EFETIVO = toggle manual (status_loja) E janela de horários.
+// O toggle manual TEM PRIORIDADE: fechado manualmente → continua fechado mesmo
+// dentro do horário (o intervalo de 30s não reabre). Os horários só podem fechar.
+const statusLojaManual = ref(true)
+const horariosAbertos = ref(true)
+const storeOpen = computed(() => statusLojaManual.value && horariosAbertos.value)
 const cartItems = ref([])
 const showCartDrawer = ref(false)
 const showCepModal = ref(false)
 const unreadMessages = ref(0)
 
 // Restaurant data for pickup (retirada)
-const restaurantData = ref({ endereco: '', cidade: '', estado: '', retirada_habilitada: false, horarios_funcionamento: [] })
+const restaurantData = ref({ endereco: '', cidade: '', estado: '', retirada_habilitada: false, horarios_funcionamento: [], timezone: 'America/Sao_Paulo' })
+
+// ── Hora local do restaurante (os horários cadastrados são no fuso dele) ──
+// Usa Intl.DateTimeFormat com timeZone explícita — não depende do relógio do
+// navegador nem do servidor (que roda em UTC).
+function agoraNoFusoRestaurante(timeZone = 'America/Sao_Paulo') {
+  const fmt = new Intl.DateTimeFormat('en-US', {
+    timeZone,
+    weekday: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  })
+  const partes = fmt.formatToParts(new Date())
+  const get = (t) => partes.find(p => p.type === t)?.value
+  const diaMap = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 }
+  let hora = parseInt(get('hour') || '0', 10)
+  if (hora === 24) hora = 0 // Intl pode retornar "24" para meia-noite
+  return {
+    diaSemana: diaMap[get('weekday')] ?? new Date().getDay(),
+    minutos: hora * 60 + parseInt(get('minute') || '0', 10),
+  }
+}
 
 // ── Verificação automática de horários de funcionamento ──
-function restauranteAbertoAgora(horarios) {
+function restauranteAbertoAgora(horarios, timeZone = 'America/Sao_Paulo') {
   if (!Array.isArray(horarios) || horarios.length !== 7) return true // sem dados = aberto
-  const agora = new Date()
-  const diaSemana = agora.getDay() // 0=Domingo
+  const { diaSemana, minutos: minutosAgora } = agoraNoFusoRestaurante(timeZone)
   const dia = horarios[diaSemana]
   if (!dia || !dia.aberto) return false
-  const abre = dia.abre || '08:00'
-  const fecha = dia.fecha || '23:00'
-  // Converter HH:MM para minutos
-  const [ah, am] = abre.split(':').map(Number)
-  const [fh, fm] = fecha.split(':').map(Number)
-  const minutosAgora = agora.getHours() * 60 + agora.getMinutes()
+  const [ah, am] = (dia.abre || '08:00').split(':').map(Number)
+  const [fh, fm] = (dia.fecha || '23:00').split(':').map(Number)
   const minutosAbre = (ah || 0) * 60 + (am || 0)
   const minutosFecha = (fh || 0) * 60 + (fm || 0)
   // Se fecha <= abre (ex: 22:00 às 02:00), considera overnight
@@ -162,18 +184,17 @@ const tempoRestanteFormatado = computed(() => {
   return `${mins} minuto${mins > 1 ? 's' : ''}`
 })
 
-function calcularMinutosAteFechar(horarios) {
+function calcularMinutosAteFechar(horarios, timeZone = 'America/Sao_Paulo') {
   if (!Array.isArray(horarios) || horarios.length !== 7) return null
-  const agora = new Date()
-  const diaSemana = agora.getDay()
+  const { diaSemana, minutos: minutosAgora } = agoraNoFusoRestaurante(timeZone)
   const dia = horarios[diaSemana]
   if (!dia || !dia.aberto) return 0
-  const fecha = dia.fecha || '23:00'
-  const [fh, fm] = fecha.split(':').map(Number)
-  const minutosAgora = agora.getHours() * 60 + agora.getMinutes()
+  const [ah, am] = (dia.abre || '08:00').split(':').map(Number)
+  const [fh, fm] = (dia.fecha || '23:00').split(':').map(Number)
+  const minutosAbre = (ah || 0) * 60 + (am || 0)
   const minutosFecha = (fh || 0) * 60 + (fm || 0)
   // Overnight: se agora > fecha, loja já fechou
-  if (minutosFecha <= (dia.abre || '08:00').split(':').reduce((h, m) => parseInt(h) * 60 + parseInt(m), 0)) {
+  if (minutosFecha <= minutosAbre) {
     // Fecha amanhã → calcular a partir de agora até meia-noite + fecha
     if (minutosAgora > minutosFecha) {
       return (1440 - minutosAgora) + minutosFecha // até meia-noite + hora de fechar
@@ -188,8 +209,9 @@ function iniciarVerificacaoHorarios() {
   if (horariosInterval) clearInterval(horariosInterval)
   horariosInterval = setInterval(() => {
     if (restaurantData.value.horarios_funcionamento.length === 7) {
-      storeOpen.value = restauranteAbertoAgora(restaurantData.value.horarios_funcionamento)
-      minutosRestantes.value = calcularMinutosAteFechar(restaurantData.value.horarios_funcionamento)
+      // Só recalcula a JANELA DE HORÁRIOS — nunca sobrescreve o toggle manual
+      horariosAbertos.value = restauranteAbertoAgora(restaurantData.value.horarios_funcionamento, restaurantData.value.timezone)
+      minutosRestantes.value = calcularMinutosAteFechar(restaurantData.value.horarios_funcionamento, restaurantData.value.timezone)
     }
   }, 30000) // Verifica a cada 30 segundos (precisão para contagem regressiva)
 }
@@ -357,7 +379,7 @@ onMounted(async () => {
 
   // Listeners
   onEvent('restaurante:status_loja', (data) => {
-    storeOpen.value = data.status_loja
+    statusLojaManual.value = data.status_loja
   })
 
   onEvent('pedido:atualizado', (data) => {
@@ -378,15 +400,17 @@ onMounted(async () => {
         estado: data.estado || '',
         retirada_habilitada: data.retirada_habilitada || false,
         horarios_funcionamento: data.horarios_funcionamento || [],
+        timezone: data.timezone || 'America/Sao_Paulo',
       }
-      // Verificar horários de funcionamento: se horários configurados, usar eles;
-      // senão, usar o toggle manual status_loja
+      // Toggle manual (status_loja) é a fonte primária; os horários de
+      // funcionamento (quando configurados) só podem fechar a loja.
+      statusLojaManual.value = data.status_loja
       if (Array.isArray(data.horarios_funcionamento) && data.horarios_funcionamento.length === 7) {
-        storeOpen.value = restauranteAbertoAgora(data.horarios_funcionamento)
-        minutosRestantes.value = calcularMinutosAteFechar(data.horarios_funcionamento)
+        horariosAbertos.value = restauranteAbertoAgora(data.horarios_funcionamento, restaurantData.value.timezone)
+        minutosRestantes.value = calcularMinutosAteFechar(data.horarios_funcionamento, restaurantData.value.timezone)
         iniciarVerificacaoHorarios()
       } else {
-        storeOpen.value = data.status_loja
+        horariosAbertos.value = true
       }
 
     // Aplicar cores do tema dinamicamente (CWE-79: validar formato hex antes de injetar no CSS)

@@ -6,6 +6,7 @@ import { config } from '../../config/index.js';
 import { authenticate, authorize } from '../../middleware/auth.js';
 import { AppError } from '../../middleware/errorHandler.js';
 import { emitToRestaurant } from '../../services/realtime.js';
+import { TZ_RESTAURANTE, timeZoneValido } from '../../services/horarios.js';
 
 const router = Router();
 
@@ -41,6 +42,18 @@ router.get('/', async (req, res, next) => {
     );
 
     // Buscar raios de entrega
+    // Fuso do restaurante (coluna timezone, migration 034). Defensivo: se a
+    // coluna ainda não existir (pré-migration), cai para o default.
+    let timezone = TZ_RESTAURANTE;
+    try {
+      const tzResult = await query(
+        'SELECT timezone FROM restaurantes WHERE id = $1',
+        [restaurantId]
+      );
+      timezone = tzResult.rows[0]?.timezone || TZ_RESTAURANTE;
+    } catch { /* coluna pode não existir ainda */ }
+
+    // Buscar raios de entrega
     const raios = await query(
       'SELECT * FROM raios_entrega WHERE restaurant_id = $1 ORDER BY raio_km ASC',
       [restaurantId]
@@ -48,6 +61,8 @@ router.get('/', async (req, res, next) => {
 
     res.json({
       ...result.rows[0],
+      // Fuso em que os horários de funcionamento são interpretados (cliente usa p/ banner)
+      timezone,
       categorias: categorias.rows,
       produtos: produtos.rows,
       raiosEntrega: raios.rows,
@@ -63,7 +78,7 @@ router.get('/', async (req, res, next) => {
 router.put('/', authenticate, authorize('admin', 'gerente'), async (req, res, next) => {
   try {
     const restaurantId = req.restaurantId || config.restaurantId;
-    const { nome, endereco, cep, cidade, estado, latitude, longitude, tempo_preparo_min, modo_sem_entregador, formas_pagamento_aceitas, cor_primaria, cor_secundaria, cor_terciaria, features, logo_base64, retirada_habilitada, horarios_funcionamento } = req.body;
+    const { nome, endereco, cep, cidade, estado, latitude, longitude, tempo_preparo_min, modo_sem_entregador, formas_pagamento_aceitas, cor_primaria, cor_secundaria, cor_terciaria, features, logo_base64, retirada_habilitada, horarios_funcionamento, timezone } = req.body;
 
     const fields = [];
     const params = [];
@@ -94,6 +109,14 @@ router.put('/', authenticate, authorize('admin', 'gerente'), async (req, res, ne
     if (horarios_funcionamento !== undefined) {
       fields.push(`horarios_funcionamento = $${idx++}`);
       params.push(JSON.stringify(horarios_funcionamento));
+    }
+    if (timezone !== undefined) {
+      // Rejeita fusos inválidos (ex.: digitação errada) — protege os horários
+      if (typeof timezone !== 'string' || !timeZoneValido(timezone)) {
+        throw new AppError('Fuso horário inválido. Use um identificador IANA (ex.: America/Sao_Paulo).', 400);
+      }
+      fields.push(`timezone = $${idx++}`);
+      params.push(timezone);
     }
 
     if (fields.length === 0) {

@@ -12,6 +12,12 @@ RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 COPY --from=builder /app/node_modules ./node_modules
 COPY . .
 
+# ── GATE DE REGRESSÃO: teste de fuso horário (antes de cada deploy) ──
+# O Portainer reconstrói a imagem a cada Pull & redeploy. Se este teste
+# falhar, o build falha e a stack NÃO sobe — impede regressões no cálculo
+# de horários de funcionamento (bug de fuso que bloqueava pedidos à noite).
+RUN node src/test-horarios.js
+
 # Create uploads directory
 RUN mkdir -p /app/uploads && chown -R appuser:appgroup /app
 

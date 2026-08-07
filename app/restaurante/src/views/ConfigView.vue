@@ -112,6 +112,12 @@
               <span v-else class="horario-fechado">Fechado</span>
             </div>
           </div>
+          <div class="form-group" style="margin-top:1rem;max-width:420px;">
+            <label>Fuso Horário <span style="font-size:0.72rem;color:var(--text-muted);font-weight:400;">(os horários acima são neste fuso)</span></label>
+            <select v-model="restaurante.timezone">
+              <option v-for="tz in timezoneOptions" :key="tz.value" :value="tz.value">{{ tz.label }}</option>
+            </select>
+          </div>
           <div style="margin-top:1rem;display:flex;gap:8px;align-items:center;">
             <button class="btn btn-primary" @click="salvarRetiradaHorarios" :disabled="salvandoRetirada">
               {{ salvandoRetirada ? 'Salvando...' : 'Salvar Configurações' }}
@@ -639,7 +645,7 @@ const storeOpen = ref(true)
 const modoSemEntregador = ref(false)
 const logoPreview = ref('')
 const logoBase64 = ref('')
-const restaurante = reactive({ nome: '', endereco: '', cep: '', cidade: '', estado: '', latitude: null, longitude: null, tempo_preparo_min: 20, cor_primaria: '#dc2626', cor_secundaria: '#f97316', cor_terciaria: '#3b82f6' })
+const restaurante = reactive({ nome: '', endereco: '', cep: '', cidade: '', estado: '', latitude: null, longitude: null, tempo_preparo_min: 20, timezone: 'America/Sao_Paulo', cor_primaria: '#dc2626', cor_secundaria: '#f97316', cor_terciaria: '#3b82f6' })
 const raios = ref([])
 const equipe = ref([])
 const buscandoCEP = ref(false)
@@ -651,6 +657,32 @@ const novoUsuario = reactive({ nome: '', apelido: '', password: 'senha123', carg
 // ── Retirada + Horários ──
 const retiradaHabilitada = ref(false)
 const diasSemana = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado']
+// Fusos mais comuns (IANA). Os horários de funcionamento são interpretados
+// no fuso escolhido — salvo em restaurantes.timezone (migration 034).
+const timezoneOptions = [
+  { value: 'America/Sao_Paulo', label: '🇧🇷 São Paulo (UTC−3)' },
+  { value: 'America/Noronha', label: '🇧🇷 Fernando de Noronha (UTC−2)' },
+  { value: 'America/Belem', label: '🇧🇷 Belém (UTC−3)' },
+  { value: 'America/Fortaleza', label: '🇧🇷 Fortaleza (UTC−3)' },
+  { value: 'America/Recife', label: '🇧🇷 Recife (UTC−3)' },
+  { value: 'America/Bahia', label: '🇧🇷 Salvador (UTC−3)' },
+  { value: 'America/Manaus', label: '🇧🇷 Manaus (UTC−4)' },
+  { value: 'America/Cuiaba', label: '🇧🇷 Cuiabá (UTC−4)' },
+  { value: 'America/Porto_Velho', label: '🇧🇷 Porto Velho (UTC−4)' },
+  { value: 'America/Boa_Vista', label: '🇧🇷 Boa Vista (UTC−4)' },
+  { value: 'America/Rio_Branco', label: '🇧🇷 Rio Branco (UTC−5)' },
+  { value: 'America/Buenos_Aires', label: '🇦🇷 Buenos Aires (UTC−3)' },
+  { value: 'America/Montevideo', label: '🇺🇾 Montevidéu (UTC−3)' },
+  { value: 'America/Asuncion', label: '🇵🇾 Assunção (UTC−3)' },
+  { value: 'America/Santiago', label: '🇨🇱 Santiago (UTC−3/−4)' },
+  { value: 'America/Bogota', label: '🇨🇴 Bogotá (UTC−5)' },
+  { value: 'America/Lima', label: '🇵🇪 Lima (UTC−5)' },
+  { value: 'America/Mexico_City', label: '🇲🇽 Cidade do México (UTC−6)' },
+  { value: 'America/New_York', label: '🇺🇸 Nova York (UTC−4/−5)' },
+  { value: 'Europe/Lisbon', label: '🇵🇹 Lisboa (UTC+0/+1)' },
+  { value: 'Europe/London', label: '🇬🇧 Londres (UTC+0/+1)' },
+  { value: 'Europe/Madrid', label: '🇪🇸 Madri (UTC+1/+2)' },
+]
 const horariosFuncionamento = ref(Array.from({ length: 7 }, () => ({ aberto: true, abre: '08:00', fecha: '23:00' })))
 const salvandoRetirada = ref(false)
 const retiradaMsg = ref(null)
@@ -747,6 +779,7 @@ async function load() {
     cidade: r.data.cidade, estado: r.data.estado,
     latitude: r.data.latitude, longitude: r.data.longitude,
     tempo_preparo_min: r.data.tempo_preparo_min,
+    timezone: r.data.timezone || 'America/Sao_Paulo',
     cor_primaria: r.data.cor_primaria || '#dc2626',
     cor_secundaria: r.data.cor_secundaria || '#f97316',
     cor_terciaria: r.data.cor_terciaria || '#3b82f6',
@@ -1026,6 +1059,7 @@ async function salvarRetiradaHorarios() {
   try {
     await api.put('/restaurante', {
       retirada_habilitada: retiradaHabilitada.value,
+      timezone: restaurante.timezone || 'America/Sao_Paulo',
       horarios_funcionamento: horariosFuncionamento.value.map(d => ({
         aberto: !!d.aberto,
         abre: d.aberto ? d.abre || '08:00' : '',

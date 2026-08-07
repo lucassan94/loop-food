@@ -18,14 +18,11 @@
 // ============================================================================
 
 import { AppError } from '../middleware/errorHandler.js';
+import { TZ_RESTAURANTE, agoraNoFusoDoRestaurante } from './horarios.js';
 
 // Módulos de venda
 export const MODULO_DELIVERY = 'delivery';
 export const MODULO_SALAO = 'salao';
-
-function minutosDoDia(agora) {
-  return agora.getHours() * 60 + agora.getMinutes();
-}
 
 function parseHora(valor) {
   const hhmm = String(valor).slice(0, 5);
@@ -41,11 +38,14 @@ function parseHora(valor) {
  * - Horário que vira o dia (fim <= início) é tratado como overnight.
  * - fim == início = disponível o dia todo.
  */
-export function produtoDisponivelAgora(produto, agora = new Date()) {
+export function produtoDisponivelAgora(produto, agora = new Date(), timeZone = TZ_RESTAURANTE) {
   if (!produto) return true;
 
+  // Dia/hora SEMPRE no fuso do restaurante (os dias cadastrados são locais)
+  const { diaSemana, minutos: now } = agoraNoFusoDoRestaurante(agora, timeZone);
+
   const dias = produto.dias_semana;
-  if (Array.isArray(dias) && dias.length > 0 && !dias.includes(agora.getDay())) {
+  if (Array.isArray(dias) && dias.length > 0 && !dias.includes(diaSemana)) {
     return false;
   }
 
@@ -60,7 +60,6 @@ export function produtoDisponivelAgora(produto, agora = new Date()) {
   // 12:00-12:00 → dia inteiro
   if (ini && fim && fim === ini) return true;
 
-  const now = minutosDoDia(agora);
   if (fimMin > inicio) {
     return now >= inicio && now <= fimMin;
   }
@@ -82,7 +81,7 @@ export function produtoNoModulo(produto, modulo) {
  * Valida todos os itens de um pedido contra as regras do produto.
  * `db` pode ser o helper `query` (módulo) ou um `client` de transação.
  */
-export async function validarItensPedido(db, itens, origem) {
+export async function validarItensPedido(db, itens, origem, timeZone = TZ_RESTAURANTE) {
   const produtoIds = [...new Set(itens.map(i => i.produto_id))];
   const result = await db.query(
     `SELECT id, nome, talheres_obrigatorio, modulos, dias_semana, horario_inicio, horario_fim
@@ -105,7 +104,7 @@ export async function validarItensPedido(db, itens, origem) {
         400
       );
     }
-    if (checarHorario && !produtoDisponivelAgora(produto)) {
+    if (checarHorario && !produtoDisponivelAgora(produto, new Date(), timeZone)) {
       throw new AppError(
         `"${item.nome_produto}" está fora do horário de disponibilidade agora.`,
         400
