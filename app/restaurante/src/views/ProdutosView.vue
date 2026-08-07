@@ -89,50 +89,84 @@
       </div>
     </div> <!-- /aba produtos -->
 
-    <!-- ─────────── Aba: CATEGORIAS ─────────── -->
-    <div v-show="mainTab === 'categorias'" class="cardapio-section">
-      <div class="cardapio-header">
-        <div>
-          <h2 style="font-size:1.2rem;">🏷️ Categorias do Cardápio</h2>
-          <p class="cardapio-sub">Crie, edite ou remova as categorias usadas para organizar os produtos e também como subcategorias de adicionais (ex: usar a categoria "Bebidas" inteira como grupo de adicionais).</p>
-        </div>
-      </div>
-
-      <div class="card" style="padding:1rem;">
-        <div class="categoria-list">
-          <div v-for="cat in categorias" :key="cat.id" class="categoria-row">
-            <div class="categoria-info">
-              <span class="cat-order">{{ cat.ordem }}</span>
-              <strong>{{ cat.nome }}</strong>
-              <code style="font-size:0.75rem;color:var(--text-muted);">{{ cat.slug }}</code>
-              <span class="cat-prod-count" v-if="cat.produto_count > 0">{{ cat.produto_count }} produto(s)</span>
-            </div>
-            <div class="categoria-actions">
-              <button class="btn btn-sm btn-secondary" @click="editarCategoria(cat)">
-                <i-lucide-pencil style="width:14px;height:14px" />
-              </button>
-              <button class="btn btn-sm btn-danger" @click="excluirCategoria(cat)">
-                <i-lucide-trash-2 style="width:14px;height:14px" />
-              </button>
-            </div>
+    <!-- ════════════════ DRAWER: CATEGORIAS ════════════════ -->
+    <Transition name="drawer-fade">
+      <div v-if="categoriasDrawerOpen" class="drawer-overlay" @click.self="fecharCategoriasDrawer"></div>
+    </Transition>
+    <Transition name="drawer-slide">
+      <aside v-if="categoriasDrawerOpen" class="drawer-panel">
+        <!-- Header -->
+        <div class="drawer-header">
+          <div class="drawer-icon"><i-lucide-tags style="width:22px;height:22px" /></div>
+          <div class="drawer-header-text">
+            <h3>Categorias do Cardápio</h3>
+            <p>Organize os produtos por categoria. Uma categoria inteira pode ser usada como subcategoria de adicionais (ex: usar "Bebidas" como grupo de extras).</p>
           </div>
-          <p v-if="categorias.length === 0" style="color:var(--text-muted);font-size:0.85rem;">Nenhuma categoria cadastrada.</p>
+          <button class="drawer-close" @click="fecharCategoriasDrawer"><i-lucide-x style="width:18px;height:18px" /></button>
         </div>
 
-        <div style="margin-top:1rem;padding-top:1rem;border-top:1px solid var(--border);">
-          <h4 style="font-size:0.9rem;margin-bottom:0.5rem;">
-            {{ editandoCategoria ? '✏️ Editar Categoria' : '➕ Nova Categoria' }}
-          </h4>
-          <div style="display:flex;gap:8px;">
-            <input v-model="catForm.nome" placeholder="Nome da categoria" style="flex:1;padding:8px 12px;border:1.5px solid var(--border);border-radius:6px;font-size:0.9rem;" @keyup.enter="salvarCategoria" />
-            <button class="btn btn-primary btn-sm" @click="salvarCategoria" :disabled="!catForm.nome.trim() || salvandoCat">
-              {{ salvandoCat ? '...' : editandoCategoria ? 'Atualizar' : 'Criar' }}
+        <!-- ── VIEW: Lista ── -->
+        <div v-if="!categoriasEditorOpen" class="drawer-body">
+          <div class="drawer-toolbar">
+            <button class="btn btn-primary" @click="novaCategoria">
+              <i-lucide-plus style="width:16px;height:16px" /> Nova Categoria
             </button>
-            <button v-if="editandoCategoria" class="btn btn-secondary btn-sm" @click="cancelarEditCategoria">Cancelar</button>
+            <span class="drawer-toolbar-count">{{ categorias.length }} categoria(s)</span>
+          </div>
+
+          <div v-if="categorias.length" class="catalog-list">
+            <div v-for="cat in categorias" :key="cat.id" class="catalog-card">
+              <div class="catalog-card-head">
+                <div class="catalog-card-title">
+                  <span class="catalog-card-icon"><i-lucide-tags style="width:16px;height:16px" /></span>
+                  <div class="catalog-card-name">
+                    <strong>{{ cat.nome }}</strong>
+                    <span v-if="cat.produto_count > 0" class="badge badge-info">{{ cat.produto_count }} produto(s)</span>
+                  </div>
+                </div>
+                <div class="catalog-card-actions">
+                  <button class="btn-icon" title="Editar" @click="editarCategoria(cat)"><i-lucide-pencil style="width:15px;height:15px" /></button>
+                  <button class="btn-icon danger" title="Excluir" @click="excluirCategoria(cat)"><i-lucide-trash-2 style="width:15px;height:15px" /></button>
+                </div>
+              </div>
+              <p class="catalog-card-sub">
+                <code style="font-size:0.74rem;color:var(--text-muted);">{{ cat.slug }}</code>
+              </p>
+            </div>
+          </div>
+
+          <div v-else class="drawer-empty">
+            <i-lucide-tags style="width:44px;height:44px" />
+            <p>Nenhuma categoria cadastrada ainda.</p>
+            <button class="btn btn-primary btn-sm" @click="novaCategoria">Criar a primeira</button>
           </div>
         </div>
-      </div>
-    </div>
+
+        <!-- ── VIEW: Editor ── -->
+        <div v-else class="drawer-body">
+          <button class="btn btn-secondary btn-sm" @click="cancelarEditCategoria">
+            <i-lucide-arrow-left style="width:15px;height:15px" /> Voltar para a lista
+          </button>
+
+          <div class="editor-card">
+            <h4>{{ editandoCategoria ? '✏️ Editar categoria' : '➕ Nova categoria' }}</h4>
+
+            <div class="form-group">
+              <label>Nome da categoria</label>
+              <input v-model="catForm.nome" placeholder="Ex: Lanches, Bebidas, Sobremesas..." @keyup.enter="salvarCategoria" />
+              <p class="field-hint">O slug (endereço amigável) é gerado automaticamente a partir do nome.</p>
+            </div>
+
+            <div class="editor-footer">
+              <button class="btn btn-primary" @click="salvarCategoria" :disabled="!catForm.nome.trim() || salvandoCat">
+                <i-lucide-save style="width:15px;height:15px" /> {{ salvandoCat ? 'Salvando...' : (editandoCategoria ? 'Salvar alterações' : 'Criar categoria') }}
+              </button>
+              <button class="btn btn-secondary" @click="cancelarEditCategoria">Cancelar</button>
+            </div>
+          </div>
+        </div>
+      </aside>
+    </Transition>
 
     <!-- ════════════════ DRAWER: SUBCATEGORIAS DE ADICIONAIS ════════════════ -->
     <Transition name="drawer-fade">
@@ -525,26 +559,22 @@
 
             <div class="form-section">
               <div class="form-section-title"><i-lucide-circle-plus style="width:16px;height:16px" /> Adicionais avulsos <span class="title-tag">legado</span></div>
-              <p class="section-hint">Aparecem no grupo "Geral". O <strong>Máximo</strong> define quantas vezes o cliente pode pedir o mesmo adicional (ex: 2 carnes, 1 cebola).</p>
+              <p class="section-hint">Específicos deste produto, aparecem no grupo "Geral" do pedido. O <strong>Máximo</strong> define quantas vezes o cliente pode pedir o mesmo adicional (ex: 2 carnes, 1 cebola).</p>
 
-              <div v-for="(extra, i) in form.extras" :key="i" class="extra-row">
-                <div class="extra-fields">
-                  <input v-model="extra.nome" placeholder="Nome do adicional" class="extra-name" />
-                  <div class="extra-number-group">
-                    <span class="extra-currency">R$</span>
-                    <input v-model.number="extra.preco" type="number" step="0.50" min="0" placeholder="0,00" class="extra-price-input" />
+              <div v-if="form.extras.length" class="mini-list">
+                <div v-for="(extra, i) in form.extras" :key="i" class="mini-list-item">
+                  <span class="mini-list-icon"><i-lucide-circle-plus style="width:15px;height:15px" /></span>
+                  <div class="mini-list-main">
+                    <strong>{{ extra.nome }}</strong>
+                    <small>{{ formatPrice(extra.preco) }} · máx {{ extra.maximo ?? 1 }}</small>
                   </div>
-                  <div class="extra-max-group">
-                    <label class="extra-max-label">Máx:</label>
-                    <input v-model.number="extra.maximo" type="number" min="0" max="99" placeholder="1" class="extra-max-input" />
-                  </div>
-                  <button class="btn-icon danger" @click="form.extras.splice(i, 1)" title="Remover adicional">
-                    <i-lucide-x style="width:15px;height:15px" />
-                  </button>
+                  <button class="btn-icon" title="Editar" @click="editarExtra(i)"><i-lucide-pencil style="width:14px;height:14px" /></button>
+                  <button class="btn-icon danger" title="Remover" @click="form.extras.splice(i, 1)"><i-lucide-trash-2 style="width:14px;height:14px" /></button>
                 </div>
               </div>
-              <button class="btn btn-secondary btn-block" @click="addExtra">
-                <i-lucide-plus style="width:15px;height:15px" /> Adicionar Opcional
+
+              <button class="btn btn-secondary btn-block" @click="abrirExtraDrawer">
+                <i-lucide-settings-2 style="width:15px;height:15px" /> {{ form.extras.length ? 'Gerenciar adicionais avulsos' : 'Adicionar adicionais avulsos' }}
               </button>
             </div>
           </div>
@@ -577,33 +607,20 @@
               <div class="form-section-title"><i-lucide-circle-plus style="width:16px;height:16px" /> Opções avulsas deste produto</div>
               <p class="section-hint">Gratuitas (ex: ponto da carne, com/sem açúcar). <strong>Única</strong> = radio; <strong>Múltipla</strong> = checkbox. Marque <strong>Obrigatória</strong> para exigir a escolha antes de adicionar ao carrinho.</p>
 
-              <div v-for="(g, gi) in form.opcoes" :key="gi" class="opcao-group">
-                <div class="extra-fields">
-                  <input v-model="g.grupo" placeholder="Nome do grupo (ex: Ponto da carne)" class="extra-name" />
-                  <select v-model="g.tipo" class="field-select">
-                    <option value="unica">Seleção única</option>
-                    <option value="multipla">Seleção múltipla</option>
-                  </select>
-                  <label class="check-inline">
-                    <input type="checkbox" v-model="g.obrigatoria" /> Obrigatória
-                  </label>
-                  <button class="btn-icon danger" @click="form.opcoes.splice(gi, 1)" title="Remover grupo">
-                    <i-lucide-x style="width:15px;height:15px" />
-                  </button>
+              <div v-if="form.opcoes.length" class="mini-list">
+                <div v-for="(g, gi) in form.opcoes" :key="gi" class="mini-list-item">
+                  <span class="mini-list-icon"><i-lucide-list-checks style="width:15px;height:15px" /></span>
+                  <div class="mini-list-main">
+                    <strong>{{ g.grupo }}</strong>
+                    <small>{{ g.tipo === 'unica' ? 'Seleção única' : 'Seleção múltipla' }}{{ g.obrigatoria ? ' · Obrigatória' : '' }} · {{ g.opcoes.filter(o => o.trim()).length }} opção(ões)</small>
+                  </div>
+                  <button class="btn-icon" title="Editar" @click="editarOpcaoAvulsa(gi)"><i-lucide-pencil style="width:14px;height:14px" /></button>
+                  <button class="btn-icon danger" title="Remover" @click="form.opcoes.splice(gi, 1)"><i-lucide-trash-2 style="width:14px;height:14px" /></button>
                 </div>
-
-                <div v-for="(opNome, oi) in g.opcoes" :key="oi" class="extra-fields sub">
-                  <input v-model="g.opcoes[oi]" placeholder="Ex: Ao ponto" class="extra-name" />
-                  <button class="btn-icon danger" @click="g.opcoes.splice(oi, 1)" title="Remover opção">
-                    <i-lucide-x style="width:15px;height:15px" />
-                  </button>
-                </div>
-                <button class="btn btn-secondary btn-sm" @click="g.opcoes.push('')">
-                  <i-lucide-plus style="width:14px;height:14px" /> Opção
-                </button>
               </div>
-              <button class="btn btn-secondary btn-block" @click="addOpcaoGrupo">
-                <i-lucide-plus style="width:15px;height:15px" /> Grupo de Opções
+
+              <button class="btn btn-secondary btn-block" @click="abrirOpcaoDrawer">
+                <i-lucide-settings-2 style="width:15px;height:15px" /> {{ form.opcoes.length ? 'Gerenciar opções avulsas' : 'Adicionar opções avulsas' }}
               </button>
             </div>
           </div>
@@ -670,11 +687,206 @@
         </div>
       </aside>
     </Transition>
+
+    <!-- ════════════ DRAWER ANINHADO: ADICIONAIS AVULSOS (dentro do form) ════════════ -->
+    <Transition name="drawer-fade">
+      <div v-if="extraDrawerOpen" class="drawer-overlay stacked" @click.self="fecharExtraDrawer"></div>
+    </Transition>
+    <Transition name="drawer-slide">
+      <aside v-if="extraDrawerOpen" class="drawer-panel drawer-narrow stacked">
+        <div class="drawer-header">
+          <div class="drawer-icon"><i-lucide-circle-plus style="width:22px;height:22px" /></div>
+          <div class="drawer-header-text">
+            <h3>Adicionais avulsos</h3>
+            <p>Específicos deste produto — aparecem no grupo "Geral" do pedido. O máximo define quantas vezes o cliente pode pedir.</p>
+          </div>
+          <button class="drawer-close" @click="fecharExtraDrawer"><i-lucide-x style="width:18px;height:18px" /></button>
+        </div>
+
+        <!-- ── VIEW: Lista ── -->
+        <div v-if="!extraEditorOpen" class="drawer-body">
+          <div class="drawer-toolbar">
+            <button class="btn btn-primary" @click="novoExtra">
+              <i-lucide-plus style="width:16px;height:16px" /> Novo Adicional
+            </button>
+            <span class="drawer-toolbar-count">{{ form.extras.length }} adicional(is)</span>
+          </div>
+
+          <div v-if="form.extras.length" class="catalog-list">
+            <div v-for="(extra, i) in form.extras" :key="i" class="catalog-card">
+              <div class="catalog-card-head">
+                <div class="catalog-card-title">
+                  <span class="catalog-card-icon"><i-lucide-circle-plus style="width:16px;height:16px" /></span>
+                  <div class="catalog-card-name">
+                    <strong>{{ extra.nome }}</strong>
+                    <span class="badge badge-soft">{{ formatPrice(extra.preco) }}</span>
+                    <span class="badge badge-soft">máx {{ extra.maximo ?? 1 }}</span>
+                  </div>
+                </div>
+                <div class="catalog-card-actions">
+                  <button class="btn-icon" title="Editar" @click="editarExtra(i)"><i-lucide-pencil style="width:15px;height:15px" /></button>
+                  <button class="btn-icon danger" title="Excluir" @click="form.extras.splice(i, 1)"><i-lucide-trash-2 style="width:15px;height:15px" /></button>
+                </div>
+              </div>
+              <p class="catalog-card-sub">{{ extra.maximo > 1 ? `O cliente pode pedir até ${extra.maximo}x` : 'Cliente pode pedir 1x (checkbox)' }}</p>
+            </div>
+          </div>
+
+          <div v-else class="drawer-empty">
+            <i-lucide-circle-plus style="width:44px;height:44px" />
+            <p>Nenhum adicional avulso ainda.</p>
+            <button class="btn btn-primary btn-sm" @click="novoExtra">Adicionar o primeiro</button>
+          </div>
+        </div>
+
+        <!-- ── VIEW: Editor ── -->
+        <div v-else class="drawer-body">
+          <button class="btn btn-secondary btn-sm" @click="cancelarExtraEdit">
+            <i-lucide-arrow-left style="width:15px;height:15px" /> Voltar para a lista
+          </button>
+
+          <div class="editor-card">
+            <h4>{{ extraEditIdx !== null ? '✏️ Editar adicional' : '➕ Novo adicional' }}</h4>
+
+            <div class="form-group">
+              <label>Nome do adicional</label>
+              <input v-model="extraForm.nome" placeholder="Ex: Carne extra, Cebola, Bacon..." @keyup.enter="salvarExtra" />
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label>Preço (R$)</label>
+                <input v-model.number="extraForm.preco" type="number" step="0.50" min="0" placeholder="0,00" />
+              </div>
+              <div class="form-group">
+                <label>Máximo por item</label>
+                <input v-model.number="extraForm.maximo" type="number" min="0" max="99" placeholder="1" />
+                <p class="field-hint">1 = checkbox · 2+ = quantidade</p>
+              </div>
+            </div>
+
+            <div class="editor-footer">
+              <button class="btn btn-primary" @click="salvarExtra" :disabled="!extraForm.nome.trim()">
+                <i-lucide-save style="width:15px;height:15px" /> Salvar
+              </button>
+              <button class="btn btn-secondary" @click="cancelarExtraEdit">Cancelar</button>
+            </div>
+          </div>
+        </div>
+      </aside>
+    </Transition>
+
+    <!-- ════════════ DRAWER ANINHADO: OPÇÕES AVULSAS DO PRATO (dentro do form) ════════════ -->
+    <Transition name="drawer-fade">
+      <div v-if="opcaoDrawerOpen" class="drawer-overlay stacked" @click.self="fecharOpcaoDrawer"></div>
+    </Transition>
+    <Transition name="drawer-slide">
+      <aside v-if="opcaoDrawerOpen" class="drawer-panel drawer-narrow stacked">
+        <div class="drawer-header">
+          <div class="drawer-icon"><i-lucide-list-checks style="width:22px;height:22px" /></div>
+          <div class="drawer-header-text">
+            <h3>Opções avulsas do prato</h3>
+            <p>Grupos de opções gratuitas específicos deste produto (ex: Ponto da carne, Com/Sem açúcar).</p>
+          </div>
+          <button class="drawer-close" @click="fecharOpcaoDrawer"><i-lucide-x style="width:18px;height:18px" /></button>
+        </div>
+
+        <!-- ── VIEW: Lista ── -->
+        <div v-if="!opcaoEditorOpen" class="drawer-body">
+          <div class="drawer-toolbar">
+            <button class="btn btn-primary" @click="novaOpcaoAvulsa">
+              <i-lucide-plus style="width:16px;height:16px" /> Novo Grupo
+            </button>
+            <span class="drawer-toolbar-count">{{ form.opcoes.length }} grupo(s)</span>
+          </div>
+
+          <div v-if="form.opcoes.length" class="catalog-list">
+            <div v-for="(g, gi) in form.opcoes" :key="gi" class="catalog-card">
+              <div class="catalog-card-head">
+                <div class="catalog-card-title">
+                  <span class="catalog-card-icon"><i-lucide-list-checks style="width:16px;height:16px" /></span>
+                  <div class="catalog-card-name">
+                    <strong>{{ g.grupo }}</strong>
+                    <span class="badge" :class="g.obrigatoria ? 'badge-danger' : 'badge-info'">{{ g.obrigatoria ? 'Obrigatória' : 'Opcional' }}</span>
+                    <span class="badge badge-soft">{{ g.tipo === 'unica' ? 'Seleção única' : 'Seleção múltipla' }}</span>
+                  </div>
+                </div>
+                <div class="catalog-card-actions">
+                  <button class="btn-icon" title="Editar" @click="editarOpcaoAvulsa(gi)"><i-lucide-pencil style="width:15px;height:15px" /></button>
+                  <button class="btn-icon danger" title="Excluir" @click="form.opcoes.splice(gi, 1)"><i-lucide-trash-2 style="width:15px;height:15px" /></button>
+                </div>
+              </div>
+              <div v-if="g.opcoes.length" class="catalog-chips">
+                <span v-for="(op, oi) in g.opcoes" :key="oi" class="catalog-chip">{{ op }}</span>
+              </div>
+              <span v-else class="catalog-empty-hint">sem opções</span>
+            </div>
+          </div>
+
+          <div v-else class="drawer-empty">
+            <i-lucide-list-checks style="width:44px;height:44px" />
+            <p>Nenhum grupo de opções ainda.</p>
+            <button class="btn btn-primary btn-sm" @click="novaOpcaoAvulsa">Criar o primeiro</button>
+          </div>
+        </div>
+
+        <!-- ── VIEW: Editor ── -->
+        <div v-else class="drawer-body">
+          <button class="btn btn-secondary btn-sm" @click="cancelarOpcaoEdit">
+            <i-lucide-arrow-left style="width:15px;height:15px" /> Voltar para a lista
+          </button>
+
+          <div class="editor-card">
+            <h4>{{ opcaoEditIdx !== null ? '✏️ Editar grupo' : '➕ Novo grupo de opções' }}</h4>
+
+            <div class="form-group">
+              <label>Nome do grupo</label>
+              <input v-model="opcaoForm.grupo" placeholder="Ex: Ponto da carne" @keyup.enter="salvarOpcaoAvulsa" />
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label>Tipo de seleção</label>
+                <div class="segmented">
+                  <button :class="{ ativo: opcaoForm.tipo === 'unica' }" @click="opcaoForm.tipo = 'unica'">Única</button>
+                  <button :class="{ ativo: opcaoForm.tipo === 'multipla' }" @click="opcaoForm.tipo = 'multipla'">Múltipla</button>
+                </div>
+              </div>
+              <div class="form-group">
+                <label>Obrigatória</label>
+                <label class="toggle" style="margin-top:10px;">
+                  <input type="checkbox" v-model="opcaoForm.obrigatoria" />
+                  <span class="slider"></span>
+                </label>
+              </div>
+            </div>
+
+            <div class="editor-subtitle">Opções do grupo</div>
+            <div v-for="(op, oi) in opcaoForm.opcoes" :key="oi" class="extra-fields" style="margin-bottom:8px;">
+              <input v-model="opcaoForm.opcoes[oi]" placeholder="Ex: Ao ponto" class="extra-name" />
+              <button class="btn-icon danger" @click="opcaoForm.opcoes.splice(oi, 1)">
+                <i-lucide-x style="width:15px;height:15px" />
+              </button>
+            </div>
+            <button class="btn btn-secondary btn-block" @click="opcaoForm.opcoes.push('')">
+              <i-lucide-plus style="width:15px;height:15px" /> Adicionar opção
+            </button>
+
+            <div class="editor-footer">
+              <button class="btn btn-primary" @click="salvarOpcaoAvulsa" :disabled="!opcaoForm.grupo.trim() || !opcaoForm.opcoes.some(o => o.trim())">
+                <i-lucide-save style="width:15px;height:15px" /> Salvar
+              </button>
+              <button class="btn btn-secondary" @click="cancelarOpcaoEdit">Cancelar</button>
+            </div>
+          </div>
+        </div>
+      </aside>
+    </Transition>
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted, markRaw } from 'vue'
+import { ref, reactive, computed, onMounted, markRaw, watch } from 'vue'
 import { Info, Image, CirclePlus, ListChecks, CalendarClock } from 'lucide-vue-next'
 import api from '../services/api'
 import { PRODUCT_PLACEHOLDER } from '../utils/images'
@@ -698,6 +910,18 @@ const catalogDrawerOpen = ref(false)
 const catalogEditorOpen = ref(false)
 const opcoesDrawerOpen = ref(false)
 const opcoesEditorOpen = ref(false)
+const categoriasDrawerOpen = ref(false)
+const categoriasEditorOpen = ref(false)
+
+// Drawers aninhados dentro do formulário de produto (empilhados sobre o form)
+const extraDrawerOpen = ref(false)
+const extraEditorOpen = ref(false)
+const extraEditIdx = ref(null)
+const extraForm = reactive({ nome: '', preco: 0, maximo: 1 })
+const opcaoDrawerOpen = ref(false)
+const opcaoEditorOpen = ref(false)
+const opcaoEditIdx = ref(null)
+const opcaoForm = reactive({ grupo: '', tipo: 'unica', obrigatoria: false, opcoes: [''] })
 // Quando o drawer foi aberto a partir do formulário de produto (botão
 // "Gerenciar..."), restaurar o form ao fechar — evita perder edição não salva
 const formEraAberto = ref(false)
@@ -798,27 +1022,92 @@ function resetForm() {
 }
 
 function novoProduto() { resetForm(); showForm.value = true }
-function addExtra() { form.extras.push({ nome: '', preco: 0, maximo: 1 }) }
-function addOpcaoGrupo() { form.opcoes.push({ grupo: '', tipo: 'unica', obrigatoria: false, opcoes: [''] }) }
+
+// ── Drawer aninhado: Adicionais avulsos ──
+function abrirExtraDrawer() { extraDrawerOpen.value = true; extraEditorOpen.value = false }
+function fecharExtraDrawer() { extraDrawerOpen.value = false; extraEditorOpen.value = false; extraEditIdx.value = null }
+function novoExtra() {
+  extraEditIdx.value = null
+  extraForm.nome = ''; extraForm.preco = 0; extraForm.maximo = 1
+  extraEditorOpen.value = true
+}
+function editarExtra(i) {
+  extraEditIdx.value = i
+  const e = form.extras[i]
+  extraForm.nome = e.nome; extraForm.preco = Number(e.preco); extraForm.maximo = e.maximo ?? 1
+  extraEditorOpen.value = true
+}
+function cancelarExtraEdit() { extraEditorOpen.value = false; extraEditIdx.value = null }
+function salvarExtra() {
+  const nome = extraForm.nome.trim()
+  if (!nome) return
+  const dados = { nome, preco: extraForm.preco || 0, maximo: extraForm.maximo ?? 1 }
+  if (extraEditIdx.value !== null) form.extras.splice(extraEditIdx.value, 1, dados)
+  else form.extras.push(dados)
+  cancelarExtraEdit()
+}
+
+// ── Drawer aninhado: Opções avulsas do prato ──
+function abrirOpcaoDrawer() { opcaoDrawerOpen.value = true; opcaoEditorOpen.value = false }
+function fecharOpcaoDrawer() { opcaoDrawerOpen.value = false; opcaoEditorOpen.value = false; opcaoEditIdx.value = null }
+function novaOpcaoAvulsa() {
+  opcaoEditIdx.value = null
+  opcaoForm.grupo = ''; opcaoForm.tipo = 'unica'; opcaoForm.obrigatoria = false; opcaoForm.opcoes = ['']
+  opcaoEditorOpen.value = true
+}
+function editarOpcaoAvulsa(gi) {
+  opcaoEditIdx.value = gi
+  const g = form.opcoes[gi]
+  opcaoForm.grupo = g.grupo
+  opcaoForm.tipo = g.tipo || 'unica'
+  opcaoForm.obrigatoria = !!g.obrigatoria
+  opcaoForm.opcoes = g.opcoes.length ? [...g.opcoes] : ['']
+  opcaoEditorOpen.value = true
+}
+function cancelarOpcaoEdit() { opcaoEditorOpen.value = false; opcaoEditIdx.value = null }
+function salvarOpcaoAvulsa() {
+  const grupo = opcaoForm.grupo.trim()
+  if (!grupo || !opcaoForm.opcoes.some(o => o.trim())) return
+  const dados = {
+    grupo,
+    tipo: opcaoForm.tipo,
+    obrigatoria: !!opcaoForm.obrigatoria,
+    opcoes: opcaoForm.opcoes.map(o => o.trim()).filter(Boolean),
+  }
+  if (opcaoEditIdx.value !== null) form.opcoes.splice(opcaoEditIdx.value, 1, dados)
+  else form.opcoes.push(dados)
+  cancelarOpcaoEdit()
+}
 
 // ── Navegação entre abas + drawers ──
 function tabProdutos() {
   catalogDrawerOpen.value = false
   opcoesDrawerOpen.value = false
+  categoriasDrawerOpen.value = false
   formEraAberto.value = false
   mainTab.value = 'produtos'
 }
 function tabCategorias() {
+  // Já aberto? Não re-renderiza nem joga do editor para a lista.
+  if (categoriasDrawerOpen.value) return
   catalogDrawerOpen.value = false
   opcoesDrawerOpen.value = false
+  showForm.value = false
   formEraAberto.value = false
   mainTab.value = 'categorias'
+  categoriasDrawerOpen.value = true
+  categoriasEditorOpen.value = false
   carregarCategorias()
+}
+function fecharCategoriasDrawer() {
+  categoriasDrawerOpen.value = false
+  if (mainTab.value === 'categorias') mainTab.value = 'produtos'
 }
 function openCatalogDrawer() {
   // Já aberto? Não re-renderiza nem joga do editor para a lista.
   if (catalogDrawerOpen.value) return
   opcoesDrawerOpen.value = false
+  categoriasDrawerOpen.value = false
   showForm.value = false
   formEraAberto.value = false
   mainTab.value = 'subcategorias'
@@ -834,6 +1123,7 @@ function closeCatalogDrawer() {
 function openOpcoesDrawer() {
   if (opcoesDrawerOpen.value) return
   catalogDrawerOpen.value = false
+  categoriasDrawerOpen.value = false
   showForm.value = false
   formEraAberto.value = false
   mainTab.value = 'opcoesPadrao'
@@ -1102,14 +1392,21 @@ async function excluir(p) {
 }
 
 // ── Category CRUD ──
+function novaCategoria() {
+  cancelarEditCategoria()
+  categoriasEditorOpen.value = true
+}
+
 function editarCategoria(cat) {
   editandoCategoria.value = cat
   catForm.nome = cat.nome
+  categoriasEditorOpen.value = true
 }
 
 function cancelarEditCategoria() {
   editandoCategoria.value = null
   catForm.nome = ''
+  categoriasEditorOpen.value = false
 }
 
 async function salvarCategoria() {
@@ -1126,6 +1423,8 @@ async function salvarCategoria() {
     editandoCategoria.value = null
     const { data } = await api.get('/produtos/categorias')
     categorias.value = data
+    categoriasEditorOpen.value = false
+    await load()
   } catch (err) {
     alert(err.response?.data?.error || 'Erro ao salvar categoria')
   } finally { salvandoCat.value = false }
@@ -1142,10 +1441,53 @@ async function excluirCategoria(cat) {
   }
 }
 
+// Fechar os drawers aninhados sempre que o formulário de produto fechar
+watch(showForm, (v) => {
+  if (!v) {
+    extraDrawerOpen.value = false
+    extraEditorOpen.value = false
+    extraEditIdx.value = null
+    opcaoDrawerOpen.value = false
+    opcaoEditorOpen.value = false
+    opcaoEditIdx.value = null
+  }
+})
+
 onMounted(() => { load(); carregarCatalogo() })
 </script>
 
 <style scoped>
+/* ══════════════════════════════════════════════════════════════
+   ABAS DO CARDÁPIO (barra de navegação principal)
+   ══════════════════════════════════════════════════════════════ */
+.cardapio-tabs {
+  display: flex; flex-wrap: wrap; gap: 4px; align-items: center;
+  padding: 6px;
+  background: var(--border-light);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  margin-bottom: 1.25rem;
+  box-shadow: var(--shadow-sm);
+}
+.cardapio-tab {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 0.6rem 1.1rem; border-radius: 10px;
+  border: 1px solid transparent; background: transparent;
+  color: var(--text-secondary); font-size: 0.88rem; font-weight: 600;
+  cursor: pointer; font-family: inherit; white-space: nowrap;
+  transition: all 0.18s ease;
+}
+.cardapio-tab svg { transition: transform 0.18s ease; }
+.cardapio-tab:hover { background: var(--surface); color: var(--primary-dark); border-color: var(--border); }
+.cardapio-tab:hover svg { transform: scale(1.12); }
+.cardapio-tab:active { transform: scale(0.96); }
+.cardapio-tab.active {
+  background: var(--primary-gradient); color: #fff;
+  border-color: transparent;
+  box-shadow: 0 4px 12px rgba(220, 38, 38, 0.28);
+}
+.cardapio-tab.active svg { color: #fff; }
+
 /* ══════════════════════════════════════════════════════════════
    SUPER SIDEBAR / DRAWER (vem da direita para a esquerda)
    ══════════════════════════════════════════════════════════════ */
@@ -1164,6 +1506,11 @@ onMounted(() => { load(); carregarCatalogo() })
   box-shadow: -16px 0 40px rgba(15, 23, 42, 0.18);
 }
 .drawer-panel.drawer-wide { width: min(920px, 100vw); }
+.drawer-panel.drawer-narrow { width: min(480px, 100vw); }
+
+/* Drawers aninhados empilhados sobre o form de produto */
+.drawer-overlay.stacked { z-index: 310; }
+.drawer-panel.stacked { z-index: 311; }
 
 /* Transições */
 .drawer-fade-enter-active, .drawer-fade-leave-active { transition: opacity 0.25s ease; }
@@ -1426,36 +1773,37 @@ onMounted(() => { load(); carregarCatalogo() })
 .subcat-check small { color: var(--text-muted); font-size: 0.74rem; }
 
 /* Extras avulsos */
-.extra-row { margin-bottom: 8px; }
 .extra-fields {
   display: flex; gap: 8px; align-items: center;
   padding: 9px 10px; border-radius: 10px;
   background: var(--border-light); border: 1px solid var(--border);
 }
-.extra-fields.sub { margin-left: 1.75rem; background: var(--surface); }
 .extra-name { flex: 1; }
-.extra-number-group { display: flex; align-items: center; gap: 4px; width: 100px; }
-.extra-currency { font-size: 0.8rem; font-weight: 600; color: var(--text-muted); }
-.extra-price-input { width: 80px; }
-.extra-max-group { display: flex; align-items: center; gap: 4px; }
-.extra-max-label { font-size: 0.75rem; font-weight: 600; color: var(--text-muted); white-space: nowrap; }
-.extra-max-input { width: 50px; text-align: center; }
 .extra-fields input, .extra-fields select {
   padding: 7px 9px; border: 1.5px solid var(--border); border-radius: 8px;
   font-size: 0.85rem; outline: none; transition: var(--transition); background: var(--surface);
 }
 .extra-fields input:focus, .extra-fields select:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.08); }
-.field-select { flex-shrink: 0; }
-.check-inline {
-  display: inline-flex; align-items: center; gap: 6px;
-  font-size: 0.8rem; font-weight: 600; white-space: nowrap; cursor: pointer;
+
+/* Mini lista de vínculos dentro do form (adicionais/opções avulsas) */
+.mini-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 0.75rem; }
+.mini-list-item {
+  display: flex; align-items: center; gap: 10px;
+  border: 1px solid var(--border); border-radius: 10px;
+  background: var(--border-light); padding: 9px 12px;
+  transition: var(--transition);
 }
-.check-inline input { width: 15px; height: 15px; accent-color: var(--primary); }
-.opcao-group {
-  border: 1px solid var(--border); border-radius: 10px; padding: 10px;
-  background: var(--surface); margin-bottom: 10px;
+.mini-list-item:hover { border-color: #cbd5e1; }
+.mini-list-icon {
+  width: 32px; height: 32px; border-radius: 9px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--surface); color: var(--primary-dark);
+  border: 1px solid var(--border);
 }
-.opcao-group > .btn { margin-left: 1.75rem; margin-top: 8px; }
+.mini-list-main { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.3; }
+.mini-list-main strong { font-size: 0.88rem; }
+.mini-list-main small { font-size: 0.74rem; color: var(--text-muted); }
+.mini-list-item .btn-icon { flex-shrink: 0; }
 
 /* Disponibilidade */
 .switch-line {
@@ -1494,23 +1842,6 @@ onMounted(() => { load(); carregarCatalogo() })
   background: var(--purple-light); color: var(--purple);
   font-size: 0.8rem; font-weight: 700;
 }
-
-/* Categoria List */
-.categoria-list { margin-bottom: 1rem; }
-.categoria-row {
-  display: flex; justify-content: space-between; align-items: center;
-  padding: 8px 12px; border-radius: 8px;
-  background: var(--border-light); margin-bottom: 6px;
-  border: 1px solid var(--border);
-}
-.categoria-info { display: flex; align-items: center; gap: 10px; flex: 1; }
-.cat-order {
-  display: inline-flex; align-items: center; justify-content: center;
-  width: 24px; height: 24px; border-radius: 50%;
-  background: rgba(220, 38, 38, 0.1); color: var(--primary-dark);
-  font-size: 0.75rem; font-weight: 700;
-}
-.categoria-actions { display: flex; gap: 4px; }
 
 /* Utilidades */
 .btn-block { width: 100%; justify-content: center; }

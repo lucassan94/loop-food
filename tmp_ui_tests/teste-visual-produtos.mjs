@@ -82,6 +82,57 @@ try {
   await sleep(600)
   await page.screenshot({ path: path.join(SHOTS, '01-produtos.png') })
 
+  // 2b. Verificar abas do cardápio (visual segmentado + aba ativa em gradiente)
+  const tabInfo = await page.evaluate(() => {
+    const tabs = [...document.querySelectorAll('.cardapio-tab')]
+    const active = tabs.find(t => t.classList.contains('active'))
+    const cs = active ? getComputedStyle(active) : null
+    return {
+      qtd: tabs.length,
+      labels: tabs.map(t => t.textContent.trim()),
+      activeLabel: active ? active.textContent.trim() : null,
+      activeBg: cs ? cs.backgroundImage.slice(0, 60) : null,
+      activeColor: cs ? cs.color : null,
+      containerBg: getComputedStyle(document.querySelector('.cardapio-tabs')).backgroundColor,
+      hasIcon: tabs.every(t => !!t.querySelector('svg')),
+    }
+  })
+  const abasCompletas = tabInfo.qtd === 4 && tabInfo.activeLabel === 'Produtos'
+  const temGradiente = tabInfo.activeBg && tabInfo.activeBg.includes('gradient')
+  log('Abas estilizadas (segmentado + ícones)', abasCompletas && temGradiente, `qtd=${tabInfo.qtd} ativa="${tabInfo.activeLabel}" gradiente=${temGradiente} cor=${tabInfo.activeColor} containerBg=${tabInfo.containerBg}`)
+  await page.screenshot({ path: path.join(SHOTS, '01b-abas-estilizadas.png') })
+
+  // 2c. Categorias → drawer (mesmo padrão do subcategorias)
+  await clickByText(page, '.cardapio-tab', 'Categorias')
+  await waitFor(page, '.drawer-panel')
+  const catTitle = await page.$eval('.drawer-panel .drawer-header h3', el => el.textContent.trim())
+  try {
+    await page.waitForFunction(
+      () => document.querySelectorAll('.catalog-card').length > 0,
+      { timeout: 10000 }
+    )
+  } catch { /* estado vazio legítimo — checado abaixo */ }
+  await sleep(400)
+  const nCatCards = await page.$$eval('.catalog-card', els => els.length)
+  log('Drawer Categorias abriu com lista', catTitle.includes('Categorias') && nCatCards > 0, `título="${catTitle}" cartões=${nCatCards}`)
+  await page.screenshot({ path: path.join(SHOTS, '02-categorias-drawer.png') })
+
+  // 2d. Editor "Nova Categoria"
+  await clickByText(page, '.drawer-body .btn-primary', 'Nova Categoria')
+  await waitFor(page, '.editor-card')
+  const catEditorOk = await page.$$eval('.editor-card label', ls => ls.some(l => l.textContent.includes('Nome da categoria')))
+  const catSaveBtn = await page.$eval('.editor-card .btn-primary', el => el.textContent.trim()).catch(() => '')
+  log('Editor de categoria OK', catEditorOk, `labelNome=${catEditorOk} botão="${catSaveBtn}"`)
+  await page.screenshot({ path: path.join(SHOTS, '02b-categoria-editor.png') })
+
+  // 2e. Voltar + fechar drawer de categorias
+  await clickByText(page, '.drawer-body .btn', 'Voltar para a lista')
+  await sleep(400)
+  await page.click('.drawer-close')
+  await sleep(700)
+  const catClosed = await page.$('.drawer-panel').then(el => !el || getComputedStyle(el).display === 'none').catch(() => true)
+  log('Drawer Categorias fechado', catClosed)
+
   // 3. Subcategorias Adicionais → drawer
   await clickByText(page, '.cardapio-tab', 'Subcategorias Adicionais')
   await waitFor(page, '.drawer-panel')
@@ -144,13 +195,69 @@ try {
   log('Form de produto abriu com abas', todasAbas, `abas=${JSON.stringify(tabLabels)}`)
   await page.screenshot({ path: path.join(SHOTS, '04-produto-dados.png') })
 
-  // Clicar em cada aba e capturar
+  // Clicar em cada aba e capturar (com drawers aninhados de Adicionais e Opções)
   for (const aba of esperadas.slice(1)) {
     await clickByText(page, '.form-tab', aba)
     await sleep(500)
     const nomeAba = aba.toLowerCase()
     await page.screenshot({ path: path.join(SHOTS, `05-aba-${nomeAba}.png`) })
     log(`Aba "${aba}" renderizada`, true)
+
+    if (aba === 'Adicionais') {
+      // Drawer aninhado: Adicionais avulsos
+      await clickByText(page, '.form-section .btn-secondary', 'avulsos')
+      await waitFor(page, '.drawer-panel.stacked')
+      const exTitle = await page.$eval('.drawer-panel.stacked .drawer-header h3', el => el.textContent.trim())
+      log('Drawer aninhado Adicionais abriu', exTitle.includes('Adicionais avulsos'), `título="${exTitle}"`)
+      await page.screenshot({ path: path.join(SHOTS, '06-drawer-adicionais.png') })
+      // Novo Adicional → editor
+      await clickByText(page, '.drawer-panel.stacked .drawer-body .btn-primary', 'Novo Adicional')
+      await waitFor(page, '.drawer-panel.stacked .editor-card')
+      await page.type('.drawer-panel.stacked .editor-card .form-group input', 'TESTE Extra')
+      await page.evaluate(() => {
+        const n = document.querySelectorAll('.drawer-panel.stacked .editor-card .form-row input[type="number"]')
+        if (n[0]) { n[0].value = '5.50'; n[0].dispatchEvent(new Event('input', { bubbles: true })) }
+        if (n[1]) { n[1].value = '2'; n[1].dispatchEvent(new Event('input', { bubbles: true })) }
+      })
+      await clickByText(page, '.drawer-panel.stacked .editor-card .btn-primary', 'Salvar')
+      await sleep(400)
+      const cardExtra = await page.evaluate(() => {
+        const cards = [...document.querySelectorAll('.drawer-panel.stacked .catalog-card')]
+        return cards.some(c => c.textContent.includes('TESTE Extra'))
+      })
+      log('Adicional salvo no drawer', cardExtra, cardExtra ? 'card "TESTE Extra" na lista' : 'card não encontrado')
+      await page.screenshot({ path: path.join(SHOTS, '06b-adicional-salvo.png') })
+      await page.click('.drawer-panel.stacked .drawer-close')
+      await sleep(600)
+      const exClosed = await page.$('.drawer-panel.stacked').then(el => !el || getComputedStyle(el).display === 'none').catch(() => true)
+      log('Drawer Adicionais fechado', exClosed)
+    }
+
+    if (aba === 'Opções') {
+      // Drawer aninhado: Opções avulsas do prato
+      await clickByText(page, '.form-section .btn-secondary', 'avulsas')
+      await waitFor(page, '.drawer-panel.stacked')
+      const opTitle = await page.$eval('.drawer-panel.stacked .drawer-header h3', el => el.textContent.trim())
+      log('Drawer aninhado Opções abriu', opTitle.includes('Opções avulsas'), `título="${opTitle}"`)
+      await page.screenshot({ path: path.join(SHOTS, '07-drawer-opcoes.png') })
+      // Novo Grupo → editor
+      await clickByText(page, '.drawer-panel.stacked .drawer-body .btn-primary', 'Novo Grupo')
+      await waitFor(page, '.drawer-panel.stacked .editor-card')
+      await page.type('.drawer-panel.stacked .editor-card .form-group input', 'TESTE Ponto')
+      await page.type('.drawer-panel.stacked .editor-card .extra-fields input', 'TESTE Mal passado')
+      await clickByText(page, '.drawer-panel.stacked .editor-card .btn-primary', 'Salvar')
+      await sleep(400)
+      const cardOpcao = await page.evaluate(() => {
+        const cards = [...document.querySelectorAll('.drawer-panel.stacked .catalog-card')]
+        return cards.some(c => c.textContent.includes('TESTE Ponto'))
+      })
+      log('Grupo de opções salvo no drawer', cardOpcao, cardOpcao ? 'card "TESTE Ponto" na lista' : 'card não encontrado')
+      await page.screenshot({ path: path.join(SHOTS, '07b-opcao-salva.png') })
+      await page.click('.drawer-panel.stacked .drawer-close')
+      await sleep(600)
+      const opClosed = await page.$('.drawer-panel.stacked').then(el => !el || getComputedStyle(el).display === 'none').catch(() => true)
+      log('Drawer Opções fechado', opClosed)
+    }
   }
 
   // 7. Fechar form
