@@ -7,6 +7,10 @@
 // Rode com: node src/test-horarios.js
 // ============================================================================
 import { lojaAbertaAgora } from './services/horarios.js';
+import pg from 'pg';
+// Registra o parser de timestamp (BUG-017) pelo efeito colateral. O Pool é
+// lazy — importar config/database.js NÃO abre conexão (gate roda sem banco).
+import './config/database.js';
 
 // Convenção do painel: índice 0 = Domingo (diasSemana[0]='Domingo' no ConfigView)
 const horarios = [
@@ -50,4 +54,20 @@ for (const c of [...casos, ...casosManaus]) {
   console.log(`${ok ? '✅' : '❌'} ${c.label}: ${res ? 'ABERTO' : 'FECHADO'} (esperado ${c.esperado ? 'ABERTO' : 'FECHADO'})`);
 }
 console.log(falhas === 0 ? '\n🎉 Todos os cenários passaram!' : `\n⚠️ ${falhas} falha(s)`);
+
+// ── Gate extra: parser de timestamp como UTC (BUG-017) ──
+// As colunas `timestamp without time zone` são gravadas em UTC pelo banco
+// (NOW() com sessão Etc/UTC). config/database.js registra um parser global
+// que lê esses valores como UTC — sem ele, toda data enviada pela API sai
+// deslocada pelo fuso do processo (ex.: +3h em America/Sao_Paulo) e o
+// frontend mostra tempos de preparo/previsão errados. Este gate garante que
+// a remoção acidental do parser quebre o build (CI/Dockerfile).
+const parserTs = pg.types.getTypeParser(pg.types.builtins.TIMESTAMP);
+const ts = parserTs('2026-08-08 22:15:07.544635');
+const parserOk = ts instanceof Date && ts.toISOString() === '2026-08-08T22:15:07.544Z';
+if (!parserOk) {
+  console.error(`❌ BUG-017: parser de timestamp não trata valores como UTC: ${String(ts)}`);
+  process.exit(1);
+}
+console.log('✅ Parser de timestamp lê valores como UTC (BUG-017)');
 process.exit(falhas === 0 ? 0 : 1);

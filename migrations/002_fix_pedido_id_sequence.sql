@@ -39,18 +39,21 @@ ALTER TABLE raios_entrega DROP CONSTRAINT IF EXISTS unique_restaurant_raio;
 ALTER TABLE raios_entrega ADD CONSTRAINT unique_restaurant_raio UNIQUE (restaurant_id, raio_km);
 
 -- Seed raios_entrega se estiver vazio
+-- Valores calibrados (BUG-018): a distância calculada é EM LINHA RETA — a rota
+-- real é ~1,4× maior (moto ~22 km/h). Em bancos já existentes estes INSERTs são
+-- no-op (WHERE NOT EXISTS); para ambientes novos garantem a matriz correta.
 INSERT INTO raios_entrega (restaurant_id, raio_km, tempo_min, tempo_max, custo)
-SELECT 1, 1, 15, 25, 5.00
+SELECT 1, 1, 10, 15, 6.00
 WHERE NOT EXISTS (SELECT 1 FROM raios_entrega WHERE restaurant_id = 1 AND raio_km = 1);
 
 INSERT INTO raios_entrega (restaurant_id, raio_km, tempo_min, tempo_max, custo)
-SELECT 1, 3, 20, 35, 7.00
+SELECT 1, 3, 15, 25, 8.00
 WHERE NOT EXISTS (SELECT 1 FROM raios_entrega WHERE restaurant_id = 1 AND raio_km = 3);
 
 INSERT INTO raios_entrega (restaurant_id, raio_km, tempo_min, tempo_max, custo)
-SELECT 1, 5, 25, 45, 10.00
+SELECT 1, 5, 25, 35, 10.00
 WHERE NOT EXISTS (SELECT 1 FROM raios_entrega WHERE restaurant_id = 1 AND raio_km = 5);
 
 INSERT INTO raios_entrega (restaurant_id, raio_km, tempo_min, tempo_max, custo)
-SELECT 1, 10, 30, 60, 15.00
+SELECT 1, 10, 40, 55, 15.00
 WHERE NOT EXISTS (SELECT 1 FROM raios_entrega WHERE restaurant_id = 1 AND raio_km = 10);

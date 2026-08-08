@@ -1,10 +1,8 @@
-god/
-others/
-spec/
-trash/
+# =====================================
+# MIGRATIONS
+# =====================================
 # migrations/ NÃO está aqui: as migrations são commitadas e o container
 # monta ./migrations:/app/migrations no deploy (GitHub → Portainer)
-
 
 # =====================================
 # DEPENDÊNCIAS
@@ -15,9 +13,8 @@ node_modules/
 # BUILD
 # =====================================
 dist/
-docs/
-spec/
 run.bat
+
 # =====================================
 # AMBIENTE
 # =====================================
@@ -51,11 +48,6 @@ app/backend/uploads/*
 !app/backend/uploads/.gitkeep
 
 # =====================================
-# CARDÁPIO (dados de exemplo)
-# =====================================
-Cardápio/
-
-# =====================================
 # IMAGENS NÃO ESSENCIAIS (exceto ícones de PWA)
 # =====================================
 *.png
@@ -69,50 +61,17 @@ Cardápio/
 !entregador/public/**/*.jpg
 
 # =====================================
-# SEGURANÇA
-# =====================================
-chavesAsaas.md
-portainer.md
-
-# =====================================
 # DEPLOY (credenciais da VPS — nunca commitar)
 # =====================================
 deploy_config.json
 
 # =====================================
-# ADMIN (tenant management - local only)
+# FERRAMENTAS LOCAIS E LIXO (não vão para a VPS)
 # =====================================
-admin/
-
-# =====================================
-# ESTRUTURA REORGANIZADA — lixo e ferramentas locais
-# =====================================
+god/
 trash/
-others/god/node_modules/
-# =====================================
-# ARQUIVOS ESPECÍFICOS DO PROJETO
-# =====================================
-problem1.png
-nul
-backend/nul
-
-# =====================================
-# SEGURANÇA — Webhooks e URLs
-# =====================================
-webhook-portainer
-
-# =====================================
-# TESTES / TEMP
-# =====================================
-asd.html
-temp
-
-# =====================================
-# ARQUIVOS LOCAIS NÃO VERSIONADOS
-# =====================================
-cookies.txt
-pedidos*.md
-
+others/asd
+others/tmp_placeholder_check/
 
 # Cache do dev server (Vite)
 .vite/

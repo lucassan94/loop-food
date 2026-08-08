@@ -45,7 +45,10 @@ async function atualizarPagamento(conn, paymentId, status, extras = {}) {
   let idx = 3;
   const sets = ['status = $1', 'atualizado_em = NOW()', "gateway = 'rede'"];
 
-  if (extras.pago_em) { sets.push(`pago_em = $${idx++}`); params.push(extras.pago_em); }
+  // pago_em é gravado com NOW() do banco (UTC) — usar new Date() do Node
+  // gravaria a hora LOCAL do container (TZ=America/Sao_Paulo), desalinhando
+  // de todos os outros timestamps que são UTC (ver config/database.js).
+  if (extras.pago_em) { sets.push('pago_em = NOW()'); }
   if (extras.end_to_end_id) { sets.push(`end_to_end_id = $${idx++}`); params.push(extras.end_to_end_id); }
   if (extras.return_code) { sets.push(`return_code = $${idx++}`); params.push(extras.return_code); }
 
@@ -103,7 +106,7 @@ const EVENT_HANDLERS = {
     }
 
     await atualizarPagamento(conn, tid, 'RECEIVED', {
-      pago_em: new Date(),
+      pago_em: true,
       end_to_end_id: payload?.data?.endToEndId || null,
       return_code: '00',
     });

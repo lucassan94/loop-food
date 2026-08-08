@@ -2,9 +2,12 @@
 # Regressão de fuso horário (CI — gate antes do deploy via Portainer)
 # =============================================================================
 # Roda automaticamente a cada push/PR que altere backend ou migrations.
-# O teste `src/test-horarios.js` valida o cálculo de horários de funcionamento
-# no fuso do restaurante — a regressão que bloqueava pedidos à noite (21h-23h
-# local = dia seguinte em UTC). Falha aqui = código não deve ir para produção.
+# O teste `src/test-horarios.js` valida:
+#   1. Cálculo de horários de funcionamento no fuso do restaurante (regressão
+#      que bloqueava pedidos à noite: 21h-23h local = dia seguinte em UTC);
+#   2. Parser de timestamp como UTC (BUG-017) — sem ele, toda data da API sai
+#      deslocada pelo fuso do processo e os tempos de preparo ficam errados.
+# Não depende do banco (Pool é lazy), mas usa o pacote `pg` (deps de produção).
 #
 # Complementa o gate de BUILD no Dockerfile do backend (RUN node src/test-horarios.js),
 # que falha o build da imagem no Portainer.
@@ -34,6 +37,11 @@ jobs:
         with:
           node-version: 22
 
-      # O teste é autocontido (só Intl/Date — não depende do banco nem de deps)
-      - name: Rodar teste de regressão (horários de funcionamento)
+      # O teste usa o parser real do pg (registrado em config/database.js).
+      # Não conecta no banco — instala apenas as deps de produção do backend.
+      - name: Instalar dependências do backend (pg)
+        working-directory: app/backend
+        run: npm ci --omit=dev
+
+      - name: Rodar teste de regressão (horários + parser de timestamp)
         run: node app/backend/src/test-horarios.js

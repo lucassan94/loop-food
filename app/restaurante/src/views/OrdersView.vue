@@ -9,12 +9,25 @@
 
     <!-- Filters -->
     <div class="filter-bar">
-      <select v-model="filtroStatus">
-        <option value="ativos">Ativos</option>
-        <option value="concluidos">Concluídos</option>
-        <option value="cancelados">Cancelados</option>
-        <option value="">Todos</option>
-      </select>
+      <!-- Filtro de status: mesmo visual dos demais filtros (pílulas) -->
+      <div class="status-radio-group">
+        <label class="status-radio" :class="{ active: filtroStatus === 'ativos' }">
+          <input type="radio" name="statusFiltro" value="ativos" v-model="filtroStatus" @change="aoMudarStatusFiltro" />
+          <span>Ativos</span>
+        </label>
+        <label class="status-radio" :class="{ active: filtroStatus === 'concluidos' }">
+          <input type="radio" name="statusFiltro" value="concluidos" v-model="filtroStatus" @change="aoMudarStatusFiltro" />
+          <span>Concluídos</span>
+        </label>
+        <label class="status-radio" :class="{ active: filtroStatus === 'cancelados' }">
+          <input type="radio" name="statusFiltro" value="cancelados" v-model="filtroStatus" @change="aoMudarStatusFiltro" />
+          <span>Cancelados</span>
+        </label>
+        <label class="status-radio" :class="{ active: filtroStatus === '' }">
+          <input type="radio" name="statusFiltro" value="" v-model="filtroStatus" @change="aoMudarStatusFiltro" />
+          <span>Todos</span>
+        </label>
+      </div>
 
       <!-- Origem Filter -->
       <div class="origem-radio-group">
@@ -110,11 +123,11 @@
           <i-lucide-bike style="width:14px;height:14px;vertical-align:middle;" /> {{ order.entregador_nome }}
         </div>
 
-        <!-- Timer -->
+        <!-- Timer: mesmo countdown/previsão que o cliente vê (TrackingView) -->
         <div v-if="isActiveOrder(order.status)" style="margin-top:8px;font-size:0.85rem;">
-          <span :style="{ color: getTimerColor(order) }">
+          <span :style="{ color: timers[order.id]?.cor }" :title="`Prazo estimado: ${timers[order.id]?.previsao}`">
             <i-lucide-clock style="width:14px;height:14px" />
-            {{ getTimerText(order) }}
+            {{ timers[order.id]?.texto }} · prev. {{ timers[order.id]?.previsao }}
           </span>
         </div>
 
@@ -225,7 +238,7 @@
             <td style="white-space:nowrap;font-size:0.85rem;">{{ formatDate(order.criado_em) }}</td>
             <td>{{ order.itens?.length }}</td>
             <td><strong>{{ formatPrice(order.total) }}</strong></td>
-            <td>{{ getTimerText(order) }}</td>
+            <td>{{ isActiveOrder(order.status) ? (timers[order.id]?.texto || '—') : '—' }}</td>
             <td>
               <button class="btn btn-sm btn-primary" @click="abrirDetalhes(order)">Ver</button>
             </td>
@@ -348,6 +361,7 @@ import { ref, computed, inject, watch, onMounted, onUnmounted } from 'vue'
 import api from '../services/api'
 import { onEvent } from '../services/realtime'
 import { useAuthStore } from '../stores/auth'
+import { calcularTimerPedido, textoRestante, corTimer } from '../utils/tempo'
 
 const emit = defineEmits(['changeView'])
 const filtroMesa = inject('filtroMesa', ref(''))
@@ -374,6 +388,7 @@ const cancelModalOrder = ref(null)     // pedido alvo do cancelamento/recusa
 const cancelModalAction = ref('cancelado') // 'cancelado' | 'recusado'
 const cancelModalMotivo = ref('')      // motivo digitado
 let pollingPaymentInterval = null
+let timerInterval = null
 
 // Estado dos estornos (refund) por pedido
 const refundStatus = ref({})
@@ -421,12 +436,23 @@ async function checkRefundStatus(orderId) {
 }
 
 const hoje = new Date().toISOString().split('T')[0]
-const filtroStatus = ref('')
+// Fila padrão: Ativos (pedido concluído/cancelado some da fila)
+const filtroStatus = ref('ativos')
 const filtroOrigem = ref('todos')
 const filtroDataPeriodo = ref('hoje')
 const filtroDataInicio = ref(hoje)
 const filtroDataFim = ref('')
 const modoSemEntregador = ref(false)
+
+function aoMudarStatusFiltro() {
+  // Fila "Ativos" = todos os pedidos ativos (sem filtro de data), igual ao KDS
+  if (filtroStatus.value === 'ativos') {
+    filtroDataPeriodo.value = ''
+    filtroDataInicio.value = ''
+    filtroDataFim.value = ''
+  }
+  loadOrders()
+}
 
 function aplicarFiltroData() {
   const hojeStr = new Date().toISOString().split('T')[0]
@@ -449,9 +475,12 @@ function aplicarFiltroData() {
 }
 
 // Computed que filtra pedidos pela origem selecionada
+// Ordem da fila: do mais antigo para o mais recente
 const filteredOrders = computed(() => {
-  if (filtroOrigem.value === 'todos') return orders.value
-  return orders.value.filter(o => o.origem === filtroOrigem.value)
+  const base = filtroOrigem.value === 'todos'
+    ? orders.value
+    : orders.value.filter(o => o.origem === filtroOrigem.value)
+  return [...base].sort((a, b) => new Date(a.criado_em) - new Date(b.criado_em))
 })
 
 function formatPrice(v) { return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v) }
@@ -485,20 +514,17 @@ const podeRecusar = computed(() => isAdmin.value)
 const podeMarcarPronto = computed(() => isAdmin.value || isChef.value)
 const podeCancelar = computed(() => isAdmin.value || isCaixa.value)
 const podeEnviarMensagem = computed(() => isAdmin.value || isChef.value)
-function getTimerText(order) {
-  const created = new Date(order.criado_em)
-  const mins = Math.floor((Date.now() - created.getTime()) / 60000)
-  if (mins < 1) return 'Agora'
-  return `${mins} min`
-}
-
-function getTimerColor(order) {
-  const created = new Date(order.criado_em)
-  const mins = (Date.now() - created.getTime()) / 60000
-  if (mins > 20) return 'var(--error)'
-  if (mins > 10) return 'var(--warning)'
-  return 'var(--text-secondary)'
-}
+// ── Timer no formato do cliente (countdown + previsão), tick a cada 1s ──
+const nowTick = ref(Date.now())
+const timers = computed(() => {
+  const map = {}
+  const agora = nowTick.value
+  for (const o of orders.value) {
+    const t = calcularTimerPedido(o, agora)
+    if (t) map[o.id] = { texto: textoRestante(t), cor: corTimer(t), previsao: t.previsao }
+  }
+  return map
+})
 
 async function loadOrders() {
   try {
@@ -698,6 +724,9 @@ onMounted(async () => {
   onEvent('pedido:novo', () => { loadOrders(); loadResumo() })
   onEvent('pedido:atualizado', () => { loadOrders(); loadResumo() })
 
+  // Tick do timer (countdown do cliente) — 1s
+  timerInterval = setInterval(() => { nowTick.value = Date.now() }, 1000)
+
   // Auto-polling LOCAL: recarrega lista de pedidos a cada 10s
   // O webhook da Rede + polling de backup do backend (15s) são os mecanismos principais
   pollingPaymentInterval = setInterval(async () => {
@@ -735,6 +764,7 @@ onMounted(async () => {
 onUnmounted(() => {
   if (pollingPaymentInterval) clearInterval(pollingPaymentInterval)
   if (pollingRefundInterval) clearInterval(pollingRefundInterval)
+  if (timerInterval) clearInterval(timerInterval)
 })
 </script>
 
@@ -780,7 +810,8 @@ onUnmounted(() => {
   color: #166534;
   border: 1px solid #bbf7d0;
 }
-.date-radio-group {
+.date-radio-group,
+.status-radio-group {
   display: flex;
   gap: 4px;
   background: var(--background);
@@ -788,7 +819,8 @@ onUnmounted(() => {
   border-radius: 8px;
   border: 1px solid var(--border);
 }
-.date-radio {
+.date-radio,
+.status-radio {
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -801,15 +833,18 @@ onUnmounted(() => {
   color: var(--text-muted);
   user-select: none;
 }
-.date-radio:hover {
+.date-radio:hover,
+.status-radio:hover {
   color: var(--text);
 }
-.date-radio.active {
+.date-radio.active,
+.status-radio.active {
   background: var(--surface);
   color: var(--primary);
   box-shadow: 0 1px 3px rgba(0,0,0,0.08);
 }
-.date-radio input[type="radio"] {
+.date-radio input[type="radio"],
+.status-radio input[type="radio"] {
   display: none;
 }
 

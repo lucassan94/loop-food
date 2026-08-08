@@ -153,6 +153,36 @@ export async function buscarCEP(cep) {
     console.warn('[CEP] BrasilAPI falhou.');
   }
 
+  // ─── Tentativa 1.5: AwesomeAPI ───
+  // Retorna coordenadas REAIS do CEP (lat/lng), gratuita e sem API key.
+  // Essencial para cidades grandes: sem ela, o fallback por cidade usa o
+  // centro da cidade e distorce o cálculo de raio/frete (ex.: CEP de SP
+  // cairia no centro de SP, 16 km longe de um restaurante em Osasco).
+  try {
+    const response = await fetch(`https://cep.awesomeapi.com.br/json/${cepLimpo}`);
+    if (response.ok) {
+      const data = await response.json();
+      // Aceita mesmo quando city/state vierem vazios (CEP de cidade única) —
+      // o essencial são as coordenadas reais; o restante vem do fallback abaixo.
+      if (data.lat && data.lng) {
+        return {
+          cep: data.cep || cepLimpo,
+          logradouro: data.address || null,
+          bairro: data.district || null,
+          cidade: data.city || dadosBrasilAPI?.cidade || null,
+          estado: data.state || dadosBrasilAPI?.estado || null,
+          latitude: String(data.lat),
+          longitude: String(data.lng),
+          origem: 'awesomeapi',
+        };
+      }
+    } else {
+      console.warn(`[CEP] AwesomeAPI sem sucesso: HTTP ${response.status}`);
+    }
+  } catch {
+    console.warn('[CEP] AwesomeAPI falhou.');
+  }
+
   // ─── Fallback 1: Coordenadas por cidade (usando dados da BrasilAPI se disponível) ───
   if (dadosBrasilAPI?.cidade) {
     const coords = buscarCoordsCidade(dadosBrasilAPI.cidade);

@@ -1,6 +1,32 @@
 import pg from 'pg';
 import { config } from './index.js';
 
+// ============================================================================
+// TIMESTAMPS: DEFESA EM PROFUNDIDADE (BUG-017 → migração 035)
+// ============================================================================
+// Histórico: as colunas eram `timestamp WITHOUT time zone` gravadas em UTC
+// (sessão Etc/UTC, NOW()). O driver pg interpretava esses valores como hora
+// LOCAL do processo Node → com TZ=America/Sao_Paulo (docker-compose/máquina
+// local BR), toda data saía +3h deslocada (tempo de preparo/previsão errados)
+// e writes com `new Date()` gravavam hora local. A migração 035 converteu
+// TODAS as colunas para `timestamptz` (instante absoluto), que o driver lê e
+// escreve corretamente em qualquer fuso — sem parser customizado.
+//
+// Este parser permanece como DEFESA: se alguma coluna `timestamp without
+// time zone` voltar a existir (tabela nova, migration sem 035), ela é tratada
+// como UTC em vez de hora local. O gate de regressão (test-horarios.js)
+// valida que ele continua ativo.
+//
+// ⚠️ REGRA DE ESCRITA: prefira sempre `NOW()` do banco. Para `timestamptz`
+// o `new Date()` do Node também grava o instante correto (serializado em
+// UTC); para uma eventual coluna naive, NÃO usar `new Date()` (gravaria
+// hora local). Ex.: o webhook da Rede usa `pago_em = NOW()`.
+pg.types.setTypeParser(pg.types.builtins.TIMESTAMP, (value) => {
+  if (value === null) return null;
+  // "2026-08-08 22:15:07.544635" → "2026-08-08T22:15:07.544635Z"
+  return new Date(value.replace(' ', 'T') + 'Z');
+});
+
 const pool = new pg.Pool({
   host: config.db.host,
   port: config.db.port,

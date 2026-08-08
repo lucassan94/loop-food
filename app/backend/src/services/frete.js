@@ -39,7 +39,7 @@ export async function calcularFrete(latitudeCliente, longitudeCliente, restauran
       'SELECT raio_km, tempo_min, tempo_max, custo FROM raios_entrega WHERE restaurant_id = $1 ORDER BY raio_km ASC LIMIT 1',
       [rid]
     );
-    const faixa = result.rows[0] || { raio_km: 1, tempo_min: 15, tempo_max: 25, custo: 5.00 };
+    const faixa = result.rows[0] || { raio_km: 1, tempo_min: 10, tempo_max: 15, custo: 6.00 };
     return {
       distancia_km: null,
       faixa_raio: faixa.raio_km,
@@ -137,7 +137,7 @@ export async function validarEntrega(restaurantId, { latitude, longitude, estado
     'SELECT raio_km, tempo_min, tempo_max, custo FROM raios_entrega WHERE restaurant_id = $1 ORDER BY raio_km ASC LIMIT 1',
     [rid]
   );
-  const faixa = result.rows[0] || { raio_km: 1, tempo_min: 15, tempo_max: 25, custo: 5.00 };
+  const faixa = result.rows[0] || { raio_km: 1, tempo_min: 10, tempo_max: 15, custo: 6.00 };
 
   return {
     distancia_km: null,

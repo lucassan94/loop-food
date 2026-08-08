@@ -251,11 +251,14 @@ async function seed() {
     console.log('✅ Retirada habilitada com horários de funcionamento');
 
     // Raios de entrega
+    // Calibração (BUG-018): a distância calculada é EM LINHA RETA — a rota real
+    // é ~1,4× maior. Valores de tempo/frete refletem o deslocamento real
+    // (moto ~22 km/h) + margem de operação.
     const raios = [
-      { km: 1, min: 15, max: 25, custo: 5.00 },
-      { km: 3, min: 20, max: 35, custo: 7.00 },
-      { km: 5, min: 25, max: 45, custo: 10.00 },
-      { km: 10, min: 30, max: 60, custo: 15.00 },
+      { km: 1, min: 10, max: 15, custo: 6.00 },
+      { km: 3, min: 15, max: 25, custo: 8.00 },
+      { km: 5, min: 25, max: 35, custo: 10.00 },
+      { km: 10, min: 40, max: 55, custo: 15.00 },
     ];
     for (const r of raios) {
       await query(

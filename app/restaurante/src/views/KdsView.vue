@@ -65,9 +65,9 @@
               {{ order.origem === 'salao' ? 'Salão' : (order.origem === 'retirada' ? 'Retirada' : 'Delivery') }}
             </span>
           </div>
-          <div class="kds-card-timer" :class="{ urgent: isUrgent(order) }">
+          <div class="kds-card-timer" :class="{ urgent: isUrgent(order) }" :title="`Previsão que o cliente vê: ${timers[order.id]?.previsao}`">
             <i-lucide-clock style="width:16px;height:16px" />
-            {{ getTimer(order) }}
+            {{ timers[order.id]?.texto }} · prev. {{ timers[order.id]?.previsao }}
           </div>
         </div>
 
@@ -155,6 +155,7 @@
 import { ref, computed, onMounted, onUnmounted, inject } from 'vue'
 import api from '../services/api'
 import { onEvent } from '../services/realtime'
+import { calcularTimerPedido, textoRestante } from '../utils/tempo'
 
 const globalLoading = inject('globalLoading')
 const loadingMessage = inject('loadingMessage')
@@ -168,6 +169,7 @@ function showFeedback(texto, tipo = 'erro') {
 const orders = ref([])
 const loading = ref(true)
 const currentTime = ref('')
+const nowTick = ref(Date.now())
 const soundMuted = ref(false)
 const newOrderToast = ref(null)
 let timeInterval = null
@@ -193,13 +195,16 @@ function isUrgent(order) {
   return mins > 15
 }
 
-function getTimer(order) {
-  const mins = Math.floor((Date.now() - new Date(order.criado_em).getTime()) / 60000)
-  if (mins < 1) return 'Agora'
-  const hours = Math.floor(mins / 60)
-  if (hours > 0) return `${hours}h ${mins % 60}min`
-  return `${mins} min`
-}
+// Timer no formato do cliente (countdown + previsão), tick a cada 1s
+const timers = computed(() => {
+  const map = {}
+  const agora = nowTick.value
+  for (const o of orders.value) {
+    const t = calcularTimerPedido(o, agora)
+    if (t) map[o.id] = { texto: textoRestante(t), previsao: t.previsao }
+  }
+  return map
+})
 
 // ─── Sound Alert System ───
 function playNotificationSound() {
@@ -303,6 +308,7 @@ async function finalizarPedido(order) {
 
 function updateTime() {
   currentTime.value = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+  nowTick.value = Date.now()
 }
 
 onMounted(() => {

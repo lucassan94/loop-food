@@ -472,9 +472,12 @@ INSERT INTO categorias (restaurant_id, nome, slug, ordem) VALUES
 ON CONFLICT (restaurant_id, slug) DO NOTHING;
 
 -- Raios de entrega padrão
+-- Valores calibrados (BUG-018): a distância calculada é EM LINHA RETA — a rota
+-- real é ~1,4× maior (moto ~22 km/h). Em bancos já existentes é no-op
+-- (ON CONFLICT DO NOTHING); para ambientes novos garante a matriz correta.
 INSERT INTO raios_entrega (restaurant_id, raio_km, tempo_min, tempo_max, custo) VALUES
-(1, 1, 15, 25, 5.00),
-(1, 3, 20, 35, 7.00),
-(1, 5, 25, 45, 10.00),
-(1, 10, 30, 60, 15.00)
+(1, 1, 10, 15, 6.00),
+(1, 3, 15, 25, 8.00),
+(1, 5, 25, 35, 10.00),
+(1, 10, 40, 55, 15.00)
 ON CONFLICT DO NOTHING;
