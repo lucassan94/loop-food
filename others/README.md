@@ -54,10 +54,7 @@ Delivery V3/
 
 > 💡 **Imagens NO BANCO (migration 028)**: as imagens (cardápio, banners, entregadores, categorias, logos) vivem na tabela `imagens` (BYTEA) do Postgres — **não há mais volume de uploads**. URLs públicas `/uploads/{tenantId}/{tipo}/{filename}` continuam iguais (servidas pelo backend a partir do banco, com `Cache-Control`). Backup do banco = backup das imagens. O `UPLOAD_DIR` em disco fica apenas como fallback de transição.
 
-> ⚠️ **Migração (1ª vez):** rodar dentro do container backend para importar imagens antigas (disco + base64 em colunas) para a tabela:
-> ```bash
-> docker compose exec backend node src/migrar-imagens-para-banco.js
-> ```
+> ✅ **Imagens migradas:** a importação dos arquivos antigos (disco + base64 em colunas) para a tabela `imagens` já foi executada (migration 028).
 
 > ⚠️ **Migrations:** rodar dentro do container: `docker compose exec backend node src/migrate.js` (as migrations são commitadas e montadas em `/app/migrations`).
 
