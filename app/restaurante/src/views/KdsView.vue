@@ -61,8 +61,9 @@
             <span class="kds-card-origin" :class="order.origem">
               <i-lucide-store v-if="order.origem === 'salao'" style="width:14px;height:14px" />
               <i-lucide-store v-else-if="order.origem === 'retirada'" style="width:14px;height:14px" />
+              <i-lucide-utensils v-else-if="order.origem === 'ifood'" style="width:14px;height:14px" />
               <i-lucide-truck v-else style="width:14px;height:14px" />
-              {{ order.origem === 'salao' ? 'Salão' : (order.origem === 'retirada' ? 'Retirada' : 'Delivery') }}
+              {{ order.origem === 'salao' ? 'Salão' : (order.origem === 'retirada' ? 'Retirada' : (order.origem === 'ifood' ? 'iFood' : 'Delivery')) }}
             </span>
           </div>
           <div class="kds-card-timer" :class="{ urgent: isUrgent(order) }" :title="`Previsão que o cliente vê: ${timers[order.id]?.previsao}`">
@@ -133,8 +134,9 @@
         <span class="kds-card-origin" :class="newOrderToast.origem" style="margin-left:auto;">
           <i-lucide-store v-if="newOrderToast.origem === 'salao'" style="width:12px;height:12px" />
           <i-lucide-store v-else-if="newOrderToast.origem === 'retirada'" style="width:12px;height:12px" />
+          <i-lucide-utensils v-else-if="newOrderToast.origem === 'ifood'" style="width:12px;height:12px" />
           <i-lucide-truck v-else style="width:12px;height:12px" />
-          {{ newOrderToast.origem === 'salao' ? 'Salão' : (newOrderToast.origem === 'retirada' ? 'Retirada' : 'Delivery') }}
+          {{ newOrderToast.origem === 'salao' ? 'Salão' : (newOrderToast.origem === 'retirada' ? 'Retirada' : (newOrderToast.origem === 'ifood' ? 'iFood' : 'Delivery')) }}
         </span>
       </div>
       <div class="kds-new-order-id">{{ newOrderToast.pedido_id }}</div>
@@ -655,6 +657,10 @@ onUnmounted(() => {
 .kds-card-origin.delivery {
   background: #dbeafe;
   color: #1e40af;
+}
+.kds-card-origin.ifood {
+  background: #ffedd5;
+  color: #c2410c;
 }
 .kds-card-timer {
   display: flex;

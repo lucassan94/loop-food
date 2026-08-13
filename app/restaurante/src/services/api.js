@@ -1,6 +1,6 @@
 import axios from 'axios'
 
-// Lê slug da URL (ex: ?slug=saborexpress) para fallback de tenant
+// Lê slug da URL (ex: ?slug=kardapio) para fallback de tenant
 // O método principal de resolução é por subdomínio (Host header),
 // mas o slug na URL permite testes sem DNS configurado.
 let _urlSlug = null

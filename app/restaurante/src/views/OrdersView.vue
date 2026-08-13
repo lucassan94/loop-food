@@ -50,6 +50,11 @@
           <i-lucide-store style="width:14px;height:14px" />
           <span>Retirada</span>
         </label>
+        <label class="origem-radio" :class="{ active: filtroOrigem === 'ifood' }">
+          <input type="radio" name="origemFiltro" value="ifood" v-model="filtroOrigem" @change="loadOrders" />
+          <i-lucide-utensils style="width:14px;height:14px" />
+          <span>iFood</span>
+        </label>
       </div>
 
       <div class="date-radio-group">
@@ -81,126 +86,58 @@
   <div class="stat-card"><div class="label">Pedidos Entregues (hoje)</div><div class="value success">{{ resumo?.pedidos_entregues || 0 }}</div></div>
   <div class="stat-card"><div class="label">Faturamento (hoje)</div><div class="value primary">{{ formatPrice(resumo?.faturamento_estimado || 0) }}</div></div>
   <div class="stat-card"><div class="label">Ativos na Fila</div><div class="value info">{{ resumo?.pedidos_ativos || 0 }}</div></div>
-</div>
-
-<!-- View Mode Tabs -->
+</div>    <!-- View Mode Tabs -->
     <div class="tabs">
-      <button class="tab" :class="{ active: viewMode === 'cards' }" @click="viewMode = 'cards'">Cartões</button>
+      <button class="tab" :class="{ active: viewMode === 'cards' }" @click="viewMode = 'cards'">Quadro</button>
       <button class="tab" :class="{ active: viewMode === 'lista' }" @click="viewMode = 'lista'">Lista</button>
+      <button class="chat-toggle-btn" @click="abrirChatDrawer()">
+        <i-lucide-message-circle style="width:16px;height:16px" />
+        Mensagens
+        <span v-if="chatTotalNaoLidas" class="chat-toggle-badge">{{ chatTotalNaoLidas }}</span>
+      </button>
     </div>
 
-    <!-- Cards View -->
-    <div v-if="viewMode === 'cards'">
-      <div v-for="order in filteredOrders" :key="order.id" class="order-card" :class="order.status">
-        <div style="display:flex;justify-content:space-between;align-items:flex-start;">
-          <div>
-            <strong>{{ order.pedido_id }}</strong>
-            <span class="origem-badge" :class="order.origem || 'delivery'">
-              <i-lucide-store v-if="order.origem === 'salao'" style="width:12px;height:12px" />
-              <i-lucide-store v-else-if="order.origem === 'retirada'" style="width:12px;height:12px" />
-              <i-lucide-truck v-else style="width:12px;height:12px" />
-              {{ order.origem === 'salao' ? 'Salão' : (order.origem === 'retirada' ? 'Retirada' : 'Delivery') }}
-            </span>
-            — {{ order.nome_cliente }}
-            <div style="font-size:0.8rem;color:var(--text-muted);">{{ formatDate(order.criado_em) }}</div>
+    <!-- Quadro de Expedição (réplica iFood Gestor de Pedidos) -->
+    <div v-if="viewMode === 'cards'" class="ifood-board">
+      <div
+        v-for="col in boardColumns"
+        :key="col.key"
+        class="ifood-lane"
+      >
+        <button class="ifood-lane-header" @click="toggleLane(col.key)">
+          <div class="ifood-lane-title">
+            <h3>{{ col.label }}</h3>
+            <span class="ifood-lane-count">{{ col.orders.length }}</span>
           </div>
-          <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;">
-            <span v-if="order.mesa" class="mesa-badge">Mesa {{ order.mesa }}</span>
-            <span class="status-badge" :class="order.status">{{ statusLabel(order.status) }}</span>
-            <!-- Badge de refund (restaurante) -->
-            <div v-if="(order.status === 'cancelado' || order.status === 'recusado') && isOnlinePayment(order.metodo_pagamento)"
-                 class="refund-status" :class="refundClass(order.id)" style="margin-top:4px;">
-              <i-lucide-clock v-if="refundIcon(order.id) === 'clock'" style="width:16px;height:16px" />
-            <i-lucide-circle-check-big v-else-if="refundIcon(order.id) === 'check-circle'" style="width:16px;height:16px" />
-            <i-lucide-circle-x v-else-if="refundIcon(order.id) === 'x-circle'" style="width:16px;height:16px" />
-            <i-lucide-loader v-else class="spinning" style="width:16px;height:16px" />
-              {{ refundLabel(order.id) }}
-            </div>
-        </div>
-        </div>
+          <i-lucide-chevron-up style="width:16px;height:16px" :class="{ rotated: laneCollapsed[col.key] }" />
+        </button>
 
-        <div v-if="order.entregador_nome" style="font-size:0.85rem;color:var(--text-secondary);margin-top:4px;">
-          <i-lucide-bike style="width:14px;height:14px;vertical-align:middle;" /> {{ order.entregador_nome }}
-        </div>
+        <div v-if="!laneCollapsed[col.key]" class="ifood-lane-cards">
+          <div v-if="col.orders.length === 0" class="ifood-lane-empty">{{ col.vazio }}</div>
 
-        <!-- Timer: mesmo countdown/previsão que o cliente vê (TrackingView) -->
-        <div v-if="isActiveOrder(order.status)" style="margin-top:8px;font-size:0.85rem;">
-          <span :style="{ color: timers[order.id]?.cor }" :title="`Prazo estimado: ${timers[order.id]?.previsao}`">
-            <i-lucide-clock style="width:14px;height:14px" />
-            {{ timers[order.id]?.texto }} · prev. {{ timers[order.id]?.previsao }}
-          </span>
-        </div>
-
-        <div style="font-size:0.85rem;margin-top:8px;">
-          <strong>{{ order.itens?.length }} item(ns)</strong> — {{ formatPrice(order.total) }}
-          <br />{{ paymentLabel(order.metodo_pagamento) }}
-        </div>
-
-        <div v-if="order.observacoes" class="order-obs-badge">
-          <i-lucide-pen-line style="width:14px;height:14px" /> {{ order.observacoes }}
-        </div>
-
-        <div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap;">
-          <!-- Aguardando Pagamento: a confirmação é automática (webhook + polling de 15s) -->
-          <template v-if="order.status === 'aguardando_pagamento'">
-            <span style="font-size:0.85rem;color:var(--text-muted);">⏳ Aguardando confirmação do pagamento...</span>
-          </template>
-
-          <!-- Pendente: Aceitar (admin/gerente/chef), Recusar (admin/gerente) -->
-          <template v-if="order.status === 'pendente'">
-            <button v-if="podeAceitar" class="btn btn-success btn-sm" @click="changeStatus(order.id, 'preparando')">Aceitar</button>
-            <button v-if="podeRecusar" class="btn btn-danger btn-sm" @click="abrirModalCancelamento(order, 'recusado')">Recusar</button>
-          </template>
-
-          <!-- Preparando: Pronto (admin/gerente/chef) -->
-          <template v-if="order.status === 'preparando'">
-            <button v-if="order.origem === 'salao' && podeMarcarPronto" class="btn btn-primary btn-sm" @click="changeStatus(order.id, 'pronto')"><i-lucide-circle-check-big style="width:14px;height:14px" /> Pronto para Servir</button>
-            <button v-else-if="podeMarcarPronto" class="btn btn-primary btn-sm" @click="changeStatus(order.id, 'pronto_entrega')"><i-lucide-circle-check-big style="width:14px;height:14px" /> {{ order.origem === 'retirada' ? 'Pronto para Retirada' : 'Pronto para Entrega' }}</button>
-          </template>
-
-          <!-- Pronto (Salão) - Finalizar Conta -->
-          <template v-if="order.status === 'pronto'">
-            <button v-if="podeMarcarPronto || isCaixa" class="btn btn-warning btn-sm" @click="changeStatus(order.id, 'finalizado')">
-              <i-lucide-wallet style="width:14px;height:14px" />
-              Finalizar Conta
-            </button>
-          </template>
-
-          <!-- Pronto para entrega -->
-          <template v-if="order.status === 'pronto_entrega'">
-            <template v-if="modoSemEntregador">
-              <button v-if="podeMarcarPronto" class="btn btn-success btn-sm" @click="changeStatus(order.id, 'entregue')"><i-lucide-circle-check-big style="width:14px;height:14px" /> Confirmar Entrega</button>
+          <div
+            v-for="order in col.orders"
+            :key="order.id"
+            class="ifood-card"
+            :class="cardClasse(order)"
+            :data-order-id="order.id"
+            @click="abrirDetalhes(order)"
+          >
+            <div class="ifood-card-num">{{ orderNumero(order) }}</div>
+            <div class="ifood-card-nome" :title="order.nome_cliente">{{ order.nome_cliente }}</div>
+            <div v-if="order.mesa" class="ifood-card-chip">🪑 {{ order.mesa }}</div>
+            <template v-if="cardActions[order.id]">
+              <button
+                v-if="cardActions[order.id].fn"
+                class="ifood-card-btn"
+                @click.stop="cardActions[order.id].fn()"
+              >
+                <span class="ifood-card-btn-bar" :style="slaBarStyle(order)"></span>
+                <span class="ifood-card-btn-label">{{ cardActions[order.id].label }}</span>
+              </button>
+              <div v-else class="ifood-card-btn ifood-card-btn-muted">{{ cardActions[order.id].label }}</div>
             </template>
-            <template v-else>
-              <span style="font-size:0.85rem;color:var(--text-muted);">Aguardando Entregador...</span>
-            </template>
-          </template>
-
-          <!-- Em trânsito / Chegou destino -->
-          <template v-if="order.status === 'em_transito'">
-            <span style="font-size:0.85rem;">Pedido em Rota de Entrega</span>
-          </template>
-          <template v-if="order.status === 'cheguei_destino'">
-            <span style="font-size:0.85rem;color:var(--primary);">Entregador no Local</span>
-          </template>
-
-          <!-- Entregue / Finalizado -->
-          <template v-if="order.status === 'entregue'">
-            <span style="font-size:0.85rem;color:var(--success);">✓ Entrega Concluída</span>
-          </template>
-          <template v-if="order.status === 'finalizado'">
-            <span style="font-size:0.85rem;color:var(--success);">✓ Conta Finalizada</span>
-          </template>
-
-          <!-- Cancelado / Recusado -->
-          <template v-if="order.status === 'cancelado' || order.status === 'recusado'">
-            <span style="font-size:0.85rem;color:var(--error);"><i-lucide-x style="width:14px;height:14px" /> {{ order.motivo_cancelamento || 'Sem motivo' }}</span>
-          </template>
-
-          <button class="btn btn-secondary btn-sm" @click="abrirDetalhes(order)">Detalhes</button>
-          <button v-if="podeEnviarMensagem && !['entregue','finalizado','cancelado','recusado'].includes(order.status)" class="btn btn-secondary btn-sm" @click="abrirMensagem(order)"><i-lucide-message-square style="width:14px;height:14px" /> Mensagem</button>
-          <!-- Cancelar disponível durante toda jornada do pedido (antes de entregue/cancelado) -->
-          <button v-if="podeCancelar && isActiveOrder(order.status) && order.status !== 'aguardando_pagamento'" class="btn btn-danger btn-sm" @click="abrirModalCancelamento(order, 'cancelado')">Cancelar</button>
+          </div>
         </div>
       </div>
     </div>
@@ -218,7 +155,7 @@
             <td><strong>{{ order.pedido_id }}</strong></td>
             <td>
               <span class="origem-badge" :class="order.origem || 'delivery'" style="font-size:0.7rem;">
-                {{ order.origem === 'salao' ? 'Salão' : (order.origem === 'retirada' ? 'Retirada' : 'Delivery') }}
+                {{ order.origem === 'salao' ? 'Salão' : (order.origem === 'retirada' ? 'Retirada' : (order.origem === 'ifood' ? 'iFood' : 'Delivery')) }}
               </span>
             </td>
             <td><span v-if="order.mesa" class="mesa-badge">{{ order.mesa }}</span></td>
@@ -247,57 +184,141 @@
       </table>
     </div>
 
-    <!-- Detail Modal -->
-    <div v-if="selectedOrder" class="modal-overlay" @click.self="selectedOrder = null">
-      <div class="modal-content">          <h3>{{ selectedOrder.pedido_id }} — {{ selectedOrder.nome_cliente }}</h3><span class="status-badge" :class="selectedOrder.status">{{ statusLabel(selectedOrder.status) }}</span>
-        <p style="color:var(--text-muted);margin-bottom:1rem;">{{ formatDate(selectedOrder.criado_em) }}</p>
-
-        <div class="profile-section"><div class="profile-section-title">Itens</div>
-          <div v-for="item in selectedOrder.itens" :key="item.id" style="font-size:0.9rem;margin-bottom:6px;">
-            <div>{{ item.quantidade }}x {{ item.nome_produto }} — {{ formatPrice(item.subtotal) }}</div>
-            <div v-if="item.extras?.length" style="font-size:0.8rem;color:var(--text-secondary);margin-left:1.25rem;">
-              + {{ item.extras.map(e => e.nome + (e.qty > 1 ? ` (${e.qty})` : '')).join(', ') }}
-            </div>
-            <div v-if="item.opcoes?.length" style="font-size:0.8rem;color:var(--text-secondary);margin-left:1.25rem;">
-              {{ item.opcoes.map(o => o.grupo + ': ' + o.nome).join(' • ') }}
-            </div>
-            <div v-if="item.talheres != null" style="font-size:0.8rem;margin-left:1.25rem;">🍴 {{ item.talheres ? 'Com talheres' : 'Sem talheres' }}</div>
-            <div v-if="item.observacao" style="font-size:0.8rem;font-style:italic;color:var(--text-secondary);margin-left:1.25rem;">📝 {{ item.observacao }}</div>
+    <!-- Painel lateral de detalhes (estilo iFood) -->
+    <transition name="chat-fade">
+      <div v-if="selectedOrder" class="detail-overlay" @click="selectedOrder = null"></div>
+    </transition>
+    <transition name="chat-slide">
+      <aside v-if="selectedOrder" class="detail-drawer">
+        <header class="detail-header">
+          <div class="detail-header-left">
+            <h3>{{ selectedOrder.pedido_id }}</h3>
+            <span class="status-badge" :class="selectedOrder.status">{{ statusLabel(selectedOrder.status) }}</span>
           </div>
-        </div>
+          <button class="chat-close" @click="selectedOrder = null" title="Fechar">✕</button>
+        </header>
 
-        <div class="profile-section"><div class="profile-section-title">Cliente</div>
-          <p v-if="selectedOrder.origem === 'retirada'" style="font-size:0.85rem;">
-            {{ selectedOrder.nome_cliente }}<br/>{{ selectedOrder.telefone_cliente }}<br/>
-            <strong style="color:var(--info);">🏪 Retirada no local</strong>
-          </p>
-          <p v-else style="font-size:0.85rem;">{{ selectedOrder.nome_cliente }}<br/>{{ selectedOrder.telefone_cliente }}<br/>{{ selectedOrder.endereco_cliente }}, {{ selectedOrder.numero_cliente }}<br/>{{ selectedOrder.bairro_cliente }}</p>
-        </div>
+        <div class="detail-scroll">
+          <!-- Meta -->
+          <div class="detail-meta">
+            <span>Feito às <b>{{ horaFeito(selectedOrder) }}</b></span>
+            <span class="detail-dot">•</span>
+            <span class="origem-badge" :class="selectedOrder.origem || 'delivery'">
+              {{ origemIcon(selectedOrder) }} {{ origemLabel(selectedOrder) }}
+            </span>
+            <span v-if="selectedOrder.mesa" class="mesa-badge">Mesa {{ selectedOrder.mesa }}</span>
+          </div>
 
-        <div class="profile-section"><div class="profile-section-title">Pagamento</div>
-          <p style="font-size:0.85rem;">{{ paymentLabel(selectedOrder.metodo_pagamento) }}</p>
-          <!-- Badge de refund (Modal) -->
+          <!-- Previsão + tempo decorrido -->
+          <div class="detail-previsao">
+            <i-lucide-clock style="width:16px;height:16px" />
+            Entrega prevista: <b>{{ timers[selectedOrder.id]?.previsao || '—' }}</b>
+            <span v-if="elapsedMap[selectedOrder.id]" class="detail-countdown" :style="{ color: elapsedMap[selectedOrder.id].cor }">
+              {{ elapsedMap[selectedOrder.id].texto }}
+            </span>
+          </div>
+
+          <div class="detail-status" :style="{ color: statusCor(selectedOrder) }">
+            <strong>{{ statusLabel(selectedOrder.status) }}</strong>
+            <span v-if="selectedOrder.status === 'pendente'"> · 5 minutos para aceitar o pedido</span>
+            <span v-if="selectedOrder.status === 'aguardando_pagamento'"> · Aguardando confirmação do pagamento</span>
+          </div>
+
+          <!-- Cliente -->
+          <div class="profile-section">
+            <div class="profile-section-title">Cliente</div>
+            <div class="detail-cliente">
+              <strong>{{ selectedOrder.nome_cliente }}</strong>
+              <span v-if="selectedOrder.telefone_cliente">
+                <i-lucide-phone style="width:13px;height:13px" />
+                <a :href="`tel:${selectedOrder.telefone_cliente}`">{{ selectedOrder.telefone_cliente }}</a>
+              </span>
+              <span v-if="selectedOrder.origem === 'retirada'" class="detail-retirada">🏪 Retirada no local</span>
+              <span v-else-if="selectedOrder.origem !== 'salao'" class="detail-endereco">
+                <i-lucide-map-pin style="width:13px;height:13px" />
+                {{ selectedOrder.endereco_cliente }}, {{ selectedOrder.numero_cliente }} — {{ selectedOrder.bairro_cliente }}
+              </span>
+            </div>
+          </div>
+
+          <!-- Itens -->
+          <div class="profile-section">
+            <div class="profile-section-title">Itens no pedido</div>
+            <div v-for="item in selectedOrder.itens" :key="item.id" class="detail-item">
+              <div class="detail-item-row">
+                <div class="ifood-item-thumb">{{ item.quantidade }}</div>
+                <div class="detail-item-main">
+                  <span class="detail-item-nome">{{ item.nome_produto }}</span>
+                  <span class="detail-item-preco">{{ formatPrice(item.subtotal) }}</span>
+                </div>
+              </div>
+              <div v-if="item.extras?.length" class="detail-item-extra">
+                + {{ item.extras.map(e => e.nome + (e.qty > 1 ? ` (${e.qty})` : '')).join(', ') }}
+              </div>
+              <div v-if="item.opcoes?.length" class="detail-item-extra">
+                {{ item.opcoes.map(o => `${o.grupo}: ${o.nome}`).join(' • ') }}
+              </div>
+              <div v-if="item.talheres != null" class="detail-item-extra">🍴 {{ item.talheres ? 'Com talheres' : 'Sem talheres' }}</div>
+              <div v-if="item.observacao" class="detail-item-obs">📝 {{ item.observacao }}</div>
+            </div>
+          </div>
+
+          <!-- Resumo -->
+          <div class="order-summary">
+            <div class="order-summary-row"><span>Subtotal</span><span>{{ formatPrice(selectedOrder.subtotal) }}</span></div>
+            <div class="order-summary-row"><span>Taxa de entrega</span><span>{{ formatPrice(selectedOrder.valor_frete) }}</span></div>
+            <div class="order-summary-total"><span>Total</span><span>{{ formatPrice(selectedOrder.total) }}</span></div>
+            <div class="order-summary-row"><span>Pagamento</span><span>{{ paymentLabel(selectedOrder.metodo_pagamento) }}</span></div>
+          </div>
+
+          <!-- Observações -->
+          <div v-if="selectedOrder.observacoes" class="order-obs-badge">
+            <i-lucide-pen-line style="width:14px;height:14px" /> {{ selectedOrder.observacoes }}
+          </div>
+
+          <!-- Refund -->
           <div v-if="(selectedOrder.status === 'cancelado' || selectedOrder.status === 'recusado') && isOnlinePayment(selectedOrder.metodo_pagamento)"
-               class="refund-status" :class="refundClass(selectedOrder.id)" style="margin-top:6px;">
-            <i :class="refundIcon(selectedOrder.id)"></i>
+               class="refund-status" :class="refundClass(selectedOrder.id)">
+            <i-lucide-clock v-if="refundIcon(selectedOrder.id) === 'clock'" style="width:16px;height:16px" />
+            <i-lucide-circle-check-big v-else-if="refundIcon(selectedOrder.id) === 'check-circle'" style="width:16px;height:16px" />
+            <i-lucide-circle-x v-else-if="refundIcon(selectedOrder.id) === 'x-circle'" style="width:16px;height:16px" />
+            <i-lucide-loader v-else class="spinning" style="width:16px;height:16px" />
             {{ refundLabel(selectedOrder.id) }}
           </div>
-        </div>
 
-        <div class="order-summary">
-          <div class="order-summary-row"><span>Subtotal:</span><span>{{ formatPrice(selectedOrder.subtotal) }}</span></div>
-          <div class="order-summary-row"><span>Frete:</span><span>{{ formatPrice(selectedOrder.valor_frete) }}</span></div>
-          <div class="order-summary-total"><span>Total:</span><span>{{ formatPrice(selectedOrder.total) }}</span></div>
+          <!-- Ações -->
+          <div class="detail-actions">
+            <template v-if="selectedOrder.status === 'pendente'">
+              <button v-if="podeAceitar" class="btn btn-success" @click="changeStatus(selectedOrder.id, 'preparando')">Aceitar</button>
+              <button v-if="podeRecusar" class="btn btn-danger" @click="abrirModalCancelamento(selectedOrder, 'recusado')">Recusar</button>
+            </template>
+            <template v-if="selectedOrder.status === 'preparando'">
+              <button v-if="podeMarcarPronto" class="btn btn-primary" @click="changeStatus(selectedOrder.id, selectedOrder.origem === 'salao' ? 'pronto' : 'pronto_entrega')">
+                <i-lucide-circle-check-big style="width:16px;height:16px" />
+                {{ selectedOrder.origem === 'salao' ? 'Pronto para Servir' : (selectedOrder.origem === 'retirada' ? 'Pronto para Retirada' : 'Pronto para Entrega') }}
+              </button>
+            </template>
+            <template v-if="selectedOrder.status === 'pronto'">
+              <button v-if="podeMarcarPronto || isCaixa" class="btn btn-warning" @click="changeStatus(selectedOrder.id, 'finalizado')">
+                <i-lucide-wallet style="width:16px;height:16px" /> Finalizar Conta
+              </button>
+            </template>
+            <template v-if="selectedOrder.status === 'pronto_entrega' && modoSemEntregador">
+              <button v-if="podeMarcarPronto" class="btn btn-success" @click="changeStatus(selectedOrder.id, 'entregue')">
+                <i-lucide-circle-check-big style="width:16px;height:16px" /> Confirmar Entrega
+              </button>
+            </template>
+            <button v-if="podeCancelar && isActiveOrder(selectedOrder.status) && selectedOrder.status !== 'aguardando_pagamento'" class="btn btn-danger" @click="abrirModalCancelamento(selectedOrder, 'cancelado')">Cancelar</button>
+            <button v-if="podeAbrirChat" class="btn btn-secondary" @click="abrirChatDoPedido(selectedOrder)">
+              <i-lucide-message-square style="width:16px;height:16px" /> Chat
+            </button>
+            <button class="btn btn-secondary" @click="imprimirPedido(selectedOrder)">
+              <i-lucide-printer style="width:16px;height:16px" /> Imprimir
+            </button>
+          </div>
         </div>
-
-        <div style="display:flex;gap:8px;margin-top:1rem;">
-          <button class="btn btn-primary" style="flex:1;" @click="imprimirPedido(selectedOrder)">
-            <i-lucide-printer style="width:16px;height:16px" /> Imprimir
-          </button>
-          <button class="btn btn-secondary" style="flex:1;" @click="selectedOrder = null">Fechar</button>
-        </div>
-      </div>
-    </div>
+      </aside>
+    </transition>
 
     <!-- Cancel/Recuse Modal (customizado, substitui prompt()) -->
     <div v-if="cancelModalOrder" class="modal-overlay" @click.self="fecharModalCancelamento">
@@ -343,16 +364,85 @@
       </div>
     </div>
 
-    <!-- Message Modal -->
-    <div v-if="msgOrder" class="modal-overlay" @click.self="msgOrder = null">
-      <div class="modal-content" style="max-width:400px;">
-        <h3><i-lucide-message-square style="width:18px;height:18px" /> Mensagem para {{ msgOrder.nome_cliente }}</h3>
-        <div class="form-group" style="margin-top:1rem;">
-          <textarea v-model="mensagemTexto" rows="3" placeholder="Digite sua mensagem..." style="width:100%;padding:0.75rem;border:1.5px solid var(--border);border-radius:6px;font-family:inherit;"></textarea>
+    <!-- Chat SuperSide bar (restaurante ↔ cliente) -->
+    <transition name="chat-fade">
+      <div v-if="chatAberto" class="chat-overlay" @click="fecharChat()"></div>
+    </transition>
+    <transition name="chat-slide">
+      <aside v-if="chatAberto" class="chat-drawer">
+        <div class="chat-drawer-header">
+          <div class="chat-drawer-title">
+            <h3><i-lucide-message-circle style="width:18px;height:18px" /> Mensagens</h3>
+            <span v-if="chatTotalNaoLidas" class="chat-drawer-sub">{{ chatTotalNaoLidas }} não lida(s)</span>
+          </div>
+          <button class="chat-close" @click="fecharChat()" title="Fechar">✕</button>
         </div>
-        <button class="btn btn-primary btn-block" @click="enviarMensagem" :disabled="!mensagemTexto.trim()">Enviar</button>
-      </div>
-    </div>
+
+        <!-- Lista de conversas -->
+        <div v-if="!chatAtivo" class="chat-conversas">
+          <div v-if="chatCarregando" class="chat-empty">Carregando...</div>
+          <div v-else-if="chatConversas.length === 0" class="chat-empty">
+            <i-lucide-message-circle style="width:34px;height:34px;opacity:.35" />
+            <p>Nenhuma conversa ainda.<br />As mensagens trocadas com os clientes aparecem aqui.</p>
+          </div>
+          <button
+            v-for="c in chatConversas"
+            :key="c.pedido_id"
+            class="chat-conversa"
+            @click="abrirConversa(c)"
+          >
+            <div class="chat-conv-avatar">{{ inicial(c.nome_cliente) }}</div>
+            <div class="chat-conv-body">
+              <div class="chat-conv-top">
+                <strong>{{ c.nome_cliente }}</strong>
+                <span class="chat-conv-time">{{ formatDate(c.ultima?.criado_em || c.criado_em) }}</span>
+              </div>
+              <div class="chat-conv-mid">
+                <span class="chat-conv-ref">{{ c.ref }} · {{ statusLabel(c.status) }}</span>
+                <span v-if="c.nao_lidas" class="chat-unread-badge">{{ c.nao_lidas }}</span>
+              </div>
+              <div class="chat-conv-preview">{{ previewChat(c.ultima) }}</div>
+            </div>
+          </button>
+        </div>
+
+        <!-- Conversa aberta -->
+        <div v-else class="chat-thread">
+          <div class="chat-thread-header">
+            <button class="chat-back" @click="chatAtivo = null" title="Voltar">←</button>
+            <div class="chat-thread-title">
+              <strong>{{ chatAtivo.nome_cliente }}</strong>
+              <span>{{ chatAtivo.ref }} · {{ statusLabel(chatAtivo.status) }}</span>
+            </div>
+            <button class="btn btn-secondary btn-sm" @click="verPedidoNoCard">Ver pedido</button>
+          </div>
+
+          <div ref="chatScroll" class="chat-msgs">
+            <div
+              v-for="m in chatMensagens"
+              :key="m.id"
+              class="chat-msg"
+              :class="m.remetente === 'restaurante' ? 'out' : 'in'"
+            >
+              <div class="chat-bubble">{{ m.mensagem }}</div>
+              <div class="chat-msg-meta">
+                {{ formatDate(m.criado_em) }}
+                <span v-if="m.remetente === 'restaurante' && m.lida_cliente" title="Cliente leu" class="receipt">✓✓</span>
+                <span v-else-if="m.remetente === 'cliente'" class="receipt" :class="{ read: m.lida }">{{ m.lida ? '✓✓' : '✓' }}</span>
+              </div>
+            </div>
+          </div>
+
+          <div v-if="chatPodeEnviar" class="chat-input-bar">
+            <textarea v-model="chatTexto" rows="1" placeholder="Responder..." @keydown.enter.exact.prevent="enviarChat()"></textarea>
+            <button class="btn btn-primary chat-send" :disabled="!chatTexto.trim() || chatEnviando" @click="enviarChat()">
+              <i-lucide-send style="width:16px;height:16px" />
+            </button>
+          </div>
+          <div v-else class="chat-somente-leitura">Somente leitura — admin/gerente/chef podem responder.</div>
+        </div>
+      </aside>
+    </transition>
   </div>
 </template>
 
@@ -381,9 +471,8 @@ const viewMode = ref('cards')
 const orders = ref([])
 const resumo = ref(null)
 const selectedOrder = ref(null)
-const msgOrder = ref(null)
-const mensagemTexto = ref('')
-// dragOrder removido (Kanban foi eliminado)
+// Quadro kanban: coluna recolhida? (chave: aceitar/preparo/pronto/rota/finalizados)
+const laneCollapsed = ref({})
 const cancelModalOrder = ref(null)     // pedido alvo do cancelamento/recusa
 const cancelModalAction = ref('cancelado') // 'cancelado' | 'recusado'
 const cancelModalMotivo = ref('')      // motivo digitado
@@ -450,6 +539,10 @@ function aoMudarStatusFiltro() {
     filtroDataPeriodo.value = ''
     filtroDataInicio.value = ''
     filtroDataFim.value = ''
+  } else {
+    // Filtros específicos (Concluídos/Cancelados/Todos) fazem sentido na Lista —
+    // o Quadro já agrupa por status de expedição.
+    viewMode.value = 'lista'
   }
   loadOrders()
 }
@@ -474,13 +567,170 @@ function aplicarFiltroData() {
   loadOrders()
 }
 
-// Computed que filtra pedidos pela origem selecionada
+// Computed que filtra pedidos pela origem + status 'ativos' (local)
 // Ordem da fila: do mais antigo para o mais recente
 const filteredOrders = computed(() => {
+  let base = filtroOrigem.value === 'todos'
+    ? orders.value
+    : orders.value.filter(o => o.origem === filtroOrigem.value)
+  if (filtroStatus.value === 'ativos') {
+    base = base.filter(o => !['entregue', 'finalizado', 'cancelado', 'recusado'].includes(o.status))
+  }
+  return [...base].sort((a, b) => new Date(a.criado_em) - new Date(b.criado_em))
+})
+
+// ── Quadro kanban estilo iFood Gestor de Pedidos ──
+// Colunas de expedição — cancelados/recusados ficam de fora (só na Lista/filtros).
+// boardOrders: NÃO aplica o filtro 'ativos' (o quadro precisa dos Finalizados);
+// os status fora das colunas (cancelado/recusado) simplesmente não aparecem.
+const boardOrders = computed(() => {
   const base = filtroOrigem.value === 'todos'
     ? orders.value
     : orders.value.filter(o => o.origem === filtroOrigem.value)
   return [...base].sort((a, b) => new Date(a.criado_em) - new Date(b.criado_em))
+})
+
+const boardColumns = computed(() => {
+  const colunas = [
+    { key: 'aceitar', label: 'Aceitar', statuses: ['aguardando_pagamento', 'pendente'], vazio: 'Pedidos aguardando confirmação' },
+    { key: 'preparo', label: 'Em preparo', statuses: ['preparando'], vazio: 'Pedidos sendo preparados na cozinha' },
+    { key: 'pronto', label: 'Pronto', statuses: ['pronto_entrega', 'pronto'], vazio: 'Pedidos prontos para coleta' },
+    { key: 'rota', label: 'Em rota', statuses: ['em_transito', 'cheguei_destino'], vazio: 'Pedidos a caminho do cliente' },
+    { key: 'finalizados', label: 'Finalizados', statuses: ['entregue', 'finalizado'], vazio: 'Pedidos finalizados hoje' },
+  ]
+  return colunas.map(c => ({
+    ...c,
+    orders: boardOrders.value.filter(o => c.statuses.includes(o.status)),
+  }))
+})
+
+function toggleLane(key) {
+  laneCollapsed.value = { ...laneCollapsed.value, [key]: !laneCollapsed.value[key] }
+}
+
+// ── SLA / barra de countdown (estilo iFood) ──
+function slaSegundos(order) {
+  if (order.status === 'pendente') return 5 * 60
+  if (order.status === 'aguardando_pagamento') return 15 * 60
+  const preparo = parseInt(order.tempo_preparo_estimado) || 20
+  const entrega = parseInt(order.tempo_entrega_estimado) || 25
+  if (order.status === 'preparando') return preparo * 60
+  if (order.status === 'pronto_entrega' || order.status === 'pronto') {
+    return (order.origem === 'salao' || order.origem === 'retirada' ? preparo : entrega) * 60
+  }
+  if (order.status === 'em_transito' || order.status === 'cheguei_destino') return entrega * 60
+  return 0
+}
+
+function elapsedInfo(order, agora = Date.now()) {
+  // Status fora de expedição não têm SLA — sem anel nem countdown
+  if (['entregue', 'finalizado', 'cancelado', 'recusado'].includes(order.status)) return null
+  const criado = new Date(order.criado_em).getTime()
+  const elapsed = Number.isNaN(criado) ? 0 : Math.max(0, Math.floor((agora - criado) / 1000))
+  const sla = slaSegundos(order)
+  const pct = sla > 0 ? Math.min(100, Math.round((elapsed / sla) * 100)) : 100
+  const mm = Math.floor(elapsed / 60)
+  const ss = elapsed % 60
+  const texto = `${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')}`
+  const cor = sla > 0
+    ? (pct >= 100 ? 'var(--error)' : pct >= 70 ? 'var(--warning)' : 'var(--success)')
+    : 'var(--text-muted)'
+  return { elapsed, sla, pct, texto, cor }
+}
+
+// Mapa de SLA por pedido (recalculado a cada tick de 1s, como `timers`)
+const elapsedMap = computed(() => {
+  const map = {}
+  const agora = nowTick.value
+  for (const o of orders.value) map[o.id] = elapsedInfo(o, agora)
+  return map
+})
+
+// Cor do status no painel: Pendente sempre vermelho iFood, demais seguem o SLA
+function statusCor(order) {
+  if (order.status === 'pendente') return '#EA1D2C'
+  if (order.status === 'aguardando_pagamento') return '#f59e0b'
+  const el = elapsedMap.value[order.id]
+  return el?.cor || '#151515'
+}
+
+// Card com borda vermelha iFood quando aguarda aceite ou estourou o SLA
+function cardClasse(order) {
+  const el = elapsedMap.value[order.id]
+  const urgente = order.status === 'pendente' || (el && el.pct >= 100)
+  return urgente ? 'urgente' : ''
+}
+
+// Barra de countdown dentro do botão: animação com duração = SLA e delay
+// negativo = tempo decorrido (mesmo mecanismo do iFood: 0%→100% em N segundos)
+function slaBarStyle(order) {
+  const el = elapsedMap.value[order.id]
+  if (!el || el.sla <= 0) return null
+  return {
+    animation: `ifood-countdown ${el.sla}s linear -${el.elapsed}s`,
+  }
+}
+
+function orderNumero(order) {
+  return (order.pedido_id || '').replace('#', '') || String(order.id)
+}
+
+function horaFeito(order) {
+  return new Date(order.criado_em).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+}
+
+function origemLabel(order) {
+  const l = { salao: 'Salão', delivery: 'Delivery', retirada: 'Retirada', ifood: 'iFood' }
+  return l[order.origem] || 'Delivery'
+}
+
+function origemIcon(order) {
+  if (order.origem === 'salao') return '🪑'
+  if (order.origem === 'retirada') return '🏪'
+  if (order.origem === 'ifood') return '🍽️'
+  return '🛵'
+}
+
+// Ação principal exibida na base do card (estilo iFood)
+function acaoCard(order) {
+  if (order.status === 'pendente') {
+    if (podeAceitar.value) {
+      return { label: 'Aceitar', cor: 'success', fn: () => changeStatus(order.id, 'preparando') }
+    }
+    return { label: 'Aguardando confirmação', cor: 'muted', fn: null }
+  }
+  if (order.status === 'aguardando_pagamento') {
+    return { label: 'Aguardando pagamento…', cor: 'muted', fn: null }
+  }
+  if (order.status === 'preparando' && podeMarcarPronto.value) {
+    const isSalao = order.origem === 'salao'
+    const label = isSalao ? 'Pronto p/ servir' : (order.origem === 'retirada' ? 'Pronto p/ retirada' : 'Pronto p/ entrega')
+    return { label, cor: 'primary', fn: () => changeStatus(order.id, isSalao ? 'pronto' : 'pronto_entrega') }
+  }
+  if (order.status === 'pronto' && (podeMarcarPronto.value || isCaixa.value)) {
+    return { label: 'Finalizar conta', cor: 'warning', fn: () => changeStatus(order.id, 'finalizado') }
+  }
+  if (order.status === 'pronto_entrega' && !modoSemEntregador.value) {
+    return { label: 'Aguardando entregador…', cor: 'muted', fn: null }
+  }
+  if (order.status === 'pronto_entrega' && podeMarcarPronto.value) {
+    return { label: 'Confirmar entrega', cor: 'success', fn: () => changeStatus(order.id, 'entregue') }
+  }
+  if (order.status === 'em_transito') return { label: 'Em rota', cor: 'muted', fn: null }
+  if (order.status === 'cheguei_destino') return { label: 'Entregador no local', cor: 'muted', fn: null }
+  if (order.status === 'entregue') return { label: '✓ Entregue', cor: 'success', fn: null }
+  if (order.status === 'finalizado') return { label: '✓ Finalizado', cor: 'success', fn: null }
+  return null
+}
+
+// Ações cacheadas por pedido (evita recriar objetos a cada render do board)
+const cardActions = computed(() => {
+  const map = {}
+  for (const o of orders.value) {
+    const acao = acaoCard(o)
+    if (acao) map[o.id] = acao
+  }
+  return map
 })
 
 function formatPrice(v) { return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v) }
@@ -495,7 +745,7 @@ function statusLabel(s) {
 }
 
 function paymentLabel(m) {
-  const l = { credito: 'Cartão Crédito', debito: 'Cartão Débito', dinheiro: 'Dinheiro', pix: 'PIX', pix_online: 'PIX Online', credito_online: 'Cartão Crédito Online', debito_online: 'Cartão Débito Online' }
+  const l = { credito: 'Cartão Crédito', debito: 'Cartão Débito', dinheiro: 'Dinheiro', pix: 'PIX', pix_online: 'PIX Online', credito_online: 'Cartão Crédito Online', debito_online: 'Cartão Débito Online', ifood: 'iFood (processado pelo iFood)' }
   return l[m] || m
 }
 
@@ -513,7 +763,133 @@ const podeAceitar = computed(() => isAdmin.value || isChef.value)
 const podeRecusar = computed(() => isAdmin.value)
 const podeMarcarPronto = computed(() => isAdmin.value || isChef.value)
 const podeCancelar = computed(() => isAdmin.value || isCaixa.value)
-const podeEnviarMensagem = computed(() => isAdmin.value || isChef.value)
+const podeAbrirChat = computed(() => isAdmin.value || isChef.value || isCaixa.value)
+const chatPodeEnviar = computed(() => isAdmin.value || isChef.value)
+
+// ── Chat SuperSide bar ──
+const chatAberto = ref(false)
+const chatAtivo = ref(null)
+const chatConversas = ref([])
+const chatMensagens = ref([])
+const chatTexto = ref('')
+const chatCarregando = ref(false)
+const chatEnviando = ref(false)
+const chatScroll = ref(null)
+
+const chatTotalNaoLidas = computed(() =>
+  chatConversas.value.reduce((acc, c) => acc + (c.nao_lidas || 0), 0)
+)
+
+async function carregarConversas() {
+  try {
+    const { data } = await api.get('/restaurante/mensagens/conversas')
+    chatConversas.value = data.conversas || []
+  } catch { /* ignore */ }
+}
+
+function abrirChatDrawer() {
+  chatAberto.value = true
+  chatAtivo.value = null
+  chatMensagens.value = []
+  carregarConversas()
+}
+
+function abrirChatDoPedido(order) {
+  chatAberto.value = true
+  abrirConversa({
+    pedido_id: order.id,
+    ref: order.pedido_id,
+    status: order.status,
+    origem: order.origem,
+    nome_cliente: order.nome_cliente,
+  })
+}
+
+function fecharChat() {
+  chatAberto.value = false
+  chatAtivo.value = null
+  chatMensagens.value = []
+  chatTexto.value = ''
+}
+
+function inicial(nome) {
+  return (nome || '?').trim().charAt(0).toUpperCase()
+}
+
+function previewChat(ultima) {
+  if (!ultima) return ''
+  const prefixo = ultima.remetente === 'cliente' ? '👤 ' : '🍳 '
+  const t = String(ultima.mensagem || '')
+  return prefixo + (t.length > 58 ? t.slice(0, 58) + '…' : t)
+}
+
+async function abrirConversa(conversa) {
+  chatAtivo.value = conversa
+  chatMensagens.value = []
+  chatTexto.value = ''
+  try {
+    const { data } = await api.get(`/pedidos/${conversa.pedido_id}`)
+    chatMensagens.value = (data.mensagens || []).slice().sort((a, b) => new Date(a.criado_em) - new Date(b.criado_em))
+  } catch { /* ignore */ }
+  marcarConversaLida(conversa.pedido_id)
+  scrollChat()
+}
+
+async function marcarConversaLida(pedidoId) {
+  const conv = chatConversas.value.find((c) => c.pedido_id === pedidoId)
+  if (conv && conv.nao_lidas > 0) {
+    conv.nao_lidas = 0
+    try {
+      await api.post('/restaurante/mensagens/ler', { pedido_id: pedidoId })
+    } catch { /* ignore */ }
+  }
+}
+
+function scrollChat() {
+  setTimeout(() => {
+    if (chatScroll.value) chatScroll.value.scrollTop = chatScroll.value.scrollHeight
+  }, 60)
+}
+
+async function enviarChat() {
+  const t = chatTexto.value.trim()
+  if (!t || !chatAtivo.value || chatEnviando.value) return
+  chatEnviando.value = true
+  chatTexto.value = ''
+  try {
+    const { data } = await api.post('/restaurante/mensagens', { pedido_id: chatAtivo.value.pedido_id, mensagem: t })
+    if (!chatMensagens.value.some((x) => x.id === data.id)) {
+      chatMensagens.value.push(data)
+    }
+    const conv = chatConversas.value.find((c) => c.pedido_id === data.pedido_id)
+    if (conv) conv.ultima = { id: data.id, mensagem: data.mensagem, remetente: data.remetente, criado_em: data.criado_em }
+    scrollChat()
+  } catch (err) {
+    chatTexto.value = t
+    showFeedback(err.response?.data?.error || 'Erro ao enviar mensagem', 'erro')
+  } finally {
+    chatEnviando.value = false
+  }
+}
+
+function verPedidoNoCard() {
+  if (!chatAtivo.value) return
+  const id = chatAtivo.value.pedido_id
+  fecharChat()
+  // Garantir que o pedido apareça no Quadro (limpa filtros e mostra o board)
+  filtroStatus.value = 'ativos'
+  filtroOrigem.value = 'todos'
+  filtroDataPeriodo.value = ''
+  filtroDataInicio.value = ''
+  filtroDataFim.value = ''
+  viewMode.value = 'cards'
+  loadOrders().then(() => {
+    setTimeout(() => {
+      const el = document.querySelector(`.board-card[data-order-id="${id}"]`)
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }, 150)
+  })
+}
 // ── Timer no formato do cliente (countdown + previsão), tick a cada 1s ──
 const nowTick = ref(Date.now())
 const timers = computed(() => {
@@ -529,10 +905,14 @@ const timers = computed(() => {
 async function loadOrders() {
   try {
     const params = {
-      status: filtroStatus.value || undefined,
       data_inicio: filtroDataInicio.value || undefined,
       data_fim: filtroDataFim.value || undefined,
-      limit: 200,
+      limit: 300,
+    }
+    // Status só vai ao backend quando explícito (Concluídos/Cancelados/Todos).
+    // 'ativos' é filtrado LOCALMENTE para o Quadro ter também os Finalizados.
+    if (filtroStatus.value && filtroStatus.value !== 'ativos') {
+      params.status = filtroStatus.value
     }
     if (filtroOrigem.value !== 'todos') {
       params.origem = filtroOrigem.value
@@ -544,6 +924,14 @@ async function loadOrders() {
     const { data } = await api.get('/pedidos', { params })
     orders.value = data
   } catch { /* ignore */ }
+}
+
+// Mantém o painel lateral sincronizado com a lista após mudanças
+function syncSelectedOrder() {
+  if (selectedOrder.value) {
+    const atualizado = orders.value.find(o => o.id === selectedOrder.value.id)
+    if (atualizado) selectedOrder.value = atualizado
+  }
 }
 
 async function loadResumo() {
@@ -560,6 +948,7 @@ async function changeStatus(orderId, newStatus) {
     await api.patch(`/pedidos/${orderId}/status`, { status: newStatus })
     await loadOrders()
     await loadResumo()
+    syncSelectedOrder()
   } catch (err) {
     showFeedback(err.response?.data?.error || 'Erro ao atualizar status', 'erro')
   } finally {
@@ -605,7 +994,6 @@ async function confirmarCancelamento() {
 }
 
 function abrirDetalhes(order) { selectedOrder.value = order }
-function abrirMensagem(order) { msgOrder.value = order; mensagemTexto.value = '' }
 
 function imprimirPedido(order) {
   const printWindow = window.open('', '_blank', 'width=400,height=600')
@@ -680,16 +1068,6 @@ function imprimirPedido(order) {
   }, 500)
 }
 
-async function enviarMensagem() {
-  globalLoading.value = true
-  loadingMessage.value = 'Enviando mensagem...'
-  try {
-    await api.post('/restaurante/mensagens', { pedido_id: msgOrder.value.id, mensagem: mensagemTexto.value })
-    msgOrder.value = null
-    showFeedback('Mensagem enviada!', 'success')
-  } catch { showFeedback('Erro ao enviar mensagem', 'erro') }
-  finally { globalLoading.value = false }
-}
 
 async function loadConfig() {
   try {
@@ -721,8 +1099,36 @@ onMounted(async () => {
   await loadOrders()
   await loadResumo()
   await loadConfig()
-  onEvent('pedido:novo', () => { loadOrders(); loadResumo() })
-  onEvent('pedido:atualizado', () => { loadOrders(); loadResumo() })
+  onEvent('pedido:novo', () => { loadOrders().then(syncSelectedOrder); loadResumo() })
+  onEvent('pedido:atualizado', () => { loadOrders().then(syncSelectedOrder); loadResumo() })
+
+  // Chat: badge inicial + atualizações em tempo real
+  carregarConversas()
+  onEvent('mensagem:novo', (m) => {
+    if (chatAberto.value && chatAtivo.value?.pedido_id === m.pedido_id) {
+      if (!chatMensagens.value.some((x) => x.id === m.id)) {
+        chatMensagens.value.push(m)
+        scrollChat()
+      }
+      marcarConversaLida(m.pedido_id)
+    } else {
+      const conv = chatConversas.value.find((c) => c.pedido_id === m.pedido_id)
+      if (conv) {
+        if (m.remetente === 'cliente') conv.nao_lidas = (conv.nao_lidas || 0) + 1
+        conv.ultima = { id: m.id, mensagem: m.mensagem, remetente: m.remetente, criado_em: m.criado_em }
+      } else {
+        carregarConversas()
+      }
+    }
+  })
+  onEvent('mensagem:lida', (data) => {
+    // Cliente leu → atualiza os recibos ✓✓ nas mensagens do restaurante
+    if (data.pedido_id && data.lida_cliente) {
+      chatMensagens.value.forEach((m) => {
+        if (m.remetente === 'restaurante') m.lida_cliente = true
+      })
+    }
+  })
 
   // Tick do timer (countdown do cliente) — 1s
   timerInterval = setInterval(() => { nowTick.value = Date.now() }, 1000)
@@ -770,9 +1176,292 @@ onUnmounted(() => {
 
 <style scoped>
 .modal-overlay {
-  position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 200;
+  position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 400;
   display: flex; align-items: center; justify-content: center; padding: 1rem;
 }
+
+/* ── Quadro de Expedição — réplica iFood Gestor de Pedidos ──
+   Valores extraídos do pedidos.mhtml (styled-components do iFood) */
+.ifood-board {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.ifood-lane {
+  display: flex;
+  flex-direction: column;
+  padding: 8px;
+  border-radius: 16px;
+  background-color: #F5F5F5;
+  gap: 4px;
+  overflow: hidden;
+}
+.ifood-lane-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 0 8px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-family: inherit;
+}
+.ifood-lane-title {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.ifood-lane-title h3 {
+  margin: 0;
+  font-size: 18px;
+  line-height: 24px;
+  color: #151515;
+  font-weight: 500;
+}
+.ifood-lane-count {
+  display: inline-block;
+  border: 1px solid #666;
+  background-color: #666;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  border-radius: 16px;
+  line-height: 16px;
+  padding: 0 8px;
+}
+.ifood-lane-header svg {
+  color: #EB0033;
+  flex-shrink: 0;
+  transition: transform 0.2s ease;
+}
+.ifood-lane-header svg.rotated { transform: rotate(180deg); }
+
+.ifood-lane-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  grid-auto-rows: max-content;
+  gap: 4px;
+}
+.ifood-lane-empty {
+  text-align: center;
+  color: #A3A3A3;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 16px;
+  padding: 18px 8px;
+  width: 100%;
+}
+
+/* Card (120–146px, número grande, nome, botão pill) */
+.ifood-card {
+  min-width: 120px;
+  max-width: 146px;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  box-sizing: border-box;
+  padding: 8px 12px;
+  background: #fff;
+  cursor: pointer;
+  border-radius: 16px;
+  border: 1px solid #EBEBEB;
+  position: relative;
+  transition: border-color 0.15s;
+}
+.ifood-card:hover { border-color: #CCC; }
+.ifood-card.urgente {
+  border-color: #EB0033;
+  box-shadow: #EB0033 0 0 0 1px inset;
+}
+.ifood-card.urgente:hover { border-color: #EB0033; }
+
+.ifood-card-num {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 500;
+  font-size: 32px;
+  line-height: 32px;
+  color: #151515;
+}
+.ifood-card-nome {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  text-transform: capitalize;
+  text-align: center;
+  font-weight: 500;
+  font-size: 14px;
+  line-height: 16px;
+  color: #666;
+}
+.ifood-card-chip {
+  text-align: center;
+  font-size: 11px;
+  color: #999;
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Botão pill do card (igual ao iFood, com barra de countdown branca) */
+.ifood-card-btn {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  overflow: hidden;
+  box-sizing: border-box;
+  margin-top: 12px;
+  width: 100%;
+  border-radius: 9999px;
+  font-family: inherit;
+  font-weight: 500;
+  font-size: 12px;
+  line-height: 16px;
+  padding: 2px 8px;
+  white-space: nowrap;
+  background-color: #EB0033;
+  color: #fff;
+  border: none;
+  cursor: pointer;
+  height: 24px;
+}
+.ifood-card-btn:hover { background-color: #FA5266; }
+.ifood-card-btn-bar {
+  position: absolute;
+  top: 0;
+  right: 0;
+  height: 100%;
+  width: 0;
+  background-color: rgba(255, 255, 255, 0.64);
+  pointer-events: none;
+}
+.ifood-card-btn-label {
+  position: relative;
+  z-index: 1;
+}
+.ifood-card-btn-muted {
+  background: transparent;
+  border: 1px solid #EBEBEB;
+  color: #666;
+  cursor: default;
+}
+.ifood-card-btn-muted:hover { background: transparent; }
+
+/* Barra de countdown: 0% → 100% no tempo do SLA (delay negativo = decorrido) */
+@keyframes ifood-countdown {
+  from { width: 0; }
+  to { width: 100%; }
+}
+
+/* ── Painel lateral de detalhes (estilo iFood) ── */
+.detail-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  z-index: 300;
+}
+.detail-drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(480px, 96vw);
+  background: var(--surface);
+  box-shadow: -8px 0 32px rgba(0,0,0,0.18);
+  z-index: 310;
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid var(--border);
+}
+.detail-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.1rem;
+  border-bottom: 1px solid var(--border);
+}
+.detail-header-left { display: flex; align-items: center; gap: 10px; }
+.detail-header-left h3 { font-size: 18px; margin: 0; color: #151515; font-weight: 600; }
+.detail-scroll { flex: 1; overflow-y: auto; padding: 1rem 1.1rem 2rem; }
+.detail-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: #717171;
+  flex-wrap: wrap;
+}
+.detail-dot { opacity: 0.5; }
+.detail-previsao {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 12px;
+  font-size: 14px;
+  color: #3E3E3E;
+}
+.detail-countdown { margin-left: auto; font-weight: 700; }
+.detail-status {
+  margin-top: 10px;
+  font-size: 16px;
+  font-weight: 600;
+  background: #fff;
+  border: 1px solid #EBEBEB;
+  border-radius: 8px;
+  padding: 14px 16px;
+}
+.detail-cliente { display: flex; flex-direction: column; gap: 6px; font-size: 0.9rem; }
+.detail-cliente a { color: #EB0033; text-decoration: none; font-weight: 500; }
+.detail-cliente span { display: flex; align-items: center; gap: 6px; color: #717171; }
+.detail-retirada { color: #EA1D2C; font-weight: 700; }
+.detail-item { padding: 8px 0; border-bottom: 1px solid #EBEBEB; }
+.detail-item:last-child { border-bottom: none; }
+.detail-item-row { display: flex; align-items: center; gap: 10px; }
+.ifood-item-thumb {
+  width: 52px;
+  height: 52px;
+  flex-shrink: 0;
+  border-radius: 16px;
+  background: #F5F5F5;
+  border: 1px solid #EBEBEB;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 700;
+  color: #3E3E3E;
+}
+.detail-item-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.detail-item-nome { font-weight: 500; font-size: 14px; color: #3E3E3E; }
+.detail-item-preco { font-size: 14px; font-weight: 500; color: #3E3E3E; }
+.detail-item-extra { font-size: 12px; color: #717171; margin: 2px 0 0 0; }
+.detail-item-obs { font-size: 12px; color: #717171; font-style: italic; }
+.detail-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 1.25rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+.detail-actions .btn { flex: 1 1 45%; justify-content: center; }
 .modal-content {
   background: white; border-radius: var(--radius); padding: 1.5rem;
   width: 100%; max-width: 500px; max-height: 80vh; overflow-y: auto;
@@ -918,6 +1607,10 @@ onUnmounted(() => {
   background: #dcfce7;
   color: #166534;
 }
+.origem-badge.ifood {
+  background: #ffedd5;
+  color: #c2410c;
+}
 .origem-badge svg {
   width: 12px;
   height: 12px;
@@ -936,6 +1629,298 @@ onUnmounted(() => {
 @keyframes slideDown {
   from { opacity: 0; transform: translateX(-50%) translateY(-10px); }
   to { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+/* ── Chat SuperSide bar ── */
+.chat-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  padding: 6px 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: var(--transition);
+  position: relative;
+}
+.chat-toggle-btn:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+.chat-toggle-badge {
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--primary);
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.chat-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  z-index: 350;
+}
+.chat-drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(400px, 94vw);
+  background: var(--surface);
+  box-shadow: -8px 0 32px rgba(0,0,0,0.18);
+  z-index: 360;
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid var(--border);
+}
+.chat-fade-enter-active, .chat-fade-leave-active { transition: opacity 0.2s ease; }
+.chat-fade-enter-from, .chat-fade-leave-to { opacity: 0; }
+.chat-slide-enter-active, .chat-slide-leave-active { transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1); }
+.chat-slide-enter-from, .chat-slide-leave-to { transform: translateX(100%); }
+
+.chat-drawer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.1rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+.chat-drawer-title h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 1rem;
+  margin: 0;
+}
+.chat-drawer-sub {
+  font-size: 0.72rem;
+  color: var(--primary);
+  font-weight: 700;
+}
+.chat-close {
+  border: none;
+  background: none;
+  font-size: 1rem;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 8px;
+  transition: var(--transition);
+}
+.chat-close:hover { background: var(--background); color: var(--text); }
+
+.chat-conversas {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.chat-empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  text-align: center;
+  padding: 2rem;
+}
+.chat-conversa {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  width: 100%;
+  text-align: left;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--background);
+  cursor: pointer;
+  transition: var(--transition);
+  font-family: inherit;
+}
+.chat-conversa:hover { border-color: var(--primary); background: var(--surface); }
+.chat-conv-avatar {
+  width: 38px;
+  height: 38px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--primary-light);
+  color: var(--primary-dark);
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.chat-conv-body { flex: 1; min-width: 0; }
+.chat-conv-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: center;
+}
+.chat-conv-time { font-size: 0.68rem; color: var(--text-muted); white-space: nowrap; }
+.chat-conv-mid {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin: 3px 0;
+}
+.chat-conv-ref { font-size: 0.75rem; color: var(--text-muted); font-weight: 600; }
+.chat-unread-badge {
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--primary);
+  color: #fff;
+  font-size: 0.68rem;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.chat-conv-preview {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.chat-thread {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.chat-thread-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+.chat-back {
+  border: none;
+  background: none;
+  color: var(--primary);
+  font-size: 1.1rem;
+  cursor: pointer;
+  padding: 4px 8px;
+}
+.chat-thread-title {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  line-height: 1.25;
+}
+.chat-thread-title strong { font-size: 0.9rem; }
+.chat-thread-title span { font-size: 0.72rem; color: var(--text-muted); }
+.chat-msgs {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0.9rem;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: var(--background);
+}
+.chat-msg {
+  display: flex;
+  flex-direction: column;
+  max-width: 82%;
+}
+.chat-msg.in { align-self: flex-start; align-items: flex-start; }
+.chat-msg.out { align-self: flex-end; align-items: flex-end; }
+.chat-bubble {
+  padding: 8px 12px;
+  border-radius: 14px;
+  font-size: 0.85rem;
+  line-height: 1.4;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.chat-msg.in .chat-bubble {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-bottom-left-radius: 4px;
+}
+.chat-msg.out .chat-bubble {
+  background: var(--primary);
+  color: #fff;
+  border-bottom-right-radius: 4px;
+}
+.chat-msg-meta {
+  font-size: 0.62rem;
+  color: var(--text-muted);
+  margin-top: 2px;
+  padding: 0 5px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.receipt { font-weight: 700; }
+.receipt.read { color: var(--primary); }
+.chat-input-bar {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  padding: 0.7rem 1rem;
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+}
+.chat-input-bar textarea {
+  flex: 1;
+  resize: none;
+  border: 1.5px solid var(--border);
+  border-radius: 18px;
+  padding: 8px 12px;
+  font-family: inherit;
+  font-size: 0.85rem;
+  outline: none;
+  max-height: 100px;
+  transition: border-color var(--transition);
+}
+.chat-input-bar textarea:focus { border-color: var(--primary); }
+.chat-send {
+  width: 38px;
+  height: 38px;
+  flex-shrink: 0;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+}
+.chat-send:disabled { opacity: 0.45; cursor: not-allowed; }
+.chat-somente-leitura {
+  padding: 0.6rem 1rem;
+  border-top: 1px solid var(--border);
+  background: var(--warning-light);
+  color: #92400e;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-align: center;
 }
 
 /* Refund status indicator */

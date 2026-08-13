@@ -48,7 +48,7 @@
           </div>
           <div class="delivery-address">
             <i-lucide-store style="width:16px;height:16px" />
-            <span>SaborExpress Cozinha — Av. Principal, 500</span>
+            <span>Kardapio Digital Cozinha — Av. Principal, 500</span>
           </div>
           <div class="delivery-address">
             <i-lucide-map-pin style="width:16px;height:16px" />

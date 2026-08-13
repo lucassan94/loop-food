@@ -8,7 +8,7 @@ import { query } from '../config/database.js';
 // Estratégia: subdomínio
 //   O tenant é identificado pelo primeiro segmento do header Host.
 //   Ex: "palazzomooca.cliente.app.com" → dominio = "palazzomooca"
-//   Ex: "saborexpress.admin.app.com" → dominio = "saborexpress"
+//   Ex: "kardapio.admin.app.com" → dominio = "kardapio"
 //
 // Cache:
 //   Os dados do tenant são cacheados em memória por 5 minutos para
@@ -170,7 +170,7 @@ async function resolveTenantBySlug(slug) {
  *
  * Isto permite navegar pelo cardápio de diferentes tenants sem configurar
  * DNS ou arquivo hosts, usando apenas URLs como:
- *   http://IP:8091/?slug=saborexpress
+ *   http://IP:8091/?slug=kardapio
  *   http://IP:8090/api/restaurante/?slug=palazzomooca
  */
 export async function tenantResolver(req, res, next) {

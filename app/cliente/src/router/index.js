@@ -17,6 +17,11 @@ const routes = [
     component: () => import('../views/TrackingView.vue'),
   },
   {
+    path: '/mensagens',
+    name: 'Mensagens',
+    component: () => import('../views/MensagensView.vue'),
+  },
+  {
     path: '/perfil',
     name: 'Profile',
     component: () => import('../views/ProfileView.vue'),

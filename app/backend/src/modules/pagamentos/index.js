@@ -75,9 +75,11 @@ router.post('/criar', authenticate, async (req, res, next) => {
         cep: z.string(),
         cidade: z.string().default('São Paulo'),
         estado: z.string().default('SP'),
-        // Coordenadas do CEP (enviadas pelo cliente) — usadas para validar o raio
-        latitude: z.number().optional(),
-        longitude: z.number().optional(),
+        // Coordenadas do CEP (enviadas pelo cliente) — usadas para validar o raio.
+        // Normaliza string → número (fontes de CEP podem devolver string);
+        // null/vazio/NaN vira ausente (evita coords 0,0).
+        latitude: z.preprocess((v) => { const n = v === null || v === undefined || String(v).trim() === '' ? NaN : Number(v); return Number.isFinite(n) ? n : undefined; }, z.number().optional()),
+        longitude: z.preprocess((v) => { const n = v === null || v === undefined || String(v).trim() === '' ? NaN : Number(v); return Number.isFinite(n) ? n : undefined; }, z.number().optional()),
       }),
       subtotal: z.number().positive(),
       valor_frete: z.number().min(0),

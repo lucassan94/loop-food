@@ -171,8 +171,11 @@ export async function buscarCEP(cep) {
           bairro: data.district || null,
           cidade: data.city || dadosBrasilAPI?.cidade || null,
           estado: data.state || dadosBrasilAPI?.estado || null,
-          latitude: String(data.lat),
-          longitude: String(data.lng),
+          // IMPORTANTE: retornar NÚMEROS (igual aos demais caminhos).
+          // Se vier string, o schema Zod de criação de pedido rejeita com
+          // "Dados inválidos" (latitude_cliente exige z.number()).
+          latitude: Number(data.lat),
+          longitude: Number(data.lng),
           origem: 'awesomeapi',
         };
       }

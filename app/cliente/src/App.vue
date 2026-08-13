@@ -40,6 +40,14 @@
       >
         <i-lucide-receipt style="width:20px;height:20px" />
         Pedidos
+      </button>
+      <button
+        class="bottom-nav-item"
+        :class="{ active: $route.name === 'Mensagens' }"
+        @click="$router.push('/mensagens')"
+      >
+        <i-lucide-message-circle style="width:20px;height:20px" />
+        Mensagens
         <span v-if="unreadMessages" class="badge">{{ unreadMessages }}</span>
       </button>
       <button
@@ -105,18 +113,19 @@
 </template>
 
 <script setup>
-import { ref, computed, provide, onMounted, onUnmounted, nextTick, markRaw } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, computed, provide, watch, onMounted, onUnmounted, nextTick, markRaw } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from './stores/auth'
 import { connectRealtime, onEvent, offEvent } from './services/realtime'
 import CheckoutPanel from './components/CheckoutPanel.vue'
 import CepOnboarding from './components/CepOnboarding.vue'
 import * as pushService from './services/push.js'
-import { Clock, Home, Receipt, User, ShoppingBag, Eye, ArrowRight, CheckCircle, XCircle, TriangleAlert, Info } from 'lucide-vue-next'
+import { Clock, Home, Receipt, User, MessageCircle, ShoppingBag, Eye, ArrowRight, CheckCircle, XCircle, TriangleAlert, Info } from 'lucide-vue-next'
 import api from './services/api'
 
 const authStore = useAuthStore()
 const $router = useRouter()
+const $route = useRoute()
 
 // Store state
 // Estado EFETIVO = toggle manual (status_loja) E janela de horários.
@@ -316,11 +325,11 @@ function updateCart(items) {
   }))
   cartItems.value = normalized
   // Save to localStorage
-  localStorage.setItem('saborexpress_cart', JSON.stringify(normalized))
+  localStorage.setItem('kardapio_cart', JSON.stringify(normalized))
 }
 
 function restoreCart() {
-  const saved = localStorage.getItem('saborexpress_cart')
+  const saved = localStorage.getItem('kardapio_cart') || localStorage.getItem('saborexpress_cart')
   if (saved) {
     try {
       const items = JSON.parse(saved)
@@ -360,13 +369,33 @@ provide('showCepModal', showCepModal)
 provide('storeOpen', storeOpen)
 provide('restaurantData', restaurantData)
 
+async function carregarNaoLidas() {
+  if (!authStore.isAuthenticated) {
+    unreadMessages.value = 0
+    return
+  }
+  try {
+    const { data } = await api.get('/pedidos/mensagens/nao-lidas')
+    unreadMessages.value = data.total || 0
+  } catch {
+    /* silencioso */
+  }
+}
+
+// Mantém o badge sempre sincronizado: recarrega a cada troca de rota
+// (ao entrar na aba Mensagens as leituras já foram feitas no servidor)
+watch(() => $route.name, () => {
+  carregarNaoLidas()
+})
+
 onMounted(async () => {
   window.addEventListener('scroll', handleScroll, { passive: true })
   await authStore.checkSession()
   restoreCart()
+  carregarNaoLidas()
 
   // CEP Onboarding: perguntar CEP na primeira visita
-  const cepSalvo = localStorage.getItem('saborexpress_cep')
+  const cepSalvo = localStorage.getItem('kardapio_cep') || localStorage.getItem('saborexpress_cep')
   if (!cepSalvo) {
     // Mostrar modal após um breve delay para não atrapalhar renderização
     setTimeout(() => {
@@ -388,9 +417,12 @@ onMounted(async () => {
     }
   })
 
-  onEvent('mensagem:novo', () => {
-    unreadMessages.value++
-    addToast('💬 Nova mensagem da cozinha!', 'warning')
+  onEvent('mensagem:novo', (data) => {
+    // Só conta como não lida se o REMETENTE for o restaurante (evita eco das próprias mensagens)
+    if (data?.remetente === 'restaurante') {
+      unreadMessages.value++
+      addToast('💬 Nova mensagem do restaurante!', 'warning')
+    }
   })    // Check store status & apply theme colors
     try {
       const { data } = await api.get('/restaurante')
@@ -443,7 +475,7 @@ async function pedirPermissaoNotificacao() {
   if (!pushService.pushSupported()) return
   if (pushService.permissionStatus() === 'granted') return
   if (pushService.permissionStatus() === 'denied') return
-  if (localStorage.getItem('saborexpress_push_declined')) return
+  if (localStorage.getItem('kardapio_push_declined') || localStorage.getItem('saborexpress_push_declined')) return
 
   // Mostrar toast convidativo para ativar notificações
   addToast('🔔 Ative notificações para saber quando seu pedido ficar pronto! Toque aqui.', 'info')

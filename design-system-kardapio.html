@@ -1,0 +1,1234 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kardapio Digital — Design System · Jornadas v3 + Visual v2.1</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Sora:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<!-- Iconografia: Lucide — a MESMA biblioteca dos apps (lucide-vue-next). Nenhum ícone ilustrativo/emoji. -->
+<script src="https://unpkg.com/lucide@1.30.0/dist/umd/lucide.js"></script>
+<style>
+/* ============================================================================
+   KARDAPIO DIGITAL · DESIGN SYSTEM
+   As JORNADAS do v3 (produto novo: hábito, ticket vivo, checkout 1-toque,
+   radar de operação, KDS por prazo, mapa de calor, momentos, séries)
+   com o VISUAL do design-system-proposta (v2.1: gradiente de marca,
+   Sora + Inter + JetBrains Mono, cantos generosos, sombras com glow, glass).
+   ============================================================================ */
+
+:root {
+  /* ── Marca (evolução) ── */
+  --brand-50:#fef2f2; --brand-100:#fee2e2; --brand-200:#fecaca; --brand-300:#fca5a5;
+  --brand-400:#f87171; --brand-500:#ef4444; --brand-600:#dc2626; --brand-700:#b91c1c;
+  --brand-800:#991b1b; --brand-900:#7f1d1d;
+  --accent-300:#fdba74; --accent-400:#fb923c; --accent-500:#f97316; --accent-600:#ea580c;
+  --gold-400:#fbbf24; --gold-500:#f59e0b; --gold-600:#d97706;
+
+  --grad-brand: linear-gradient(135deg, #dc2626 0%, #f97316 100%);
+  --grad-brand-deep: linear-gradient(135deg, #991b1b 0%, #dc2626 45%, #f97316 100%);
+  --grad-brand-soft: linear-gradient(135deg, rgba(220,38,38,.12) 0%, rgba(249,115,22,.12) 100%);
+  --grad-night: linear-gradient(160deg, #0f172a 0%, #1e293b 55%, #334155 100%);
+  --grad-gold: linear-gradient(135deg, #f59e0b 0%, #f97316 100%);
+
+  /* ── Estado ── */
+  --success-50:#f0fdf4; --success-500:#22c55e; --success-600:#16a34a; --success-700:#15803d;
+  --warning-50:#fffbeb; --warning-400:#fbbf24; --warning-500:#f59e0b; --warning-700:#b45309;
+  --danger-50:#fef2f2;  --danger-500:#ef4444;  --danger-600:#dc2626;
+  --info-50:#eff6ff;    --info-500:#3b82f6;   --info-600:#2563eb;
+  --violet-50:#f5f3ff;  --violet-500:#8b5cf6; --violet-600:#7c3aed;
+
+  /* ── Neutros claros (com toque quente) ── */
+  --bg:#f7f5f2;
+  --surface:#ffffff;
+  --surface-2:#faf8f5;
+  --text-1:#211d1a;
+  --text-2:#5d564f;
+  --text-3:#a89f95;
+  --border:#eae5de;
+  --border-strong:#d9d2c8;
+  --sidebar:#151820;
+
+  /* ── Tipografia ── */
+  --font-ui:'Inter',system-ui,sans-serif;
+  --font-display:'Sora','Inter',sans-serif;
+  --font-mono:'JetBrains Mono',ui-monospace,monospace;
+
+  /* ── Espaçamento ── */
+  --s-1:4px; --s-2:8px; --s-3:12px; --s-4:16px;
+  --s-5:24px; --s-6:32px; --s-7:48px; --s-8:64px; --s-9:96px;
+
+  /* ── Raio (generoso) ── */
+  --r-sm:8px; --r-md:12px; --r-lg:16px; --r-xl:24px; --r-2xl:32px; --r-3xl:40px; --r-full:999px;
+
+  /* ── Sombras (escala de elevação + glow) ── */
+  --shadow-xs:0 1px 2px rgba(33,29,26,.05);
+  --shadow-sm:0 1px 3px rgba(33,29,26,.06),0 1px 2px rgba(33,29,26,.04);
+  --shadow-md:0 4px 14px -2px rgba(33,29,26,.10),0 2px 4px -2px rgba(33,29,26,.05);
+  --shadow-lg:0 14px 36px -10px rgba(33,29,26,.16),0 4px 12px -4px rgba(33,29,26,.07);
+  --shadow-xl:0 28px 72px -20px rgba(33,29,26,.26),0 10px 28px -10px rgba(33,29,26,.10);
+  --shadow-elev:0 -6px 24px -6px rgba(33,29,26,.14);
+  --shadow-glow:0 8px 26px -6px rgba(220,38,38,.38);
+  --shadow-glow-accent:0 8px 26px -6px rgba(249,115,22,.38);
+  --shadow-card-hover:0 18px 44px -14px rgba(33,29,26,.18);
+
+  /* ── Glass ── */
+  --glass:rgba(255,255,255,.72);
+  --glass-border:rgba(255,255,255,.55);
+
+  --trans:cubic-bezier(.4,0,.2,1);
+  --ease-spring:cubic-bezier(.34,1.56,.64,1);
+  --nav-h:64px;
+}
+
+[data-theme="dark"] {
+  --bg:#0f1115;
+  --surface:#191d24;
+  --surface-2:#14171d;
+  --text-1:#f4f2ef;
+  --text-2:#b3aca3;
+  --text-3:#6d675f;
+  --border:#272c36;
+  --border-strong:#363c49;
+  --sidebar:#0b0d11;
+  --success-50:rgba(34,197,94,.12); --warning-50:rgba(245,158,11,.12);
+  --danger-50:rgba(239,68,68,.12);  --info-50:rgba(59,130,246,.12); --violet-50:rgba(139,92,246,.12);
+  --shadow-xs:0 1px 2px rgba(0,0,0,.35);
+  --shadow-sm:0 1px 3px rgba(0,0,0,.35),0 1px 2px rgba(0,0,0,.28);
+  --shadow-md:0 4px 14px -2px rgba(0,0,0,.45),0 2px 4px -2px rgba(0,0,0,.32);
+  --shadow-lg:0 14px 36px -10px rgba(0,0,0,.6),0 4px 12px -4px rgba(0,0,0,.4);
+  --shadow-xl:0 28px 72px -20px rgba(0,0,0,.75),0 10px 28px -10px rgba(0,0,0,.5);
+  --shadow-elev:0 -6px 24px -6px rgba(0,0,0,.5);
+  --glass:rgba(25,29,36,.7);
+  --glass-border:rgba(255,255,255,.08);
+}
+
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:var(--font-ui);background:var(--bg);color:var(--text-1);line-height:1.6;-webkit-font-smoothing:antialiased;transition:background .3s var(--trans),color .3s var(--trans)}
+::selection{background:rgba(220,38,38,.18)}
+.container{max-width:1180px;margin:0 auto;padding:0 var(--s-5)}
+::-webkit-scrollbar{width:8px;height:8px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border-strong);border-radius:4px}
+::-webkit-scrollbar-thumb:hover{background:var(--text-3)}
+button{font-family:inherit}
+a{color:inherit}
+:focus-visible{outline:2px solid var(--brand-600);outline-offset:2px;border-radius:6px}
+
+/* ============================================================
+   NAVBAR (glass)
+   ============================================================ */
+.navbar{position:sticky;top:0;z-index:100;height:var(--nav-h);background:var(--glass);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border-bottom:1px solid var(--border)}
+.navbar-inner{height:100%;display:flex;align-items:center;justify-content:space-between;gap:var(--s-4)}
+.brand{display:flex;align-items:center;gap:var(--s-3);font-family:var(--font-display);font-weight:700;font-size:1.02rem;letter-spacing:-.02em;color:var(--text-1);text-decoration:none}
+.brand-mark{width:38px;height:38px;border-radius:14px;background:var(--grad-brand);display:grid;place-items:center;color:#fff;box-shadow:var(--shadow-glow)}
+.brand small{display:block;font-family:var(--font-ui);font-weight:500;font-size:.6rem;color:var(--text-3);letter-spacing:.12em;text-transform:uppercase}
+.brand-mark svg.lucide{width:21px;height:21px}
+.nav-links{display:flex;align-items:center;gap:var(--s-1)}
+.nav-links a{padding:.45rem .85rem;border-radius:var(--r-md);font-size:.84rem;font-weight:500;color:var(--text-2);text-decoration:none;transition:all .2s var(--trans)}
+.nav-links a:hover{color:var(--text-1);background:var(--border)}
+.nav-links a.active{color:var(--brand-600);background:var(--brand-50)}
+[data-theme="dark"] .nav-links a.active{color:#fca5a5}
+.nav-actions{display:flex;align-items:center;gap:var(--s-3)}
+.theme-toggle{width:40px;height:40px;border-radius:var(--r-md);border:1px solid var(--border);background:var(--surface);color:var(--text-2);cursor:pointer;display:grid;place-items:center;transition:all .2s var(--trans)}
+.theme-toggle:hover{color:var(--brand-600);border-color:var(--brand-300);transform:translateY(-1px)}
+.theme-toggle svg.lucide{width:18px;height:18px}
+.btn-nav{display:inline-flex;align-items:center;gap:8px;padding:.55rem 1.15rem;border-radius:var(--r-md);border:none;cursor:pointer;background:var(--grad-brand);color:#fff;font-weight:600;font-size:.84rem;box-shadow:var(--shadow-glow);transition:all .2s var(--trans);text-decoration:none}
+.btn-nav:hover{transform:translateY(-1px);box-shadow:var(--shadow-glow),0 12px 24px -8px rgba(220,38,38,.4)}
+.btn-nav svg.lucide{width:15px;height:15px}
+
+/* ============================================================
+   HERO
+   ============================================================ */
+.hero{position:relative;overflow:hidden;padding:var(--s-8) 0 var(--s-7)}
+.hero::before{content:'';position:absolute;inset:0;pointer-events:none;background:radial-gradient(600px 340px at 85% -10%,rgba(249,115,22,.14),transparent 70%),radial-gradient(520px 300px at -5% 15%,rgba(220,38,38,.12),transparent 70%)}
+.hero-grid{position:relative;display:grid;grid-template-columns:1.15fr .85fr;gap:var(--s-7);align-items:center}
+.eyebrow{display:inline-flex;align-items:center;gap:8px;padding:.35rem .8rem;border-radius:var(--r-full);background:var(--grad-brand-soft);border:1px solid rgba(220,38,38,.18);color:var(--brand-700);font-size:.7rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
+[data-theme="dark"] .eyebrow{color:#fca5a5}
+.eyebrow .dot{width:7px;height:7px;border-radius:50%;background:var(--brand-600);animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(.75)}}
+.hero h1{margin:var(--s-4) 0 var(--s-3);font-family:var(--font-display);font-size:clamp(2.2rem,5vw,3.3rem);font-weight:800;line-height:1.12;letter-spacing:-.03em}
+.hero h1 .grad{background:var(--grad-brand);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+.hero p.lead{font-size:1.04rem;color:var(--text-2);max-width:56ch}
+.hero-cta{display:flex;gap:var(--s-3);margin-top:var(--s-5);flex-wrap:wrap}
+.hero-meta{display:flex;gap:var(--s-5);margin-top:var(--s-6);flex-wrap:wrap}
+.hero-meta .meta-item{display:flex;flex-direction:column}
+.hero-meta .meta-item b{font-family:var(--font-display);font-size:1.35rem;font-weight:800}
+.hero-meta .meta-item b .grad{background:var(--grad-brand);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+.hero-meta .meta-item span{font-size:.74rem;color:var(--text-3);text-transform:uppercase;letter-spacing:.08em;font-weight:600}
+
+/* Mock de tela no hero (estilo v2.1) */
+.hero-mock{position:relative;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-2xl);box-shadow:var(--shadow-xl);overflow:hidden;animation:float 7s ease-in-out infinite}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+.mock-bar{display:flex;align-items:center;gap:6px;padding:.7rem 1rem;border-bottom:1px solid var(--border);background:var(--surface-2)}
+.mock-bar i{width:10px;height:10px;border-radius:50%;display:inline-block}
+.mock-bar i:nth-child(1){background:#f87171}.mock-bar i:nth-child(2){background:#fbbf24}.mock-bar i:nth-child(3){background:#4ade80}
+.mock-bar span{margin-left:8px;font-size:.7rem;color:var(--text-3);font-family:var(--font-mono)}
+.mock-body{padding:1.1rem}
+.mock-title{display:flex;justify-content:space-between;align-items:center;margin-bottom:.9rem}
+.mock-title b{font-family:var(--font-display);font-size:.95rem}
+.pill{display:inline-flex;align-items:center;gap:5px;padding:.28rem .7rem;border-radius:var(--r-full);font-size:.66rem;font-weight:700;letter-spacing:.03em}
+.pill-warning{background:var(--warning-50);color:var(--warning-700)}
+.pill-success{background:var(--success-50);color:var(--success-700)}
+.pill-info{background:var(--info-50);color:var(--info-600)}
+.pill-violet{background:var(--violet-50);color:var(--violet-600)}
+.pill-danger{background:var(--danger-50);color:var(--danger-600)}
+.pill-dot{width:6px;height:6px;border-radius:50%;display:inline-block}
+.mock-row{display:flex;justify-content:space-between;align-items:center;padding:.75rem .9rem;border-radius:var(--r-lg);border:1px solid var(--border);margin-bottom:.6rem;background:var(--surface-2);animation:slidein .5s var(--ease-spring) both}
+.mock-row:nth-child(2){animation-delay:.15s}.mock-row:nth-child(3){animation-delay:.3s}
+@keyframes slidein{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+.mock-row .l{display:flex;align-items:center;gap:10px}
+.mock-avatar{width:34px;height:34px;border-radius:var(--r-md);background:var(--grad-brand-soft);border:1px solid rgba(220,38,38,.2);display:grid;place-items:center}
+.mock-avatar svg.lucide{width:16px;height:16px;color:var(--brand-600)}
+.mock-row b{display:block;font-size:.82rem}
+.mock-row small{color:var(--text-3);font-size:.68rem}
+.timer{font-family:var(--font-mono);font-weight:600;font-size:.8rem;color:var(--text-2)}
+.timer.urgent{color:var(--danger-600)}
+.timer.warn{color:var(--warning-500)}
+.progress{height:6px;border-radius:var(--r-full);background:var(--border);overflow:hidden;margin-top:.9rem}
+.progress span{display:block;height:100%;width:68%;background:var(--grad-brand);border-radius:var(--r-full);animation:grow 2.4s var(--ease-spring) both}
+@keyframes grow{from{width:4%}}
+
+/* ============================================================
+   SEÇÕES
+   ============================================================ */
+.section{padding:var(--s-7) 0;border-top:1px solid var(--border);scroll-margin-top:var(--nav-h)}
+.section-head{margin-bottom:var(--s-6)}
+.section-head .kicker{font-family:var(--font-mono);font-size:.75rem;font-weight:600;color:var(--brand-600);letter-spacing:.1em;text-transform:uppercase}
+[data-theme="dark"] .section-head .kicker{color:#fca5a5}
+.section-head h2{font-family:var(--font-display);font-size:clamp(1.5rem,3vw,2.1rem);font-weight:800;letter-spacing:-.02em;margin-top:var(--s-1)}
+.section-head p{color:var(--text-2);margin-top:var(--s-2);max-width:66ch;font-size:.95rem}
+.grid-2{display:grid;grid-template-columns:repeat(2,1fr);gap:var(--s-5)}
+.grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:var(--s-5)}
+.grid-4{display:grid;grid-template-columns:repeat(4,1fr);gap:var(--s-4)}
+@media (max-width:900px){.hero-grid,.grid-2{grid-template-columns:1fr}.grid-3,.grid-4{grid-template-columns:repeat(2,1fr)}.nav-links{display:none}}
+@media (max-width:560px){.grid-3,.grid-4{grid-template-columns:1fr}}
+
+.principle{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-xl);padding:var(--s-5);transition:all .25s var(--trans);position:relative;overflow:hidden}
+.principle:hover{transform:translateY(-4px);box-shadow:var(--shadow-lg);border-color:var(--border-strong)}
+.principle .ico{width:44px;height:44px;border-radius:var(--r-md);background:var(--grad-brand-soft);border:1px solid rgba(220,38,38,.2);display:grid;place-items:center;margin-bottom:var(--s-3)}
+.principle .ico svg.lucide{width:22px;height:22px;color:var(--brand-600)}
+.principle h3{font-family:var(--font-display);font-size:1.02rem;font-weight:700;margin-bottom:6px}
+.principle p{font-size:.85rem;color:var(--text-2)}
+
+/* ============================================================
+   COMPONENTES BASE (v2.1)
+   ============================================================ */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:.62rem 1.3rem;border-radius:var(--r-md);border:1px solid transparent;cursor:pointer;font-weight:600;font-size:.875rem;transition:all .18s var(--trans);white-space:nowrap;position:relative}
+.btn:active{transform:scale(.97)}
+.btn svg.lucide{width:16px;height:16px}
+.btn-primary{background:var(--grad-brand);color:#fff;box-shadow:var(--shadow-glow)}
+.btn-primary:hover{transform:translateY(-2px);box-shadow:0 14px 30px -8px rgba(220,38,38,.5)}
+.btn-accent{background:linear-gradient(135deg,#f97316,#f59e0b);color:#fff;box-shadow:0 8px 24px -6px rgba(249,115,22,.4)}
+.btn-accent:hover{transform:translateY(-2px);box-shadow:0 12px 26px -8px rgba(249,115,22,.5)}
+.btn-dark{background:var(--text-1);color:var(--bg)}
+.btn-dark:hover{transform:translateY(-2px);opacity:.9}
+.btn-outline{background:transparent;border-color:var(--border-strong);color:var(--text-1)}
+.btn-outline:hover{border-color:var(--brand-600);color:var(--brand-600);background:var(--brand-50)}
+.btn-ghost{background:transparent;color:var(--text-2)}
+.btn-ghost:hover{background:var(--border);color:var(--text-1)}
+.btn-success{background:var(--success-600);color:#fff}
+.btn-success:hover{background:var(--success-700);transform:translateY(-2px)}
+.btn-danger{background:var(--danger-500);color:#fff}
+.btn-danger:hover{background:var(--danger-600);transform:translateY(-2px)}
+.btn-violet{background:var(--violet-600);color:#fff}
+.btn-violet:hover{background:#6d28d9;transform:translateY(-2px)}
+.btn-sm{padding:.44rem .9rem;font-size:.76rem;border-radius:var(--r-sm)}
+.btn-lg{padding:.85rem 1.8rem;font-size:.95rem;border-radius:var(--r-lg)}
+.btn-icon{padding:.6rem;border-radius:var(--r-md)}
+.btn:disabled{opacity:.5;cursor:not-allowed;transform:none!important;box-shadow:none!important}
+.btn-block{width:100%}
+.btn-group{display:flex;gap:var(--s-2);flex-wrap:wrap;align-items:center}
+
+.badge{display:inline-flex;align-items:center;gap:6px;padding:.28rem .8rem;border-radius:var(--r-full);font-size:.72rem;font-weight:700;letter-spacing:.02em;border:1px solid transparent}
+.badge .bdot{width:6px;height:6px;border-radius:50%;display:inline-block}
+.badge-status{text-transform:uppercase;letter-spacing:.06em;font-size:.64rem}
+.badge-soft-success{background:var(--success-50);color:var(--success-700)}.badge-soft-success .bdot{background:var(--success-500)}
+.badge-soft-warning{background:var(--warning-50);color:var(--warning-700)}.badge-soft-warning .bdot{background:var(--warning-500)}
+.badge-soft-info{background:var(--info-50);color:var(--info-600)}.badge-soft-info .bdot{background:var(--info-500)}
+.badge-soft-violet{background:var(--violet-50);color:var(--violet-600)}.badge-soft-violet .bdot{background:var(--violet-500)}
+.badge-soft-danger{background:var(--danger-50);color:var(--danger-600)}.badge-soft-danger .bdot{background:var(--danger-500)}
+.badge-solid-success{background:var(--success-600);color:#fff}
+.badge-solid-warning{background:var(--warning-500);color:#fff}
+.badge-solid-info{background:var(--info-600);color:#fff}
+.badge-solid-violet{background:var(--violet-600);color:#fff}
+.badge-solid-danger{background:var(--danger-500);color:#fff}
+
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-xl);padding:var(--s-5);transition:all .22s var(--trans);position:relative;overflow:hidden}
+.stat-card:hover{transform:translateY(-3px);box-shadow:var(--shadow-lg)}
+.stat-card .sc-top{display:flex;justify-content:space-between;align-items:flex-start}
+.stat-card .sc-ico{width:40px;height:40px;border-radius:var(--r-md);display:grid;place-items:center}
+.sc-ico.red{background:var(--brand-50)}.sc-ico.green{background:var(--success-50)}
+.sc-ico.amber{background:var(--warning-50)}.sc-ico.blue{background:var(--info-50)}
+.sc-ico.violet{background:var(--violet-50)}
+.sc-ico svg.lucide{width:20px;height:20px}
+.stat-card .sc-label{font-size:.72rem;color:var(--text-3);font-weight:600;text-transform:uppercase;letter-spacing:.06em}
+.stat-card .sc-value{font-family:var(--font-display);font-size:1.7rem;font-weight:800;letter-spacing:-.02em;margin-top:2px}
+.stat-card .sc-trend{font-size:.72rem;font-weight:700;margin-top:4px;display:inline-flex;align-items:center;gap:4px}
+.sc-trend.up{color:var(--success-600)}.sc-trend.down{color:var(--danger-600)}
+
+.order-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:var(--s-4);border-left:4px solid var(--border-strong);transition:all .22s var(--trans)}
+.order-card:hover{box-shadow:var(--shadow-md);transform:translateY(-2px)}
+.order-card.oc-pendente{border-left-color:var(--warning-400)}
+.order-card.oc-preparando{border-left-color:var(--info-500)}
+.order-card.oc-pronto{border-left-color:var(--violet-500)}
+.order-card.oc-transito{border-left-color:var(--accent-500)}
+.order-card.oc-entregue{border-left-color:var(--success-500)}
+.order-card.oc-cancelado{border-left-color:var(--danger-500);opacity:.7}
+.oc-head{display:flex;justify-content:space-between;align-items:flex-start;gap:var(--s-3)}
+.oc-head b{font-family:var(--font-display);font-size:1rem;font-weight:800}
+.oc-head .oc-id{font-family:var(--font-mono);font-size:.72rem;color:var(--text-3)}
+.oc-items{font-size:.82rem;color:var(--text-2);margin:8px 0;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.oc-foot{display:flex;justify-content:space-between;align-items:center;margin-top:var(--s-3);padding-top:var(--s-3);border-top:1px dashed var(--border)}
+.oc-total{font-weight:800;font-size:.95rem}
+
+.countdown{display:inline-flex;align-items:center;gap:8px;padding:.34rem .85rem;border-radius:var(--r-md);background:var(--surface-2);border:1px solid var(--border);font-family:var(--font-mono);font-size:.76rem;font-weight:600}
+.countdown .cd-ico{display:inline-flex}
+.countdown .cd-ico svg.lucide{width:13px;height:13px}
+.countdown.urgent{background:var(--danger-50);border-color:rgba(239,68,68,.3);color:var(--danger-600);animation:blink 1.6s infinite}
+.countdown.warn{background:var(--warning-50);border-color:rgba(245,158,11,.35);color:var(--warning-700)}
+[data-theme="dark"] .countdown.warn{color:#fcd34d}
+@keyframes blink{50%{opacity:.65}}
+
+.kds-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-xl);padding:var(--s-4);border-top:4px solid var(--info-500);transition:all .22s var(--trans)}
+.kds-card:hover{box-shadow:var(--shadow-lg);transform:translateY(-3px)}
+.kds-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:var(--s-2)}
+.kds-top b{font-family:var(--font-display);font-size:.98rem}
+.kds-top .kds-prazo{font-family:var(--font-mono);font-size:.68rem;color:var(--text-3)}
+.kds-items{background:var(--surface-2);border-radius:var(--r-md);padding:var(--s-3);margin:var(--s-2) 0;font-size:.84rem}
+.kds-items .kds-item{display:flex;justify-content:space-between;padding:3px 0}
+.kds-items .qty{font-weight:800;color:var(--brand-600)}
+[data-theme="dark"] .kds-items .qty{color:#fca5a5}
+.kds-timer{display:flex;justify-content:space-between;align-items:center;margin-top:var(--s-3);font-family:var(--font-mono);font-size:.72rem;color:var(--text-2)}
+.kds-progress{height:8px;border-radius:var(--r-full);background:var(--border);overflow:hidden;margin-top:var(--s-2)}
+.kds-progress span{display:block;height:100%;background:linear-gradient(90deg,var(--info-500),var(--violet-500));border-radius:var(--r-full);transition:width .6s var(--trans)}
+
+/* stepper (jornada do ticket vivo) */
+.stepper{display:flex;align-items:flex-start;gap:0;margin:var(--s-4) 0}
+.stepper .stp{flex:1;display:flex;flex-direction:column;align-items:center;position:relative;text-align:center}
+.stepper .stp::before{content:'';position:absolute;top:14px;left:-50%;width:100%;height:2px;background:var(--border)}
+.stepper .stp:first-child::before{display:none}
+.stepper .stp .st-ico{width:30px;height:30px;border-radius:50%;background:var(--surface-2);border:2px solid var(--border-strong);display:grid;place-items:center;z-index:1;transition:all .3s var(--trans)}
+.stepper .st-ico svg.lucide{width:15px;height:15px}
+.stepper .stp.done .st-ico{background:var(--success-600);border-color:var(--success-600);color:#fff}
+.stepper .stp.done::before{background:var(--success-500)}
+.stepper .stp.active .st-ico{background:var(--grad-brand);border-color:var(--brand-600);color:#fff;box-shadow:var(--shadow-glow);animation:pulse 1.6s infinite}
+.stepper .stp.active::before{background:var(--success-500)}
+.stepper .stp .st-lbl{font-size:.62rem;font-weight:600;color:var(--text-3);margin-top:6px}
+.stepper .stp.done .st-lbl,.stepper .stp.active .st-lbl{color:var(--text-1)}
+
+/* hold-to-confirm (jornada checkout 1-toque) */
+.hold-btn{position:relative;overflow:hidden;width:100%;height:56px;border-radius:var(--r-lg);border:none;background:var(--grad-brand);color:#fff;font-weight:800;font-size:.82rem;letter-spacing:.04em;cursor:pointer;user-select:none;touch-action:none;box-shadow:var(--shadow-glow)}
+.hold-btn .hb-fill{position:absolute;left:0;top:0;bottom:0;width:0;background:rgba(153,27,27,.45);border-radius:var(--r-lg)}
+.hold-btn .hb-txt{position:relative;z-index:1;display:flex;align-items:center;justify-content:center;gap:8px;height:100%}
+.hold-btn .hb-txt svg.lucide{width:17px;height:17px}
+.hold-btn.holding .hb-fill{transition:width .22s linear}
+
+/* mapa de calor (jornada E6) */
+.heatmap{position:relative;height:140px;border-radius:var(--r-lg);background:var(--sidebar);overflow:hidden}
+.heatmap .hm-glow{position:absolute;border-radius:50%;filter:blur(18px);opacity:.65}
+.heatmap .hm-pin{position:absolute;width:9px;height:9px;border-radius:50%;background:var(--grad-brand);border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.4);transform:translate(-50%,-50%)}
+.heatmap .hm-label{position:absolute;bottom:8px;left:12px;color:#fff;font-family:var(--font-mono);font-size:.6rem;opacity:.85}
+.heat-demo-bar{display:flex;align-items:flex-end;gap:6px;height:100px;margin-top:var(--s-3)}
+.heat-demo-bar i{flex:1;border-radius:4px 4px 0 0;background:var(--grad-brand)}
+.heat-demo-bar i:nth-child(1){height:40%}.heat-demo-bar i:nth-child(2){height:65%}.heat-demo-bar i:nth-child(3){height:90%}.heat-demo-bar i:nth-child(4){height:55%}.heat-demo-bar i:nth-child(5){height:100%}
+
+/* séries (jornada E8) */
+.series-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-xl);padding:var(--s-5)}
+.series-card .sr-row{display:flex;align-items:center;gap:var(--s-3);padding:var(--s-3) 0;border-bottom:1px dashed var(--border)}
+.series-card .sr-row:last-child{border-bottom:none}
+.series-card .sr-ic{width:40px;height:40px;border-radius:var(--r-md);background:var(--grad-brand-soft);display:grid;place-items:center;color:var(--brand-600)}
+.series-card .sr-ic svg.lucide{width:20px;height:20px}
+.series-card .sr-prog{flex:1}
+.series-card .sr-prog .sr-bar{height:8px;border-radius:var(--r-full);background:var(--border);overflow:hidden}
+.series-card .sr-prog .sr-bar span{display:block;height:100%;background:var(--grad-brand);border-radius:var(--r-full)}
+.series-card .sr-meta{font-family:var(--font-mono);font-size:.68rem;color:var(--text-3);min-width:96px;text-align:right}
+.series-card .sr-name{font-size:.84rem;font-weight:700}
+
+/* momentos (jornada E7) */
+.momento-row{display:flex;align-items:center;gap:var(--s-3);padding:var(--s-3);border-radius:var(--r-lg);border:1px solid var(--border);background:var(--surface-2);margin-bottom:var(--s-2);transition:all .2s var(--trans)}
+.momento-row:hover{border-color:var(--brand-300);background:var(--surface);box-shadow:var(--shadow-sm)}
+.momento-row .m-ic{width:38px;height:38px;border-radius:var(--r-md);display:grid;place-items:center;flex-shrink:0}
+.momento-row .m-ic svg.lucide{width:18px;height:18px}
+.momento-row b{font-size:.84rem;display:block}
+.momento-row small{font-size:.7rem;color:var(--text-3)}
+
+/* ============================================================
+   EXPERIÊNCIAS (jornadas v3 com visual v2.1)
+   ============================================================ */
+.xp-grid{display:grid;grid-template-columns:1fr 1fr;gap:var(--s-5)}
+@media (max-width:900px){.xp-grid{grid-template-columns:1fr}}
+.xp-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-2xl);overflow:hidden;transition:all .25s var(--trans)}
+.xp-card:hover{transform:translateY(-4px);box-shadow:var(--shadow-card-hover);border-color:var(--border-strong)}
+.xp-head{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-bottom:1px solid var(--border);background:var(--surface-2)}
+.xp-head .x-id{font-family:var(--font-mono);font-size:.64rem;font-weight:700;letter-spacing:.1em;color:var(--brand-600);background:var(--brand-50);border-radius:var(--r-full);padding:3px 10px}
+[data-theme="dark"] .xp-head .x-id{color:#fca5a5}
+.xp-head .x-tag{font-size:.6rem;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:.07em}
+.xp-body{padding:var(--s-5)}
+.xp-body h3{font-family:var(--font-display);font-size:1.12rem;font-weight:800;letter-spacing:-.01em;margin-bottom:6px}
+.xp-body>p{font-size:.84rem;color:var(--text-2);margin-bottom:var(--s-4)}
+.xp-demo{border:1px solid var(--border);border-radius:var(--r-lg);background:var(--surface-2);padding:var(--s-4);min-height:120px;position:relative}
+.xp-demo .demo-row{display:flex;justify-content:space-between;align-items:center;border:1px solid var(--border);background:var(--surface);border-radius:var(--r-md);padding:9px 12px;margin-bottom:8px;font-size:.8rem}
+.xp-demo .demo-row b{font-family:var(--font-display);font-size:.84rem;font-weight:700}
+.xp-demo .demo-row small{font-family:var(--font-mono);font-size:.6rem;color:var(--text-3)}
+
+/* paleta de comandos (E4) */
+.palette-demo{background:var(--grad-night);border-radius:var(--r-lg);padding:var(--s-4);color:#e2e8f0;box-shadow:var(--shadow-lg)}
+.palette-demo .pd-input{display:flex;align-items:center;gap:10px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.14);border-radius:var(--r-md);padding:12px;font-family:var(--font-mono);font-size:.84rem}
+.palette-demo .pd-input svg.lucide{width:16px;height:16px;color:#fdba74}
+.palette-demo .pd-list{display:grid;gap:6px;margin-top:10px}
+.palette-demo .pd-item{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;border:1px solid rgba(255,255,255,.1);border-radius:var(--r-sm);font-size:.78rem;cursor:pointer}
+.palette-demo .pd-item.hl{background:var(--grad-brand-soft);border-color:rgba(249,115,22,.4)}
+.palette-demo .pd-item kbd{font-family:var(--font-mono);font-size:.6rem;border:1px solid currentColor;border-radius:4px;padding:1px 6px;opacity:.8}
+
+/* ============================================================
+   SIMULADOR DO APP (celular, visual v2.1 + jornadas v3)
+   ============================================================ */
+.sim-shell{display:flex;gap:var(--s-7);align-items:center;justify-content:center;flex-wrap:wrap}
+.phone{width:340px;height:700px;border-radius:44px;position:relative;background:var(--surface);border:8px solid var(--text-1);box-shadow:var(--shadow-xl);overflow:hidden;flex-shrink:0}
+.phone-notch{position:absolute;top:0;left:50%;transform:translateX(-50%);width:120px;height:22px;background:var(--text-1);border-radius:0 0 14px 14px;z-index:40}
+.phone-status{position:absolute;top:4px;left:0;right:0;z-index:41;display:flex;justify-content:space-between;padding:6px 20px;font-size:.6rem;font-weight:600;color:var(--text-1);font-family:var(--font-mono)}
+[data-theme="dark"] .phone-status{color:#fff}
+.phone-status svg.lucide{width:11px;height:11px}
+.phone-screen{position:absolute;inset:0;overflow:hidden;background:var(--bg)}
+.phone-screen .screen{padding:34px 14px 14px;height:100%;overflow-y:auto;position:relative}
+.phone-screen .screen::-webkit-scrollbar{width:0}
+.sim-tabbar{position:absolute;left:10px;right:10px;bottom:10px;height:58px;border-radius:22px;background:var(--glass);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border:1px solid var(--glass-border);box-shadow:var(--shadow-lg);display:flex;align-items:center;justify-content:space-around;z-index:30}
+.sim-tabbar button{display:flex;flex-direction:column;align-items:center;gap:2px;font-size:.55rem;font-weight:700;color:var(--text-3);padding:6px 12px;border-radius:16px;cursor:pointer;border:none;background:none;transition:all .18s var(--trans)}
+.sim-tabbar button svg.lucide{width:19px;height:19px}
+.sim-tabbar button.active{color:var(--brand-600)}
+[data-theme="dark"] .sim-tabbar button.active{color:#fca5a5}
+/* sim habit (E1) */
+.sim-habit{border-radius:var(--r-xl);background:var(--grad-brand-deep);color:#fff;padding:16px;margin-bottom:12px;box-shadow:var(--shadow-glow);position:relative;overflow:hidden}
+.sim-habit::after{content:'';position:absolute;inset:0;background:radial-gradient(80% 90% at 90% 0%,rgba(255,255,255,.18),transparent 60%)}
+.sim-habit .h-top{display:flex;justify-content:space-between;font-family:var(--font-mono);font-size:.56rem;letter-spacing:.1em;text-transform:uppercase;opacity:.85;margin-bottom:8px;position:relative;z-index:1}
+.sim-habit h2{font-family:var(--font-display);font-size:1.12rem;font-weight:800;line-height:1.15;position:relative;z-index:1}
+.sim-habit .h-rep{display:flex;align-items:center;gap:8px;margin-top:12px;background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.3);border-radius:var(--r-md);padding:8px 10px;font-size:.68rem;position:relative;z-index:1;backdrop-filter:blur(6px)}
+.sim-habit .h-rep .go{background:#fff;color:var(--brand-700);border:none;font-weight:800;font-size:.62rem;text-transform:uppercase;padding:6px 12px;border-radius:var(--r-full);cursor:pointer;margin-left:auto}
+.sim-search{display:flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-full);padding:10px 14px;margin-bottom:12px;box-shadow:var(--shadow-sm)}
+.sim-search svg.lucide{width:15px;height:15px;opacity:.5}
+.sim-search input{border:none;background:none;outline:none;flex:1;font-size:.78rem;color:var(--text-1)}
+.sim-cats{display:flex;gap:7px;overflow-x:auto;padding-bottom:8px;margin-bottom:10px}
+.sim-cats::-webkit-scrollbar{display:none}
+.sim-cat{flex-shrink:0;display:inline-flex;align-items:center;gap:6px;padding:7px 13px;border-radius:var(--r-full);border:1px solid var(--border-strong);background:var(--surface);font-size:.66rem;font-weight:600;cursor:pointer;transition:all .18s var(--trans)}
+.sim-cat svg.lucide{width:13px;height:13px}
+.sim-cat.active{border-color:var(--brand-600);color:var(--brand-700);background:var(--brand-50)}
+[data-theme="dark"] .sim-cat.active{color:#fca5a5}
+.sim-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding-bottom:66px}
+.sim-prod{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden;cursor:pointer;transition:all .2s var(--ease-spring);box-shadow:var(--shadow-xs)}
+.sim-prod:hover{transform:translateY(-3px);box-shadow:var(--shadow-md)}
+.p-img{height:76px;border-bottom:1px solid var(--border);display:grid;place-items:center;position:relative}
+.p-img svg.lucide{width:38px;height:38px;color:#fff;stroke-width:1.6}
+.p-img .p-tag{position:absolute;top:6px;left:8px;background:rgba(0,0,0,.5);color:#fff;font-size:.5rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;padding:2px 8px;border-radius:var(--r-full);backdrop-filter:blur(4px)}
+.p-body{padding:9px 11px}
+.p-body b{font-size:.74rem;font-weight:700;display:block;line-height:1.2}
+.p-body .p-desc{font-size:.58rem;color:var(--text-3);margin:3px 0 7px;line-height:1.3}
+.p-foot{display:flex;justify-content:space-between;align-items:center}
+.p-price{font-family:var(--font-display);font-size:.86rem;font-weight:800}
+.p-add{width:26px;height:26px;border:none;border-radius:var(--r-full);background:var(--grad-brand);color:#fff;font-size:1rem;font-weight:700;cursor:pointer;display:grid;place-items:center;box-shadow:0 4px 12px rgba(220,38,38,.35);transition:transform .18s var(--ease-spring)}
+.p-add:active{transform:scale(.82)}
+/* mini cart (E3) */
+.sim-minicart{position:absolute;left:10px;right:10px;bottom:76px;border-radius:18px;background:var(--grad-brand-deep);color:#fff;display:flex;align-items:center;justify-content:space-between;padding:0 8px 0 14px;height:56px;box-shadow:var(--shadow-glow);cursor:pointer;z-index:31;opacity:0;pointer-events:none;transform:translateY(10px);transition:all .3s var(--ease-spring)}
+.sim-minicart.show{opacity:1;pointer-events:auto;transform:none}
+.sim-minicart .mc-l{display:flex;align-items:center;gap:10px;font-size:.7rem;font-weight:600}
+.sim-minicart .mc-l svg.lucide{width:20px;height:20px}
+.sim-minicart .mc-l b{font-family:var(--font-display);font-size:.88rem;font-weight:800;display:block}
+.sim-minicart .mc-go{width:36px;height:36px;border-radius:12px;background:#fff;color:var(--brand-600);display:grid;place-items:center}
+.sim-minicart .mc-go svg.lucide{width:18px;height:18px}
+/* sheet */
+.sim-sheet{position:absolute;inset:0;z-index:45;display:none}
+.sim-sheet.open{display:block}
+.sheet-back{position:absolute;inset:0;background:rgba(15,23,42,.45);backdrop-filter:blur(3px)}
+.sheet{position:absolute;left:0;right:0;bottom:0;background:var(--surface);border-radius:var(--r-2xl) var(--r-2xl) 0 0;box-shadow:var(--shadow-elev);padding:var(--s-4);animation:sheetup .35s var(--ease-spring)}
+@keyframes sheetup{from{transform:translateY(80px);opacity:0}to{transform:none;opacity:1}}
+.sheet .sheet-hero{height:86px;border-radius:var(--r-lg);display:grid;place-items:center;margin-bottom:12px}
+.sheet .sheet-hero svg.lucide{width:46px;height:46px;color:#fff;stroke-width:1.6}
+.sheet .s-title{font-family:var(--font-display);font-size:1.02rem;font-weight:800}
+.sheet .s-desc{font-size:.72rem;color:var(--text-3);margin:4px 0 10px}
+.sheet-opt{display:flex;justify-content:space-between;border:1px solid var(--border);border-radius:var(--r-md);padding:9px 12px;font-size:.74rem;cursor:pointer;font-weight:600;margin-bottom:7px;transition:all .15s}
+.sheet-opt.active{background:var(--grad-brand-soft);border-color:rgba(220,38,38,.35)}
+.sheet .s-qty{display:flex;align-items:center;justify-content:center;gap:14px;margin-bottom:12px}
+.sheet .s-qty button{width:32px;height:32px;border:1px solid var(--border-strong);border-radius:var(--r-full);background:var(--surface);font-size:1.05rem;font-weight:700;cursor:pointer}
+.sheet .s-qty b{font-family:var(--font-display);font-size:1.05rem;min-width:26px;text-align:center}
+/* ticket vivo (E2) */
+.sim-ticket{border-radius:var(--r-xl);background:var(--surface);border:1px solid var(--border);box-shadow:var(--shadow-md);margin-bottom:12px;overflow:hidden}
+.sim-ticket .st-head{display:flex;justify-content:space-between;align-items:center;border-bottom:1px dashed var(--border);padding:10px 14px}
+.sim-ticket .st-head b{font-family:var(--font-display);font-size:.9rem;font-weight:800}
+.sim-ticket .st-head span{font-family:var(--font-mono);font-size:.56rem;background:var(--grad-brand-soft);color:var(--brand-700);border:1px solid rgba(220,38,38,.25);border-radius:var(--r-full);padding:3px 10px;font-weight:700;text-transform:uppercase}
+[data-theme="dark"] .sim-ticket .st-head span{color:#fca5a5}
+.sim-ticket .st-body{padding:14px}
+.st-count{text-align:center;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r-lg);padding:12px;margin-bottom:10px}
+.st-count .big{font-family:var(--font-display);font-size:2rem;font-weight:800;line-height:1;font-variant-numeric:tabular-nums}
+.st-count .big.urgent{color:var(--danger-600)}
+.st-count small{font-family:var(--font-mono);font-size:.58rem;letter-spacing:.1em;text-transform:uppercase;color:var(--text-3)}
+/* operação (sidebar escura estilo v2.1) */
+.ops-shell{display:grid;grid-template-columns:1fr 1fr;gap:var(--s-5)}
+@media (max-width:900px){.ops-shell{grid-template-columns:1fr}}
+.ops-win{background:var(--sidebar);border-radius:var(--r-2xl);overflow:hidden;box-shadow:var(--shadow-xl);color:#e2e8f0}
+.ops-win .ops-head{display:flex;justify-content:space-between;align-items:center;padding:14px 18px;border-bottom:1px solid rgba(255,255,255,.08)}
+.ops-win .ops-head b{font-family:var(--font-display);font-size:.95rem;font-weight:700;display:flex;align-items:center;gap:9px}
+.ops-win .ops-head b svg.lucide{width:16px;height:16px;color:#fdba74}
+.ops-win .ops-head span{font-family:var(--font-mono);font-size:.6rem;color:rgba(255,255,255,.5);text-transform:uppercase;letter-spacing:.08em}
+.ops-body{padding:16px}
+.ops-fila{display:grid;gap:8px}
+.of-card{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.09);border-radius:var(--r-md);padding:12px;display:flex;gap:12px;align-items:center;transition:all .2s}
+.of-card:hover{background:rgba(255,255,255,.09)}
+.of-card .oc-time{font-family:var(--font-display);font-size:1.02rem;font-weight:800;color:#fdba74;min-width:44px;font-variant-numeric:tabular-nums}
+.of-card .oc-info{flex:1;font-size:.72rem}
+.of-card .oc-info b{display:block;font-size:.8rem;color:#f1f5f9}
+.of-card .oc-info small{color:rgba(255,255,255,.55)}
+.of-card .oc-dot{width:12px;height:12px;border-radius:50%;flex-shrink:0;background:var(--border-strong)}
+.of-card.warn .oc-dot{background:var(--warning-400);animation:pulse 1.4s infinite}
+.of-card.done .oc-dot{background:var(--success-500)}
+.of-card.done{opacity:.55}
+.of-badge{font-family:var(--font-mono);font-size:.56rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;padding:3px 9px;border-radius:var(--r-full)}
+.of-badge.atraso{background:rgba(239,68,68,.2);color:#fca5a5;border:1px solid rgba(239,68,68,.4)}
+.of-badge.ok{background:rgba(34,197,94,.15);color:#86efac;border:1px solid rgba(34,197,94,.35)}
+
+/* guia lateral */
+.guide-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-xl);box-shadow:var(--shadow-md);padding:var(--s-5);max-width:440px;margin-bottom:var(--s-4)}
+.guide-card h4{font-family:var(--font-display);font-size:.82rem;font-weight:800;border-bottom:1px dashed var(--border);padding-bottom:10px;margin-bottom:12px}
+.guide-card ol{display:grid;gap:8px;font-size:.82rem;color:var(--text-2);padding-left:20px}
+.guide-card ol b{color:var(--text-1)}
+.check-list{display:grid;gap:8px;font-size:.78rem;color:var(--text-2)}
+.check-list .cli{display:flex;align-items:flex-start;gap:8px}
+.check-list .cli svg.lucide{width:15px;height:15px;color:var(--success-600);flex-shrink:0;margin-top:3px}
+
+.footer{border-top:1px solid var(--border);padding:var(--s-6) 0;text-align:center;color:var(--text-3);font-size:.8rem}
+.footer b{color:var(--text-2)}
+.toast-wrap{position:fixed;top:calc(var(--nav-h) + 12px);right:16px;z-index:300;display:flex;flex-direction:column;gap:8px}
+.toast{display:flex;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--border);border-left:4px solid var(--success-500);border-radius:var(--r-md);padding:.8rem 1rem;box-shadow:var(--shadow-lg);font-size:.85rem;font-weight:500;animation:toastin .3s var(--ease-spring);min-width:260px;max-width:340px}
+.toast svg.lucide{width:16px;height:16px;color:var(--success-600)}
+@keyframes toastin{from{opacity:0;transform:translateX(40px)}to{opacity:1;transform:none}}
+.toast.out{animation:toastout .25s forwards}
+@keyframes toastout{to{opacity:0;transform:translateX(40px)}}
+</style>
+</head>
+<body>
+
+<!-- ============ NAVBAR ============ -->
+<nav class="navbar">
+  <div class="container navbar-inner">
+    <a class="brand" href="#top">
+      <span class="brand-mark"><i data-lucide="book-open-text"></i></span>
+      <div><b>Kardapio Digital</b><small>Design System · v2.1 + jornadas v3</small></div>
+    </a>
+    <div class="nav-links">
+      <a href="#manifesto">Manifesto</a>
+      <a href="#principios">Princípios</a>
+      <a href="#experiencias">Experiências</a>
+      <a href="#componentes">Componentes</a>
+      <a href="#simulador">Simulador</a>
+      <a href="#operacao">Operação</a>
+    </div>
+    <div class="nav-actions">
+      <button class="theme-toggle" id="themeBtn" onclick="setTheme()" aria-label="Alternar tema"><i data-lucide="moon"></i></button>
+      <a class="btn-nav" href="#simulador"><i data-lucide="play"></i> Simular</a>
+    </div>
+  </div>
+</nav>
+
+<!-- ============ MANIFESTO ============ -->
+<header class="hero" id="manifesto">
+  <div class="container hero-grid">
+    <div>
+      <span class="eyebrow"><i data-lucide="sparkles" style="width:13px;height:13px"></i> <span class="dot"></span> Kardapio Digital · nova experiência</span>
+      <h1>As jornadas do v3 com o visual <span class="grad">que você já aprova</span>.</h1>
+      <p class="lead">O <b>Kardapio Digital</b> une o que cada versão tem de melhor: as <b>8 jornadas de produto do v3</b> (hábito, ticket vivo, checkout em 1 toque, radar de operação, KDS por prazo, mapa de calor, momentos e séries) vestidas com o <b>visual evoluído do design-system-proposta</b> — gradiente de marca, Sora, cantos generosos, sombras com glow e dark mode.</p>
+      <div class="hero-cta">
+        <button class="btn btn-primary" onclick="document.getElementById('experiencias').scrollIntoView({behavior:'smooth'})"><i data-lucide="sparkles"></i> Ver as 8 jornadas</button>
+        <button class="btn btn-outline" onclick="document.getElementById('simulador').scrollIntoView({behavior:'smooth'})"><i data-lucide="smartphone"></i> Simular o app</button>
+      </div>
+      <div class="hero-meta">
+        <div class="meta-item"><b class="grad">8</b><span>jornadas novas</span></div>
+        <div class="meta-item"><b class="grad">1</b><span>visual consolidado</span></div>
+        <div class="meta-item"><b class="grad">L/D</b><span>tema claro e escuro</span></div>
+        <div class="meta-item"><b class="grad">3</b><span>apps da operação</span></div>
+      </div>
+    </div>
+    <div>
+      <div class="hero-mock">
+        <div class="mock-bar"><i></i><i></i><i></i><span>kardapio.digital/app — Sexta, 20:14</span></div>
+        <div class="mock-body">
+          <div class="mock-title"><b>Boa noite, Beto</b><span class="pill pill-warning"><span class="pill-dot" style="background:var(--warning-400)"></span> Modo Hábito</span></div>
+          <div class="mock-row">
+            <div class="l"><span class="mock-avatar"><i data-lucide="pizza"></i></span><div><b>Repetir a calabresa?</b><small>sua sexta desde março · R$ 54,90</small></div></div>
+            <button class="btn btn-primary btn-sm" onclick="simHabitHero()"><i data-lucide="repeat"></i> Repetir</button>
+          </div>
+          <div class="mock-row">
+            <div class="l"><span class="mock-avatar"><i data-lucide="bike"></i></span><div><b>#1216 em rota</b><small>Luana · ~12 min até você</small></div></div>
+            <span class="timer">12:41</span>
+          </div>
+          <div class="mock-row" style="margin-bottom:0">
+            <div class="l"><span class="mock-avatar"><i data-lucide="receipt-text"></i></span><div><b>Checkout em 1 toque</b><small>Pix salvo · segurar para confirmar</small></div></div>
+            <span class="badge badge-solid-success">Pronto</span>
+          </div>
+          <div class="progress"><span></span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- ============ PRINCÍPIOS ============ -->
+<section class="section" id="principios">
+  <div class="container">
+    <div class="section-head">
+      <span class="kicker">01 · Fundamentos</span>
+      <h2>Princípios herdados do v3, polidos pela v2.1</h2>
+      <p>O produto do v3 (menos toques, mais contexto) com a disciplina visual da v2.1 (clareza, hierarquia, calor de marca).</p>
+    </div>
+    <div class="grid-4">
+      <div class="principle">
+        <div class="ico"><i data-lucide="file-text"></i></div>
+        <h3>Honestidade estrutural</h3>
+        <p>O que é botão parece botão; o que é dado parece dado. Sem enfeite que minta sobre a função.</p>
+      </div>
+      <div class="principle">
+        <div class="ico"><i data-lucide="newspaper"></i></div>
+        <h3>Ritmo editorial</h3>
+        <p>Manchetes em Sora, preço em corpo de destaque, dados em mono. O olho para onde a manchete manda.</p>
+      </div>
+      <div class="principle">
+        <div class="ico"><i data-lucide="radar"></i></div>
+        <h3>Densidade operacional</h3>
+        <p>Na cozinha e na rua, menos é perigo. Painel escuro, tudo numa linha do tempo, atraso previsto antes de virar crise.</p>
+      </div>
+      <div class="principle">
+        <div class="ico"><i data-lucide="hand"></i></div>
+        <h3>Surpresa tátil</h3>
+        <p>Segurar para confirmar, selo que estala, momento sonoro. Cada ação tem peso físico — e 1 toque resolve o que hoje leva 6.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ EXPERIÊNCIAS (JORNADAS v3) ============ -->
+<section class="section" id="experiencias">
+  <div class="container">
+    <div class="section-head">
+      <span class="kicker">02 · Jornadas</span>
+      <h2>As 8 jornadas do v3</h2>
+      <p>Não são telas repaginadas — são fluxos que não existem hoje. Cada uma ataca um atrito real do delivery, agora com o visual v2.1.</p>
+    </div>
+    <div class="xp-grid">
+
+      <!-- E1 · Modo Hábito -->
+      <div class="xp-card">
+        <div class="xp-head"><span class="x-id">E1 · Cliente</span><span class="x-tag">Home preditiva</span></div>
+        <div class="xp-body">
+          <h3>Modo Hábito</h3>
+          <p>Em vez de catálogo, um jornal calculado do histórico: "Sexta, 20:14 — você sempre pede calabresa. Repetir?" Um toque no ticket e o pedido já sai.</p>
+          <div class="xp-demo">
+            <div class="demo-row"><div><b>Pizza Calabresa</b><small>habitual · toda sexta</small></div><button class="btn btn-primary btn-sm"><i data-lucide="repeat"></i> Repetir</button></div>
+            <div class="demo-row" style="margin-bottom:0"><div><b>X-Salada Completo</b><small>visto 2 min atrás</small></div><span class="badge badge-soft-violet">sugestão</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- E2 · Ticket Vivo -->
+      <div class="xp-card">
+        <div class="xp-head"><span class="x-id">E2 · Cliente</span><span class="x-tag">Pós-pedido</span></div>
+        <div class="xp-body">
+          <h3>Ticket Vivo</h3>
+          <p>O tracking vira um ticket vivo: countdown por perna (cozinha → saída → destino), mini-mapa do entregador e o ping "sai pra receber" quando ele chega.</p>
+          <div class="xp-demo">
+            <div class="stepper">
+              <div class="stp done"><span class="st-ico"><i data-lucide="check"></i></span><span class="st-lbl">Recebido</span></div>
+              <div class="stp done"><span class="st-ico"><i data-lucide="chef-hat"></i></span><span class="st-lbl">Cozinha</span></div>
+              <div class="stp active"><span class="st-ico"><i data-lucide="truck"></i></span><span class="st-lbl">Rota</span></div>
+              <div class="stp"><span class="st-ico"><i data-lucide="home"></i></span><span class="st-lbl">Chegou</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- E3 · Checkout 1 toque -->
+      <div class="xp-card">
+        <div class="xp-head"><span class="x-id">E3 · Cliente</span><span class="x-tag">Checkout</span></div>
+        <div class="xp-body">
+          <h3>Checkout em 1 toque</h3>
+          <p>Endereço e método padrão já salvos? O carrinho vira um único botão. Segurar-para-confirmar (600ms) evita toque acidental sem modal de confirmação.</p>
+          <div class="xp-demo">
+            <div class="hold-btn"><span class="hb-fill"></span><span class="hb-txt"><i data-lucide="lock"></i> Segurar p/ confirmar</span></div>
+            <p style="font-size:.62rem;color:var(--text-3);margin-top:8px;text-align:center;font-family:var(--font-mono)">600ms · sem modal · com estalo</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- E4 · Radar de Operação -->
+      <div class="xp-card">
+        <div class="xp-head"><span class="x-id">E4 · Restaurante</span><span class="x-tag">Painel</span></div>
+        <div class="xp-body">
+          <h3>Radar de Operação</h3>
+          <p>Fila + KDS + entregas na MESMA linha do tempo. Veja o atraso previsto antes de acontecer e abra qualquer ação pela paleta de comandos.</p>
+          <div class="palette-demo">
+            <div class="pd-input"><i data-lucide="command"></i> atraso</div>
+            <div class="pd-list">
+              <div class="pd-item hl">Ver pedidos atrasando <kbd>↵</kbd></div>
+              <div class="pd-item">Repriorizar cozinha <kbd>⌘K</kbd></div>
+              <div class="pd-item">Pausar delivery <kbd>⌘P</kbd></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- E5 · Prep-Ticket por prazo -->
+      <div class="xp-card">
+        <div class="xp-head"><span class="x-id">E5 · Cozinha</span><span class="x-tag">KDS</span></div>
+        <div class="xp-body">
+          <h3>Prep-Ticket por prazo</h3>
+          <p>Nada de ordem de chegada: o KDS ordena pelo PRAZO (rota do entregador + previsão). Amarelo = gargalo, vermelho = atraso. O prato sai quando precisa sair.</p>
+          <div class="kds-card" style="margin:0">
+            <div class="kds-top"><b>#1216 · Luana</b><span class="kds-prazo">PRAZO 21:38</span></div>
+            <div class="kds-items">
+              <div class="kds-item"><span>1× Calabresa G</span><span class="qty">12 min</span></div>
+              <div class="kds-item"><span>2× Coca-Cola 2L</span><span class="qty">—</span></div>
+            </div>
+            <div class="kds-timer"><span>no forno · 18:24</span><span style="color:var(--warning-500)">2 min rest</span></div>
+            <div class="kds-progress"><span style="width:78%;background:linear-gradient(90deg,#f59e0b,#dc2626)"></span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- E6 · Mapa de calor -->
+      <div class="xp-card">
+        <div class="xp-head"><span class="x-id">E6 · Entregador</span><span class="x-tag">Logística</span></div>
+        <div class="xp-body">
+          <h3>Mapa de calor da região</h3>
+          <p>O entregador vê onde os pedidos nascem e onde a demanda está quente — e recebe rota de retorno com pedido em vez de voltar vazio.</p>
+          <div class="xp-demo" style="padding:0;overflow:hidden">
+            <div class="heatmap">
+              <span class="hm-glow" style="left:18%;top:22%;width:90px;height:90px;background:rgba(249,115,22,.55)"></span>
+              <span class="hm-glow" style="left:58%;top:14%;width:70px;height:70px;background:rgba(220,38,38,.6)"></span>
+              <span class="hm-glow" style="left:42%;top:52%;width:60px;height:60px;background:rgba(251,191,36,.45)"></span>
+              <span class="hm-pin" style="left:20%;top:26%"></span>
+              <span class="hm-pin" style="left:60%;top:18%"></span>
+              <span class="hm-pin" style="left:44%;top:56%"></span>
+              <span class="hm-pin" style="left:72%;top:62%"></span>
+              <span class="hm-label">demanda das últimas 2h · 14 pedidos</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- E7 · Momentos -->
+      <div class="xp-card">
+        <div class="xp-head"><span class="x-id">E7 · Todos</span><span class="x-tag">Status como cena</span></div>
+        <div class="xp-body">
+          <h3>Momentos</h3>
+          <p>Cada mudança de status é uma cena com som, cor e micro-animação próprios — do estalo do pedido confirmado ao ding da entrega. O cliente sente o progresso, não o lê.</p>
+          <div class="xp-demo">
+            <div class="momento-row"><span class="m-ic" style="background:var(--grad-brand-soft)"><i data-lucide="utensils-crossed" style="color:var(--brand-600)"></i></span><div><b>Recebido · estalo</b><small>vibração curta + badge aceso</small></div></div>
+            <div class="momento-row"><span class="m-ic" style="background:var(--info-50)"><i data-lucide="flame" style="color:var(--info-600)"></i></span><div><b>Na cozinha · braseiro</b><small>tom laranja + progresso do forno</small></div></div>
+            <div class="momento-row" style="margin-bottom:0"><span class="m-ic" style="background:var(--success-50)"><i data-lucide="bell-ring" style="color:var(--success-600)"></i></span><div><b>Saiu · ding</b><small>"sai pra receber" + mini-mapa</small></div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- E8 · Séries -->
+      <div class="xp-card">
+        <div class="xp-head"><span class="x-id">E8 · Fidelidade</span><span class="x-tag">Placar</span></div>
+        <div class="xp-body">
+          <h3>Séries — fidelidade em placar</h3>
+          <p>Fidelidade virando série de temporada: "2/3 pizzas no mês → brinde da casa". Progresso visível, recompensa esperada, e o Modo Hábito alimenta a série.</p>
+          <div class="series-card" style="margin:0">
+            <div class="sr-row">
+              <span class="sr-ic"><i data-lucide="pizza"></i></span>
+              <div class="sr-prog"><div class="sr-name">Pizzas no mês</div><div class="sr-bar" style="margin-top:5px"><span style="width:66%"></span></div></div>
+              <span class="sr-meta">2 / 3 · brinde!</span>
+            </div>
+            <div class="sr-row" style="border-bottom:none">
+              <span class="sr-ic"><i data-lucide="gift"></i></span>
+              <div class="sr-prog"><div class="sr-name">Próxima recompensa</div><div class="sr-bar" style="margin-top:5px"><span style="width:15%;background:linear-gradient(135deg,#f59e0b,#f97316)"></span></div></div>
+              <span class="sr-meta">Sobremesa grátis</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ============ COMPONENTES ============ -->
+<section class="section" id="componentes">
+  <div class="container">
+    <div class="section-head">
+      <span class="kicker">03 · Kit v2.1</span>
+      <h2>Componentes base (do design-system-proposta)</h2>
+      <p>Os componentes aprovados da v2.1 continuam sendo o alfabeto — agora servindo às jornadas do v3.</p>
+    </div>
+    <div class="grid-2" style="margin-bottom:var(--s-5)">
+      <div class="guide-card" style="max-width:none">
+        <h4>Botões</h4>
+        <div class="btn-group">
+          <button class="btn btn-primary"><i data-lucide="shopping-bag"></i> Pedir agora</button>
+          <button class="btn btn-accent"><i data-lucide="repeat"></i> Repetir pedido</button>
+          <button class="btn btn-dark"><i data-lucide="play"></i> Iniciar</button>
+          <button class="btn btn-outline"><i data-lucide="share"></i> Compartilhar</button>
+          <button class="btn btn-success"><i data-lucide="check"></i> Pronto</button>
+          <button class="btn btn-danger"><i data-lucide="x"></i> Cancelar</button>
+          <button class="btn btn-violet"><i data-lucide="sparkles"></i> Novo</button>
+          <button class="btn btn-ghost btn-icon"><i data-lucide="more-horizontal"></i></button>
+        </div>
+      </div>
+      <div class="guide-card" style="max-width:none">
+        <h4>Badges &amp; countdowns</h4>
+        <div class="btn-group" style="gap:8px">
+          <span class="badge badge-soft-success"><span class="bdot"></span> Entregue</span>
+          <span class="badge badge-soft-warning"><span class="bdot"></span> Na cozinha</span>
+          <span class="badge badge-soft-info"><span class="bdot"></span> Em rota</span>
+          <span class="badge badge-soft-violet"><span class="bdot"></span> Pronto</span>
+          <span class="badge badge-soft-danger"><span class="bdot"></span> Atrasado</span>
+        </div>
+        <div class="btn-group" style="gap:8px;margin-top:12px">
+          <span class="countdown"><span class="cd-ico"><i data-lucide="timer"></i></span> 12:41</span>
+          <span class="countdown warn"><span class="cd-ico"><i data-lucide="timer"></i></span> 02:18</span>
+          <span class="countdown urgent"><span class="cd-ico"><i data-lucide="timer"></i></span> 00:31</span>
+        </div>
+      </div>
+    </div>
+    <div class="grid-3">
+      <div class="stat-card">
+        <div class="sc-top"><span class="sc-label">Tempo médio</span><span class="sc-ico red"><i data-lucide="timer"></i></span></div>
+        <div class="sc-value">34 min</div>
+        <span class="sc-trend up"><i data-lucide="trending-up"></i> -6% vs ontem</span>
+      </div>
+      <div class="stat-card">
+        <div class="sc-top"><span class="sc-label">Pedidos no prazo</span><span class="sc-ico green"><i data-lucide="circle-check"></i></span></div>
+        <div class="sc-value">92%</div>
+        <span class="sc-trend up"><i data-lucide="trending-up"></i> +4% na semana</span>
+      </div>
+      <div class="stat-card">
+        <div class="sc-top"><span class="sc-label">Recompensas</span><span class="sc-ico violet"><i data-lucide="gift"></i></span></div>
+        <div class="sc-value">3</div>
+        <span class="sc-trend up"><i data-lucide="sparkles"></i> 2 séries ativas</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ SIMULADOR ============ -->
+<section class="section" id="simulador" style="background:var(--surface-2)">
+  <div class="container">
+    <div class="section-head">
+      <span class="kicker">04 · Simulador</span>
+      <h2>As jornadas v3, no bolso</h2>
+      <p>Toque em “Repetir” no hábito, adicione itens, confirme segurando e acompanhe o Ticket Vivo — tudo no visual v2.1.</p>
+    </div>
+    <div class="sim-shell">
+      <div class="phone">
+        <div class="phone-notch"></div>
+        <div class="phone-status"><span>21:47</span><span style="display:flex;gap:4px"><i data-lucide="signal"></i><i data-lucide="wifi"></i><i data-lucide="battery-full"></i></span></div>
+        <div class="phone-screen"><div class="screen" id="simScreen"></div></div>
+        <div class="sim-minicart" id="simMiniCart" onclick="simOpenCart()">
+          <div class="mc-l"><i data-lucide="shopping-bag"></i><div><b id="mcTotal">R$ 0,00</b><span id="mcQty" style="font-size:.6rem;opacity:.85">0 itens</span></div></div>
+          <div class="mc-go"><i data-lucide="chevron-up"></i></div>
+        </div>
+        <div class="sim-tabbar">
+          <button class="active" data-tab="home" onclick="simGo('home')"><i data-lucide="house"></i>Início</button>
+          <button data-tab="cardapio" onclick="simGo('cardapio')"><i data-lucide="utensils"></i>Cardápio</button>
+          <button data-tab="pedidos" onclick="simGo('pedidos')"><i data-lucide="receipt-text"></i>Pedidos</button>
+          <button data-tab="series" onclick="simGo('series')"><i data-lucide="trophy"></i>Séries</button>
+        </div>
+        <div class="sim-sheet" id="simSheet"></div>
+      </div>
+
+      <div style="max-width:420px">
+        <div class="guide-card">
+          <h4>O que testar (4 jornadas)</h4>
+          <ol>
+            <li><b>E1 · Hábito:</b> toque em <b>Repetir</b> no cartão de topo — o pedido é montado sozinho.</li>
+            <li><b>E3 · Checkout 1-toque:</b> abra o carrinho e <b>segure</b> o botão ~0,7s.</li>
+            <li><b>E2 · Ticket Vivo:</b> o countdown avança sozinho a cada status.</li>
+            <li><b>E8 · Séries:</b> aba própria mostra o placar de fidelidade.</li>
+          </ol>
+        </div>
+        <div class="guide-card">
+          <h4>Visual v2.1 aplicado</h4>
+          <div class="check-list">
+            <div class="cli"><i data-lucide="check"></i> Gradiente de marca e glow nos CTAs</div>
+            <div class="cli"><i data-lucide="check"></i> Cantos generosos (12–40px) em tudo</div>
+            <div class="cli"><i data-lucide="check"></i> Sora nos títulos, Inter no corpo, mono nos dados</div>
+            <div class="cli"><i data-lucide="check"></i> Dark mode completo (toggle no topo)</div>
+            <div class="cli"><i data-lucide="check"></i> Lucide 1.30.0, zero emojis de conteúdo</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ OPERAÇÃO ============ -->
+<section class="section" id="operacao">
+  <div class="container">
+    <div class="section-head">
+      <span class="kicker">05 · Operação</span>
+      <h2>Radar, cozinha e rua — painel escuro v2.1</h2>
+      <p>As jornadas E4–E6 rodando no painel da loja: mesma linha do tempo para fila, KDS e entregas.</p>
+    </div>
+    <div class="ops-shell">
+      <div class="ops-win">
+        <div class="ops-head"><b><i data-lucide="radar"></i> Radar de Operação</b><span>E4 · tempo real</span></div>
+        <div class="ops-body">
+          <div class="grid-4" style="gap:8px;margin-bottom:14px">
+            <div class="of-card" style="display:block;text-align:center"><div class="oc-time" style="min-width:0">12</div><small style="color:rgba(255,255,255,.55);font-size:.6rem;text-transform:uppercase;letter-spacing:.06em">OK</small></div>
+            <div class="of-card" style="display:block;text-align:center"><div class="oc-time" style="min-width:0;color:var(--warning-400)">8</div><small style="color:rgba(255,255,255,.55);font-size:.6rem;text-transform:uppercase;letter-spacing:.06em">Atenção</small></div>
+            <div class="of-card" style="display:block;text-align:center"><div class="oc-time" style="min-width:0;color:#fca5a5">3</div><small style="color:rgba(255,255,255,.55);font-size:.6rem;text-transform:uppercase;letter-spacing:.06em">Crítico</small></div>
+            <div class="of-card" style="display:block;text-align:center"><div class="oc-time" style="min-width:0;color:#fdba74">4</div><small style="color:rgba(255,255,255,.55);font-size:.6rem;text-transform:uppercase;letter-spacing:.06em">Em rota</small></div>
+          </div>
+          <div class="ops-fila">
+            <div class="of-card"><span class="oc-time">02:12</span><div class="oc-info"><b>#1216 · Calabresa G + Coca</b><small>Luana · Pix · 3km · KDS #12</small></div><span class="of-badge ok">Saiu</span></div>
+            <div class="of-card warn"><span class="oc-time" style="color:var(--warning-400)">01:48</span><div class="oc-info"><b>#1219 · X-Bacon + Fritas</b><small>Marco · Cartão · 5km · KDS #07</small></div><span class="of-badge" style="background:rgba(251,191,36,.15);color:#fcd34d;border:1px solid rgba(251,191,36,.35)">2 min rest</span></div>
+            <div class="of-card warn"><span class="oc-time" style="color:var(--warning-400)">01:12</span><div class="oc-info"><b>#1221 · Parmegiana frango</b><small>Ana · Dinheiro · 2km · KDS #09</small></div><span class="of-badge">Prazo</span></div>
+            <div class="of-card"><span class="oc-time" style="color:#fca5a5">00:31</span><div class="oc-info"><b>#1224 · Combo casal</b><small>Beto · Pix · 6km · KDS #04</small></div><span class="of-badge atraso">Atrasado</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="ops-win">
+        <div class="ops-head"><b><i data-lucide="map"></i> Entregas &amp; calor</b><span>E6 · logística</span></div>
+        <div class="ops-body">
+          <div class="heatmap" style="height:150px;margin-bottom:14px">
+            <span class="hm-glow" style="left:16%;top:20%;width:100px;height:100px;background:rgba(249,115,22,.55)"></span>
+            <span class="hm-glow" style="left:60%;top:12%;width:80px;height:80px;background:rgba(220,38,38,.6)"></span>
+            <span class="hm-glow" style="left:40%;top:55%;width:66px;height:66px;background:rgba(251,191,36,.45)"></span>
+            <span class="hm-pin" style="left:18%;top:24%"></span>
+            <span class="hm-pin" style="left:62%;top:16%"></span>
+            <span class="hm-pin" style="left:42%;top:58%"></span>
+            <span class="hm-label">rota de retorno sugerida · +2 pedidos</span>
+          </div>
+          <div class="ops-fila">
+            <div class="of-card"><span class="oc-time">12:41</span><div class="oc-info"><b>#1216 → Vila Olímpia</b><small>Luana · 3km · sacola: 2 itens</small></div><span class="of-badge ok">Em rota</span></div>
+            <div class="of-card"><span class="oc-time" style="color:var(--warning-400)">08:20</span><div class="oc-info"><b>#1221 → Jardim Anália</b><small>Ana · 2km · voltar com pedido?</small></div><span class="of-badge" style="background:rgba(139,92,246,.15);color:#c4b5fd;border:1px solid rgba(139,92,246,.35)">Sugerido</span></div>
+            <div class="of-card done"><span class="oc-time" style="text-decoration:line-through">05:10</span><div class="oc-info"><b>#1209 → Entregue</b><small>Carlos · avaliação 5.0</small></div><span class="of-badge ok">Feito</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer class="footer">
+  <div class="container">
+    <p><b>Kardapio Digital · Design System</b> — jornadas do v3 com o visual do design-system-proposta (v2.1).<br>
+    Lucide (1.30.0) · Sora + Inter + JetBrains Mono · gradiente de marca · dark mode · nenhum emoji de conteúdo.</p>
+  </div>
+</footer>
+
+<div class="toast-wrap" id="toastWrap"></div>
+
+<script>
+/* ============================================================
+   KARDAPIO DIGITAL — simulador das jornadas v3 (visual v2.1)
+   ============================================================ */
+const $ = (id) => document.getElementById(id);
+const fmt = (n) => n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+const applyIcons = () => { if (window.lucide && lucide.createIcons) lucide.createIcons(); };
+
+/* ---------- tema ---------- */
+function setTheme() {
+  const cur = document.documentElement.dataset.theme;
+  const next = cur === 'dark' ? 'light' : 'dark';
+  document.documentElement.dataset.theme = next;
+  $('themeBtn').innerHTML = `<i data-lucide="${next === 'dark' ? 'sun' : 'moon'}"></i>`;
+  applyIcons();
+}
+
+/* ---------- dados ---------- */
+const ICONS = {
+  pizza: 'pizza', hamburger: 'hamburger', fries: 'utensils', coca: 'cup-soda',
+  suco: 'citrus', pudim: 'cake-slice', choco: 'ice-cream-cone'
+};
+const CATS = [
+  { id: 'todos', label: 'Todos', ico: 'layout-grid' },
+  { id: 'pizzas', label: 'Pizzas', ico: 'pizza' },
+  { id: 'lanches', label: 'Lanches', ico: 'hamburger' },
+  { id: 'bebidas', label: 'Bebidas', ico: 'cup-soda' },
+  { id: 'doces', label: 'Doces', ico: 'cake-slice' }
+];
+const PRODS = [
+  { id: 1, nome: 'Calabresa G', desc: 'Mussarela, calabresa e orégano', preco: 54.9, cat: 'pizzas', ico: 'pizza', tag: 'Top', bg: 'linear-gradient(135deg,#dc2626,#f97316)' },
+  { id: 2, nome: 'Quatro Queijos', desc: 'Mussarela, gorgonzola, parmesão', preco: 58.9, cat: 'pizzas', ico: 'pizza', bg: 'linear-gradient(135deg,#b91c1c,#f97316)' },
+  { id: 3, nome: 'X-Bacon', desc: 'Pão, burger, bacon e cheddar', preco: 26.9, cat: 'lanches', ico: 'hamburger', tag: 'Novo', bg: 'linear-gradient(135deg,#ea580c,#f59e0b)' },
+  { id: 4, nome: 'Batata Frita', desc: 'Porção 300g com cheddar', preco: 18.9, cat: 'lanches', ico: 'fries', bg: 'linear-gradient(135deg,#d97706,#fbbf24)' },
+  { id: 5, nome: 'Coca-Cola 350ml', desc: 'Gelada', preco: 7.5, cat: 'bebidas', ico: 'coca', bg: 'linear-gradient(135deg,#7f1d1d,#991b1b)' },
+  { id: 6, nome: 'Suco de Laranja', desc: 'Natural, 500ml', preco: 9.9, cat: 'bebidas', ico: 'suco', bg: 'linear-gradient(135deg,#f97316,#f59e0b)' },
+  { id: 7, nome: 'Pudim Caseiro', desc: 'Com calda de caramelo', preco: 11.9, cat: 'doces', ico: 'pudim', tag: 'Doce', bg: 'linear-gradient(135deg,#f59e0b,#fb923c)' },
+  { id: 8, nome: 'Milkshake Chocolate', desc: '300ml com chantilly', preco: 14.9, cat: 'doces', ico: 'choco', bg: 'linear-gradient(135deg,#78350f,#451a03)' }
+];
+
+const state = {
+  tab: 'home', cat: 'todos',
+  cart: [], qty: 1, sel: null,
+  active: false, step: 0, laInt: null
+};
+const HABITO = { nome: 'Calabresa G', preco: 54.9 };
+const STEPS = [
+  { lbl: 'Recebido', sub: 'Aguardando confirmação' },
+  { lbl: 'Na cozinha', sub: 'Preparando seu pedido' },
+  { lbl: 'Saindo', sub: 'Saiu para entrega' },
+  { lbl: 'Em rota', sub: 'Quase chegando' },
+  { lbl: 'Entregue', sub: 'Bom apetite!' }
+];
+const MIN_TOTAL = 45;
+const stepMin = (s) => Math.max(5, MIN_TOTAL - s * 8);
+const stepPct = (s) => [0, 30, 55, 82, 100][s];
+
+/* ---------- helpers ---------- */
+function showToast(msg, ok = true) {
+  const w = $('toastWrap');
+  const t = document.createElement('div');
+  t.className = 'toast';
+  t.innerHTML = `<i data-lucide="${ok ? 'circle-check' : 'triangle-alert'}"></i> ${msg}`;
+  w.appendChild(t); applyIcons();
+  setTimeout(() => { t.classList.add('out'); setTimeout(() => t.remove(), 260); }, 2400);
+}
+const cartCount = () => state.cart.reduce((a, b) => a + b.qty, 0);
+const cartTotal = () => state.cart.reduce((a, b) => a + PRODS.find(p => p.id === b.id).preco * b.qty, 0);
+
+/* ---------- renders ---------- */
+function renderHeader() {
+  return `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <div><div style="font-size:.6rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text-3)">Entregar em</div><b style="font-size:.88rem">Vila Olímpia · 05340</b></div>
+      <button onclick="simGo('pedidos')" aria-label="Pedidos" style="width:34px;height:34px;border-radius:50%;border:1px solid var(--border);background:var(--surface);color:var(--text-2);display:grid;place-items:center;cursor:pointer"><i data-lucide="receipt-text" style="width:16px;height:16px"></i></button>
+    </div>`;
+}
+function renderHabit() {
+  return `<div class="sim-habit">
+      <div class="h-top"><span><i data-lucide="repeat" style="width:12px;height:12px"></i> Modo Hábito</span><span>Sexta · 21:47</span></div>
+      <h2>Repetir a calabresa, Beto?</h2>
+      <div class="h-rep"><i data-lucide="pizza" style="width:15px;height:15px"></i> ${HABITO.nome} · ${fmt(HABITO.preco)} · sua sexta desde março<button class="go" onclick="simRepeat()">Repetir</button></div>
+    </div>`;
+}
+function renderSearch() {
+  return `<div class="sim-search"><i data-lucide="search"></i><input placeholder="O que você quer comer?" readonly onclick="simGo('cardapio')"></div>`;
+}
+function renderActivePill() {
+  if (!state.active) return '';
+  const st = state.step;
+  return `<div class="sim-ticket" style="cursor:pointer;padding:10px 14px;box-shadow:var(--shadow-sm)" onclick="simGo('ticket')">
+      <div class="st-head" style="padding:0;border:none"><b>#1216 · em andamento</b><span>${STEPS[st].lbl}</span></div>
+      <div class="st-body" style="padding:8px 0 0"><div class="progress" style="margin-top:0"><span style="width:${stepPct(st)}%;animation:none"></span></div></div>
+    </div>`;
+}
+function renderCats(active) {
+  return `<div class="sim-cats">${CATS.map(c => `<span class="sim-cat${c.id === active ? ' active' : ''}" onclick="simCat('${c.id}')"><i data-lucide="${c.ico}"></i>${c.label}</span>`).join('')}</div>`;
+}
+function renderProds(list) {
+  return `<div class="sim-grid">${list.map(p => `
+    <div class="sim-prod" onclick="simOpen('${p.id}')">
+      <div class="p-img" style="background:${p.bg}">${p.tag ? `<span class="p-tag">${p.tag}</span>` : ''}<i data-lucide="${ICONS[p.ico] || 'utensils'}"></i></div>
+      <div class="p-body"><b>${p.nome}</b><span class="p-desc">${p.desc}</span>
+        <div class="p-foot"><span class="p-price">${fmt(p.preco)}</span>
+          <button class="p-add" aria-label="Adicionar ${p.nome}" onclick="event.stopPropagation();simAdd('${p.id}')">+</button>
+        </div>
+      </div>
+    </div>`).join('')}</div>`;
+}
+
+function simGo(tab) {
+  state.tab = tab;
+  document.querySelectorAll('.sim-tabbar button').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+  render();
+}
+function simCat(id) { state.cat = id; state.tab = 'cardapio'; render(); }
+
+function render() {
+  const s = $('simScreen');
+  const t = state.tab;
+  if (t === 'home') {
+    s.innerHTML = renderHeader() + renderActivePill() + renderHabit() + renderSearch() + renderCats(state.cat) + renderProds(PRODS);
+  } else if (t === 'cardapio') {
+    s.innerHTML = `<div style="font-size:1.02rem;font-weight:800;font-family:var(--font-display);margin-bottom:10px">Cardápio</div>` + renderActivePill() + renderSearch() + renderCats(state.cat) + renderProds(PRODS.filter(p => state.cat === 'todos' || p.cat === state.cat));
+  } else if (t === 'pedidos') {
+    s.innerHTML = `<div style="font-size:1.02rem;font-weight:800;font-family:var(--font-display);margin-bottom:4px">Meus pedidos</div><div style="font-size:.66rem;color:var(--text-3);margin-bottom:12px">Tudo aqui é um ticket vivo.</div>`
+      + (state.active ? renderTicketCard() : '')
+      + `<div class="sim-ticket" style="cursor:pointer" onclick="showToast('Histórico completo em breve')">
+          <div class="st-head"><b>Pedidos anteriores</b><span>12</span></div>
+          <div class="st-body"><p style="font-size:.7rem;color:var(--text-2)">Semana passada · X-Bacon + Fritas · <b>R$ 45,80</b></p><p style="font-size:.7rem;color:var(--text-2);margin-top:4px">Há 2 semanas · Parmegiana · <b>R$ 62,00</b></p></div>
+        </div>`;
+  } else if (t === 'series') {
+    s.innerHTML = `<div style="font-size:1.02rem;font-weight:800;font-family:var(--font-display);margin-bottom:4px">Séries</div><div style="font-size:.66rem;color:var(--text-3);margin-bottom:12px">Sua fidelidade em placar.</div>
+      <div class="series-card">
+        <div class="sr-row"><span class="sr-ic"><i data-lucide="pizza"></i></span><div class="sr-prog"><div class="sr-name">Pizzas no mês</div><div class="sr-bar" style="margin-top:5px"><span style="width:66%"></span></div></div><span class="sr-meta">2 / 3</span></div>
+        <div class="sr-row"><span class="sr-ic"><i data-lucide="gift"></i></span><div class="sr-prog"><div class="sr-name">Brinde da casa</div><div class="sr-bar" style="margin-top:5px"><span style="width:66%;background:linear-gradient(135deg,#f59e0b,#f97316)"></span></div></div><span class="sr-meta">na próxima!</span></div>
+        <div class="sr-row" style="border-bottom:none"><span class="sr-ic"><i data-lucide="trophy"></i></span><div class="sr-prog"><div class="sr-name">Sexta de pizza</div><div class="sr-bar" style="margin-top:5px"><span style="width:100%"></span></div></div><span class="sr-meta">3× seguidas</span></div>
+      </div>`;
+  } else if (t === 'ticket') {
+    s.innerHTML = renderTicketView();
+  }
+  applyIcons();
+  syncMiniCart();
+}
+
+function renderTicketCard() {
+  const st = state.step;
+  return `<div class="sim-ticket" style="cursor:pointer" onclick="simGo('ticket')">
+      <div class="st-head"><b>#1216 · Calabresa G</b><span>${STEPS[st].lbl}</span></div>
+      <div class="st-body"><p style="font-size:.7rem;color:var(--text-2)">${STEPS[st].sub} · resta <b>~${stepMin(st)} min</b></p>
+      <div class="progress" style="margin-top:10px"><span style="width:${stepPct(st)}%;animation:none"></span></div></div>
+    </div>`;
+}
+
+function renderTicketView() {
+  const st = state.step;
+  const done = st >= 4;
+  return `<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+      <button onclick="simGo('pedidos')" aria-label="Voltar" style="width:34px;height:34px;border-radius:50%;border:1px solid var(--border);background:var(--surface);color:var(--text-2);display:grid;place-items:center;cursor:pointer"><i data-lucide="arrow-left" style="width:16px;height:16px"></i></button>
+      <div><b style="font-size:.95rem;font-family:var(--font-display)">Pedido #1216</b><div style="font-size:.64rem;color:var(--text-3)">Calabresa G · 2x Coca · Pix</div></div>
+    </div>
+    <div class="sim-ticket">
+      <div class="st-head"><b>Kardapio Digital</b><span>${STEPS[st].lbl}</span></div>
+      <div class="st-body">
+        <div class="st-count"><div class="big ${st >= 1 ? 'urgent' : ''}" id="simCount">~${stepMin(st)} min</div><small>tempo estimado até a porta</small></div>
+        <div class="stepper">${STEPS.map((s2, i) => `
+          <div class="stp ${i < st ? 'done' : ''} ${i === st ? 'active' : ''}">
+            <span class="st-ico"><i data-lucide="${['receipt','flame','utensils-crossed','bike','party-popper'][i]}"></i></span>
+            <span class="st-lbl">${s2.lbl}</span>
+          </div>`).join('')}</div>
+      </div>
+    </div>
+    <div class="sim-ticket" style="cursor:pointer" onclick="showToast('Chamando a loja…')">
+      <div class="st-head"><b>Falar com a loja</b><span style="background:var(--surface-2);color:var(--text-2);border-color:var(--border)"><i data-lucide="phone" style="width:13px;height:13px"></i></span></div>
+      <div class="st-body"><p style="font-size:.7rem;color:var(--text-2)">${done ? 'Avalie o pedido' : 'Avisar sobre a entrega'}</p></div>
+    </div>`;
+}
+
+/* ---------- interações ---------- */
+function simOpen(id) {
+  const p = PRODS.find(x => x.id == id);
+  state.sel = p; state.qty = 1;
+  const sheet = $('simSheet');
+  sheet.innerHTML = `
+    <div class="sheet-back" onclick="simCloseSheet()"></div>
+    <div class="sheet">
+      <div style="width:40px;height:4px;border-radius:99px;background:var(--border-strong);margin:2px auto 10px"></div>
+      <div class="sheet-hero" style="background:${p.bg}"><i data-lucide="${ICONS[p.ico] || 'utensils'}"></i></div>
+      <div class="s-title">${p.nome}</div>
+      <div class="s-desc">${p.desc}</div>
+      <div class="sheet-opt active" onclick="showToast('Meio sem borda · padrão')"><span>Meio sem borda</span><span>R$ 0,00</span></div>
+      <div class="sheet-opt" onclick="showToast('Extra de borda por R$ 8,00')"><span>Borda de catupiry</span><span>+ R$ 8,00</span></div>
+      <div class="s-qty"><button onclick="simQty(-1)" aria-label="Menos">−</button><b>${state.qty}</b><button onclick="simQty(1)" aria-label="Mais">+</button></div>
+      <button class="btn btn-primary btn-block" onclick="simConfirmAdd()"><i data-lucide="shopping-bag"></i> Adicionar · ${fmt(p.preco * state.qty)}</button>
+    </div>`;
+  sheet.classList.add('open');
+  applyIcons();
+}
+function simCloseSheet() { $('simSheet').classList.remove('open'); state.sel = null; }
+function simQty(d) {
+  state.qty = Math.max(1, state.qty + d);
+  const p = state.sel; if (!p) return;
+  const btn = document.querySelector('.sheet .btn');
+  if (btn) btn.innerHTML = `<i data-lucide="shopping-bag"></i> Adicionar · ${fmt(p.preco * state.qty)}`;
+  const b = document.querySelector('.s-qty b'); if (b) b.textContent = state.qty;
+  applyIcons();
+}
+function simConfirmAdd() {
+  const p = state.sel; if (!p) return;
+  simAdd(p.id, state.qty);
+  simCloseSheet();
+}
+function simAdd(id, q = 1) {
+  const row = state.cart.find(x => x.id == id);
+  if (row) row.qty += q; else state.cart.push({ id, qty: q });
+  syncMiniCart();
+  showToast('Adicionado ao carrinho');
+}
+function simRepeat() {
+  const row = state.cart.find(x => x.id == 1);
+  if (row) row.qty += 1; else state.cart.push({ id: 1, qty: 1 });
+  syncMiniCart();
+  showToast('Calabresa adicionada — repetir na sexta!');
+}
+function simHabitHero() { simRepeat(); }
+function simOpenCart() {
+  if (!state.cart.length) return;
+  state.sel = null;
+  const sheet = $('simSheet');
+  const lines = state.cart.map(x => { const p = PRODS.find(q => q.id === x.id); return `<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px dashed var(--border)"><span style="font-size:.8rem"><b style="color:var(--brand-600)">${x.qty}×</b> ${p.nome}</span><span style="font-size:.8rem;font-weight:700">${fmt(p.preco * x.qty)}</span></div>`; }).join('');
+  sheet.innerHTML = `
+    <div class="sheet-back" onclick="simCloseSheet()"></div>
+    <div class="sheet">
+      <div style="width:40px;height:4px;border-radius:99px;background:var(--border-strong);margin:2px auto 10px"></div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <div class="s-title" style="font-size:1rem">Seu pedido</div>
+        <button onclick="simEmptyCart()" style="border:none;background:var(--danger-50);color:var(--danger-600);font-size:.66rem;font-weight:700;padding:6px 12px;border-radius:99px;cursor:pointer"><i data-lucide="trash-2" style="width:12px;height:12px"></i> Limpar</button>
+      </div>
+      <div style="font-size:.66rem;color:var(--text-3);margin-bottom:4px">Kardapio Digital · Vila Olímpia</div>
+      ${lines}
+      <div style="display:flex;justify-content:space-between;padding:12px 0;font-size:.8rem;font-weight:700"><span>Subtotal</span><span>${fmt(cartTotal())}</span></div>
+      <div style="display:flex;justify-content:space-between;padding-bottom:12px;font-size:.76rem;color:var(--text-3)"><span>Entrega</span><span>Grátis (raio 1)</span></div>
+      <div style="display:flex;justify-content:space-between;padding-bottom:12px;font-size:1rem;font-weight:800"><span>Total</span><span style="color:var(--brand-600)">${fmt(cartTotal())}</span></div>
+      <div style="display:flex;gap:8px;align-items:center;justify-content:center;background:var(--surface-2);border:1px solid var(--border);border-radius:99px;padding:10px 14px;margin-bottom:14px;font-size:.72rem;font-weight:600"><i data-lucide="smartphone" style="width:14px;height:14px"></i> Pix · confirmação em 1 toque</div>
+      <div class="hold-btn" id="holdBtn" onpointerdown="holdStart(event)" onpointerup="holdEnd()" onpointercancel="holdEnd()" onpointerleave="holdEnd()"><span class="hb-fill"></span><span class="hb-txt"><i data-lucide="fingerprint"></i> Segurar p/ confirmar</span></div>
+      <div style="text-align:center;font-size:.6rem;color:var(--text-3);margin-top:8px;font-family:var(--font-mono)">segure ~0,7s — gesto, sem modal</div>
+    </div>`;
+  sheet.classList.add('open');
+  applyIcons();
+}
+function simEmptyCart() {
+  state.cart = [];
+  syncMiniCart();
+  simCloseSheet();
+  showToast('Carrinho vazio', false);
+}
+function syncMiniCart() {
+  const mc = $('simMiniCart');
+  if (!mc) return;
+  const n = cartCount(), t = cartTotal();
+  mc.classList.toggle('show', n > 0);
+  $('mcQty').textContent = n + ' itens';
+  $('mcTotal').textContent = fmt(t);
+}
+
+/* ---------- hold to confirm (E3) ---------- */
+let holdT = null;
+function holdStart(e) {
+  if (holdT) { clearInterval(holdT); holdT = null; }
+  const btn = $('holdBtn'); if (!btn) return;
+  btn.classList.add('holding');
+  const fill = btn.querySelector('.hb-fill');
+  if (fill) fill.style.width = '100%';
+  holdT = setTimeout(() => { holdT = null; simConfirmOrder(); }, 700);
+}
+function holdEnd() {
+  if (holdT) { clearInterval(holdT); holdT = null; }
+  const btn = $('holdBtn'); if (!btn) return;
+  btn.classList.remove('holding');
+  const fill = btn.querySelector('.hb-fill');
+  if (fill) fill.style.width = '0';
+}
+function simConfirmOrder() {
+  $('simSheet').classList.remove('open');
+  state.cart = [];
+  syncMiniCart();
+  launchActive();
+  simGo('ticket');
+  showToast('Pedido #1216 confirmado — ticket vivo!');
+}
+
+/* ---------- Live Activity do ticket (E2) ---------- */
+function launchActive() {
+  state.active = true; state.step = 0;
+  if (state.laInt) clearInterval(state.laInt);
+  state.laInt = setInterval(() => {
+    if (!state.active) return;
+    if (state.step < 4) {
+      state.step++;
+      if (state.tab === 'ticket') render();
+      if (state.tab === 'pedidos') render();
+    } else {
+      clearInterval(state.laInt); state.laInt = null;
+    }
+  }, 4000);
+}
+
+/* ---------- init ---------- */
+render();
+</script>
+</body>
+</html>

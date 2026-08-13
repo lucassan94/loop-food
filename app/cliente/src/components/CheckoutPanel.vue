@@ -386,7 +386,7 @@ const freteInfo = ref(null)
 const erroFrete = ref(null)
 
 // Carregar CEP salvo do localStorage (do onboarding)
-const savedCep = localStorage.getItem('saborexpress_cep') || ''
+const savedCep = localStorage.getItem('kardapio_cep') || localStorage.getItem('saborexpress_cep') || ''
 
 // Tipo de entrega: 'delivery' | 'retirada'
 const tipoEntrega = ref('delivery')
@@ -752,7 +752,7 @@ async function confirmOrder() {
           cep: form.cep,
           cidade: form.cidade,
           estado: form.estado,
-          ...(form.latitude != null ? { latitude: form.latitude, longitude: form.longitude } : {}),
+          ...(form.latitude != null ? { latitude: Number(form.latitude), longitude: Number(form.longitude) } : {}),
         },
         subtotal: valorSubtotal,
         valor_frete: tipoEntrega.value === 'retirada' ? 0 : valorFrete,
@@ -814,7 +814,7 @@ async function confirmOrder() {
 
       // Salvar CEP no localStorage
       if (form.cep) {
-        localStorage.setItem('saborexpress_cep', form.cep.replace(/\D/g, ''))
+        localStorage.setItem('kardapio_cep', form.cep.replace(/\D/g, ''))
       }
 
     // Salvar endereço/CPF no perfil do cliente
@@ -876,7 +876,7 @@ async function confirmOrder() {
       cep_cliente: tipoEntrega.value === 'retirada' ? '' : form.cep,
       cidade_cliente: tipoEntrega.value === 'retirada' ? '' : form.cidade,
       estado_cliente: tipoEntrega.value === 'retirada' ? '' : form.estado,
-      ...(form.latitude != null && tipoEntrega.value !== 'retirada' ? { latitude_cliente: form.latitude, longitude_cliente: form.longitude } : {}),
+      ...(form.latitude != null && tipoEntrega.value !== 'retirada' ? { latitude_cliente: Number(form.latitude), longitude_cliente: Number(form.longitude) } : {}),
       subtotal: subtotal.value,
       valor_frete: tipoEntrega.value === 'retirada' ? 0 : (freteInfo.value?.custo || 0),
       total: tipoEntrega.value === 'retirada' ? subtotal.value : subtotal.value + (freteInfo.value?.custo || 0),
@@ -905,7 +905,7 @@ async function confirmOrder() {
     // Salvar dados do perfil para próximos pedidos
     await salvarPerfilNoCheckout(authStore.user?.cpf_cnpj || '')
     if (form.cep) {
-      localStorage.setItem('saborexpress_cep', form.cep.replace(/\D/g, ''))
+      localStorage.setItem('kardapio_cep', form.cep.replace(/\D/g, ''))
     }
 
     updateCart([])

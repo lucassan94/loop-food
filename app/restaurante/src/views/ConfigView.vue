@@ -610,13 +610,89 @@
         </div>
       </div>
     </div>
+
+    <!-- ── Tab: Integrações ── -->
+    <div v-if="activeTab === 'integracoes'" style="display:grid;gap:1.5rem;max-width:800px;">
+      <div class="card">
+        <div class="card-header">
+          <i-lucide-plug-zap style="width:16px;height:16px" /> iFood
+        </div>
+        <div class="card-body">
+          <p style="font-size:0.85rem;color:var(--text-muted);margin-bottom:1rem;">
+            Receba os pedidos do iFood direto na fila deste painel e sincronize seu cardápio. A ativação é por restaurante e não afeta os demais canais.
+          </p>
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:0.75rem 0;border-bottom:1px solid var(--border);">
+            <div>
+              <strong>Integração iFood</strong>
+              <p style="font-size:0.8rem;color:var(--text-muted);margin-top:2px;">Ative para começar a receber pedidos do iFood</p>
+            </div>
+            <label class="toggle" style="flex-shrink:0;">
+              <input type="checkbox" v-model="ifoodForm.ativo" />
+              <span class="slider"></span>
+            </label>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-top:1rem;">
+            <div class="form-group" style="margin-bottom:0;">
+              <label>Merchant ID (iFood)</label>
+              <input v-model="ifoodForm.merchant_id" placeholder="Ex: 123456" :disabled="!ifoodForm.ativo" />
+              <p style="font-size:0.72rem;color:var(--text-muted);margin-top:2px;">Número da loja no iFood (fornecido pelo parceiro).</p>
+            </div>
+            <div class="form-group" style="margin-bottom:0;">
+              <label>Ambiente</label>
+              <select v-model="ifoodForm.ambiente" :disabled="!ifoodForm.ativo">
+                <option value="sandbox">Sandbox (testes)</option>
+                <option value="producao">Produção</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-group" style="margin-top:0.75rem;margin-bottom:0;">
+            <label>Entrega dos pedidos iFood</label>
+            <select v-model="ifoodForm.delivery_mode" :disabled="!ifoodForm.ativo">
+              <option value="own">Entrega própria (frota Kardapio Digital)</option>
+              <option value="ifood">Entregador do iFood</option>
+            </select>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;margin-top:1rem;">
+            <label class="toggle" style="flex-shrink:0;">
+              <input type="checkbox" v-model="ifoodForm.sync_catalogo" :disabled="!ifoodForm.ativo" />
+              <span class="slider"></span>
+            </label>
+            <span style="font-size:0.85rem;color:var(--text-secondary);">Sincronizar cardápio automaticamente</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;margin-top:1rem;">
+            <label class="toggle" style="flex-shrink:0;">
+              <input type="checkbox" v-model="ifoodForm.auto_aceite" :disabled="!ifoodForm.ativo" />
+              <span class="slider"></span>
+            </label>
+            <span style="font-size:0.85rem;color:var(--text-secondary);">Aceitar pedidos automaticamente</span>
+            <span style="font-size:0.72rem;color:var(--text-muted);">Recomendado — evita cancelamento por atraso no aceite (SLA do iFood).</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;margin-top:1.25rem;flex-wrap:wrap;">
+            <button class="btn btn-primary" @click="salvarIfood" :disabled="salvandoIfood">
+              {{ salvandoIfood ? 'Salvando...' : 'Salvar Configuração' }}
+            </button>
+            <button class="btn btn-secondary" @click="testarIfood" :disabled="testandoIfood || !ifoodForm.ativo">
+              {{ testandoIfood ? 'Testando...' : 'Testar conexão' }}
+            </button>
+            <button class="btn btn-secondary" @click="sincronizarCardapioIfood" :disabled="sincronizandoIfood || !ifoodForm.ativo">
+              {{ sincronizandoIfood ? 'Sincronizando...' : 'Sincronizar cardápio agora' }}
+            </button>
+            <span v-if="ifoodMsg" class="retirada-msg" :class="ifoodMsg.tipo">{{ ifoodMsg.texto }}</span>
+          </div>
+          <div v-if="ifoodSyncInfo" style="margin-top:0.75rem;font-size:0.78rem;color:var(--text-muted);">
+            <div>Última sincronização: <strong>{{ ifoodSyncInfo.ultimaSync || 'nunca' }}</strong></div>
+            <div>Pedidos iFood: <strong>{{ ifoodSyncInfo.pedidosIfood }}</strong></div>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted, reactive, computed, markRaw } from 'vue'
 import api from '../services/api'
-import { Power, Store, Palette, MapPin, CreditCard, Table2, Users, Images } from 'lucide-vue-next'
+import { Power, Store, Palette, MapPin, CreditCard, Table2, Users, Images, PlugZap } from 'lucide-vue-next'
 
 // ── Tabs ──
 const tabs = [
@@ -628,6 +704,7 @@ const tabs = [
   { id: 'salao', label: 'Salão', icon: markRaw(Table2) },
   { id: 'equipe', label: 'Equipe', icon: markRaw(Users) },
   { id: 'carrossel', label: 'Carrossel', icon: markRaw(Images) },
+  { id: 'integracoes', label: 'Integrações', icon: markRaw(PlugZap) },
 ]
 const activeTab = ref('geral')
 
@@ -1072,7 +1149,96 @@ async function salvarRetiradaHorarios() {
   } finally { salvandoRetirada.value = false }
 }
 
-onMounted(() => { load(); carregarBanners(); loadMesas() })
+// ── Integrações: iFood ──
+const ifoodForm = reactive({ ativo: false, ambiente: 'sandbox', merchant_id: '', delivery_mode: 'own', sync_catalogo: false, auto_aceite: false })
+const salvandoIfood = ref(false)
+const testandoIfood = ref(false)
+const sincronizandoIfood = ref(false)
+const ifoodMsg = ref(null)
+const ifoodSyncInfo = ref(null)
+
+async function carregarIfood() {
+  try {
+    const { data } = await api.get('/ifood/settings')
+    ifoodForm.ativo = !!data.ativo
+    ifoodForm.ambiente = data.ambiente || 'sandbox'
+    ifoodForm.merchant_id = data.merchant_id || ''
+    ifoodForm.delivery_mode = data.delivery_mode || 'own'
+    ifoodForm.sync_catalogo = !!data.sync_catalogo
+    ifoodForm.auto_aceite = !!data.auto_aceite
+    carregarIfoodMetrics()
+  } catch (err) {
+    console.warn('[iFood] Falha ao carregar configurações:', err?.response?.data?.error || err.message)
+  }
+}
+
+async function carregarIfoodMetrics() {
+  try {
+    const { data } = await api.get('/ifood/metrics')
+    ifoodSyncInfo.value = {
+      ultimaSync: data.ultimaSync ? new Date(data.ultimaSync).toLocaleString('pt-BR') : null,
+      pedidosIfood: (data.porStatus || []).reduce((acc, s) => acc + (s.total || 0), 0),
+    }
+  } catch { /* métricas opcionais */ }
+}
+
+async function salvarIfood() {
+  ifoodMsg.value = null
+  if (ifoodForm.ativo && !ifoodForm.merchant_id.trim()) {
+    ifoodMsg.value = { tipo: 'error', texto: 'Informe o Merchant ID para ativar a integração iFood.' }
+    return
+  }
+  salvandoIfood.value = true
+  try {
+    await api.put('/ifood/settings', {
+      ativo: ifoodForm.ativo,
+      ambiente: ifoodForm.ambiente,
+      merchant_id: ifoodForm.merchant_id.trim() || null,
+      delivery_mode: ifoodForm.delivery_mode,
+      sync_catalogo: ifoodForm.sync_catalogo,
+      auto_aceite: ifoodForm.auto_aceite,
+    })
+    ifoodMsg.value = { tipo: 'success', texto: 'Configuração iFood salva com sucesso!' }
+    carregarIfoodMetrics()
+  } catch (err) {
+    ifoodMsg.value = { tipo: 'error', texto: err.response?.data?.error || 'Erro ao salvar a configuração.' }
+  } finally { salvandoIfood.value = false }
+}
+
+async function sincronizarCardapioIfood() {
+  sincronizandoIfood.value = true
+  ifoodMsg.value = null
+  try {
+    const { data } = await api.post('/ifood/catalog/sync', { ambiente: ifoodForm.ambiente })
+    ifoodMsg.value = {
+      tipo: 'success',
+      texto: `Cardápio sincronizado! ${data.categorias} categorias e ${data.itens} itens enviados ao iFood.`,
+    }
+    carregarIfoodMetrics()
+  } catch (err) {
+    ifoodMsg.value = { tipo: 'error', texto: err.response?.data?.error || 'Falha ao sincronizar o cardápio.' }
+  } finally { sincronizandoIfood.value = false }
+}
+
+async function testarIfood() {
+  testandoIfood.value = true
+  ifoodMsg.value = null
+  try {
+    const { data } = await api.post('/ifood/token', { ambiente: ifoodForm.ambiente })
+    const expira = data.token?.expiraEm
+    const rotuloAmbiente = data.ambiente === 'production' ? 'Produção' : 'Sandbox'
+    ifoodMsg.value = {
+      tipo: 'success',
+      texto: expira
+        ? `Conexão OK em ${rotuloAmbiente}! Token válido até ${new Date(expira).toLocaleTimeString('pt-BR')}.`
+        : `Conexão OK em ${rotuloAmbiente}! Token obtido com sucesso.`,
+    }
+  } catch (err) {
+    ifoodMsg.value = { tipo: 'error', texto: err.response?.data?.error || 'Falha na conexão com o iFood.' }
+  } finally { testandoIfood.value = false }
+}
+
+onMounted(() => { load(); carregarBanners(); loadMesas(); carregarIfood() })
 </script>
 
 <style scoped>

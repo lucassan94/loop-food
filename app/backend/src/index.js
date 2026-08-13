@@ -6,6 +6,7 @@ import http from 'http';
 import { config } from './config/index.js';
 import { initRealtime } from './services/realtime.js';
 import { iniciarPollingRede } from './services/pollingRede.js';
+import { iniciarPollingIfood } from './modules/ifood/polling.js';
 import { healthCheck } from './config/database.js';
 import { buscarCEP } from './services/cep.js';
 import { errorHandler, notFound } from './middleware/errorHandler.js';
@@ -24,6 +25,7 @@ import restauranteRoutes from './modules/restaurante/index.js';
 import dashboardRoutes from './modules/dashboard/index.js';
 import pagamentosRoutes from './modules/pagamentos/index.js';
 import pushRoutes from './modules/push/index.js';
+import ifoodRoutes from './modules/ifood/index.js';
 
 const app = express();
 const server = http.createServer(app);
@@ -160,6 +162,7 @@ app.use('/api/entregadores', entregadoresRoutes);
 app.use('/api/restaurante', restauranteRoutes);
 app.use('/api/pagamentos', pagamentosRoutes);
 app.use('/api/push', pushRoutes);
+app.use('/api/ifood', ifoodRoutes);
 
 // Rotas exclusivas do módulo Admin (restrição de módulo aplicada dentro de cada rota)
 app.use('/api/dashboard', dashboardRoutes);
@@ -223,8 +226,11 @@ initRealtime(server);
 // Polling de backup do pagamento (Rede) — confirma PIX quando o webhook não chega
 iniciarPollingRede();
 
+// Polling de eventos do iFood — traz pedidos do iFood para a fila (Fases 3+)
+iniciarPollingIfood();
+
 server.listen(config.port, '0.0.0.0', () => {
-  console.log(`\n🚀 SaborExpress Backend v2`);
+  console.log(`\n🚀 Kardapio Digital Backend v2`);
   console.log(`📡 Server: http://localhost:${config.port}`);
   console.log(`🏪 Restaurante ID: ${config.restaurantId}`);
   console.log(`📦 Database: ${config.db.host}:${config.db.port}/${config.db.database}`);

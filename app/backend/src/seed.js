@@ -18,9 +18,17 @@ async function seed() {
 
     // Admin user
     const adminHash = await bcrypt.hash('admin123', 12);
+    // Migrar email antigo da marca (SaborExpress) — torna o re-seed idempotente
+    // e evita criar um segundo admin quando o banco já foi populado antes.
+    await query(
+      `UPDATE restaurante_users SET email = 'admin@kardapiodigital.com'
+       WHERE restaurant_id = $1 AND apelido = 'admin'
+         AND email IS DISTINCT FROM 'admin@kardapiodigital.com'`,
+      [config.restaurantId]
+    );
     await query(
       `INSERT INTO restaurante_users (restaurant_id, nome, email, apelido, senha_hash, cargo)
-       VALUES ($1, 'Administrador', 'admin@saborexpress.com', 'admin', $2, 'admin')
+       VALUES ($1, 'Administrador', 'admin@kardapiodigital.com', 'admin', $2, 'admin')
        ON CONFLICT (restaurant_id, email) DO NOTHING`,
       [config.restaurantId, adminHash]
     );
@@ -218,16 +226,23 @@ async function seed() {
 
     // Sample entregador — login por username: entregador / entregador123
     const entregadorHash = await bcrypt.hash('entregador123', 12);
+    // Migrar email antigo da marca (SaborExpress) — idempotente como o admin
+    await query(
+      `UPDATE entregadores SET email = 'entregador@kardapiodigital.com'
+       WHERE restaurant_id = $1 AND apelido = 'entregador'
+         AND email IS DISTINCT FROM 'entregador@kardapiodigital.com'`,
+      [config.restaurantId]
+    );
     await query(
       `INSERT INTO entregadores (restaurant_id, nome, apelido, email, telefone, senha_hash, status)
-       VALUES ($1, 'Entregador', 'entregador', 'entregador@saborexpress.com', '(11) 98888-7777', $2, 'ativo')
+       VALUES ($1, 'Entregador', 'entregador', 'entregador@kardapiodigital.com', '(11) 98888-7777', $2, 'ativo')
        ON CONFLICT (restaurant_id, email) DO NOTHING`,
       [config.restaurantId, entregadorHash]
     );
     // Backfill: garantir apelido 'entregador' caso o registro já existisse
     await query(
       `UPDATE entregadores SET apelido = COALESCE(NULLIF(apelido, ''), 'entregador')
-       WHERE restaurant_id = $1 AND email = 'entregador@saborexpress.com'`,
+       WHERE restaurant_id = $1 AND email = 'entregador@kardapiodigital.com'`,
       [config.restaurantId]
     );
     console.log('✅ Test driver created: entregador / entregador123');

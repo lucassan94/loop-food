@@ -1,6 +1,6 @@
 import axios from 'axios'
 
-// Lê slug da URL (ex: ?slug=saborexpress) para fallback de tenant
+// Lê slug da URL (ex: ?slug=kardapio) para fallback de tenant
 let _urlSlug = null
 try {
   const params = new URLSearchParams(window.location.search)

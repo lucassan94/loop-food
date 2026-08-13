@@ -3,13 +3,15 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SaborExpress — Design System v2.1 · Proposta Evoluída</title>
+<title>Kardapio Digital — Design System v2.1 · Proposta Evoluída</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Sora:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<!-- Iconografia: Lucide — a MESMA biblioteca dos apps (lucide-vue-next). Nenhum ícone ilustrativo/emoji. -->
+<script src="https://unpkg.com/lucide@1.30.0/dist/umd/lucide.js"></script>
 <style>
 /* ============================================================================
-   SABOREXPRESS · DESIGN SYSTEM v2.1 — EVOLUÇÃO
+   KARDAPIO DIGITAL · DESIGN SYSTEM v2.1 — EVOLUÇÃO
    Proposta: tokens + componentes + simulador de app móvel
    ============================================================================ */
 
@@ -117,6 +119,7 @@ body{font-family:var(--font-ui);background:var(--bg);color:var(--text-1);line-he
 .brand{display:flex;align-items:center;gap:var(--s-3);font-family:var(--font-display);font-weight:700;font-size:1.05rem;letter-spacing:-.02em;color:var(--text-1);text-decoration:none}
 .brand-mark{width:38px;height:38px;border-radius:14px;background:var(--grad-brand);display:grid;place-items:center;color:#fff;font-size:1.15rem;box-shadow:var(--shadow-glow)}
 .brand small{display:block;font-family:var(--font-ui);font-weight:500;font-size:.62rem;color:var(--text-3);letter-spacing:.12em;text-transform:uppercase}
+.brand-mark svg.lucide{width:22px;height:22px}
 .nav-links{display:flex;align-items:center;gap:var(--s-1)}
 .nav-links a{padding:.45rem .85rem;border-radius:var(--r-md);font-size:.85rem;font-weight:500;color:var(--text-2);text-decoration:none;transition:all .2s var(--trans)}
 .nav-links a:hover{color:var(--text-1);background:var(--border)}
@@ -315,6 +318,8 @@ body{font-family:var(--font-ui);background:var(--bg);color:var(--text-1);line-he
 .sheet-demo{position:absolute;left:0;right:0;bottom:0;background:var(--surface);border-radius:var(--r-xl) var(--r-xl) 0 0;box-shadow:var(--shadow-elev);padding:var(--s-4);transform:translateY(20px);animation:sheetup .5s var(--ease-spring) both}
 @keyframes sheetup{from{transform:translateY(80px);opacity:0}to{transform:none;opacity:1}}
 .sheet-handle{width:42px;height:5px;border-radius:var(--r-full);background:var(--border-strong);margin:0 auto 14px}
+.sheet-close svg.lucide{width:16px;height:16px}
+.sim-sheet .sheet-close{color:var(--text-3)}
 .sheet-demo .sd-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
 .sheet-demo .sd-head b{font-family:var(--font-display);font-size:.95rem}
 .sheet-demo .sd-row{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r-lg);margin-bottom:8px;font-size:.8rem}
@@ -525,6 +530,42 @@ table.ds-table{width:100%;border-collapse:collapse;font-size:.84rem;min-width:62
 .tag-pill{font-family:var(--font-mono);font-size:.64rem;color:var(--text-3);background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r-full);padding:2px 8px}
 
 /* ============================================================
+   ICONOGRAFIA — LUCIDE (SVG em traço, herda currentColor)
+   ============================================================ */
+svg.lucide{display:inline-block;vertical-align:-0.18em;flex-shrink:0}
+.principle .ico svg.lucide{width:22px;height:22px;color:var(--brand-600)}
+.evol-ico svg.lucide{width:20px;height:20px;color:#fff}
+.token-block h4 svg.lucide{width:15px;height:15px;color:var(--text-2)}
+.sc-ico svg.lucide{width:20px;height:20px}
+.countdown .cd-ico svg.lucide{width:13px;height:13px}
+.st-ico svg.lucide{width:15px;height:15px}
+.tabbar .tab svg.lucide{width:20px;height:20px}
+.mc-ico svg.lucide{width:22px;height:22px;color:#fff}
+.mc-go svg.lucide{width:18px;height:18px;color:var(--brand-600)}
+.fab svg.lucide{width:24px;height:24px}
+.empty-state .e-ico svg.lucide{width:30px;height:30px;color:var(--brand-600)}
+.queue-empty .big svg.lucide{width:44px;height:44px;color:var(--text-3)}
+.m-ico svg.lucide{width:24px;height:24px;color:var(--danger-500)}
+.toast .t-ico svg.lucide{width:17px;height:17px}
+.affix svg.lucide{width:15px;height:15px}
+.mock-avatar svg.lucide{width:16px;height:16px;color:var(--brand-600)}
+.err-msg svg.lucide{width:13px;height:13px;flex-shrink:0}
+.theme-toggle svg.lucide{width:18px;height:18px}
+.queue-head h3 svg.lucide{width:20px;height:20px;vertical-align:-4px;color:var(--brand-600)}
+.oc-head b svg.lucide{width:16px;height:16px;vertical-align:-3px;margin-right:6px;color:var(--text-2)}
+.b-badge svg.lucide,.b-meta span svg.lucide{width:12px;height:12px}
+.sim-banner p svg.lucide{width:14px;height:14px;vertical-align:-3px}
+.sim-search svg.lucide{width:16px;height:16px;opacity:.5}
+.sim-tabbar button svg.lucide{width:20px;height:20px}
+.sim-cat svg.lucide{width:15px;height:15px}
+.p-img svg.lucide,.ci-img svg.lucide{width:42px;height:42px;color:#fff;stroke-width:1.6}
+.sheet-hero svg.lucide{width:56px;height:56px;color:#fff;stroke-width:1.6}
+.ts-count svg.lucide{width:15px;height:15px}
+.c-stars svg.lucide{width:12px;height:12px;color:var(--gold-500)}
+.demo-list .demo-li{display:flex;align-items:flex-start;gap:8px}
+.demo-list svg.lucide{width:14px;height:14px;color:var(--success-600);margin-top:3px;flex-shrink:0}
+
+/* ============================================================
    SIMULADOR DO APP (celular)
    ============================================================ */
 .sim-shell{display:flex;gap:var(--s-7);align-items:center;justify-content:center;flex-wrap:wrap}
@@ -650,8 +691,8 @@ table.ds-table{width:100%;border-collapse:collapse;font-size:.84rem;min-width:62
 <nav class="navbar">
   <div class="container navbar-inner">
     <a class="brand" href="#top">
-      <span class="brand-mark">🍕</span>
-      <span>SaborExpress<small>Design System · v2.1</small></span>
+      <span class="brand-mark"><i data-lucide="utensils-crossed"></i></span>
+      <span>Kardapio Digital<small>Design System · v2.1</small></span>
     </a>
     <div class="nav-links">
       <a href="#principios">Princípios</a>
@@ -664,7 +705,7 @@ table.ds-table{width:100%;border-collapse:collapse;font-size:.84rem;min-width:62
       <a href="#simulador">Simulador</a>
     </div>
     <div class="nav-actions">
-      <button class="theme-toggle" id="themeToggle" title="Alternar tema" aria-label="Alternar tema">🌙</button>
+      <button class="theme-toggle" id="themeToggle" title="Alternar tema" aria-label="Alternar tema"><i data-lucide="moon"></i></button>
       <a class="btn-nav" href="#simulador">Simular app ↓</a>
     </div>
   </div>
@@ -675,7 +716,7 @@ table.ds-table{width:100%;border-collapse:collapse;font-size:.84rem;min-width:62
   <div class="container hero-grid">
     <div>
       <span class="eyebrow"><span class="dot"></span> Proposta evoluída · v2.1</span>
-      <h1>O <span class="grad">novo SaborExpress</span>, evoluído em cada detalhe.</h1>
+      <h1>O <span class="grad">novo Kardapio Digital</span>, evoluído em cada detalhe.</h1>
       <p class="lead">Do token à tela: sombras de elevação, raios generosos, posicionamento de ações na zona do polegar, bottom sheets, steppers de rastreio e um simulador de app móvel — tudo navegável nesta página.</p>
       <div class="hero-cta">
         <button class="btn btn-primary" onclick="document.getElementById('evolucoes').scrollIntoView({behavior:'smooth'})">Ver evoluções</button>
@@ -689,20 +730,20 @@ table.ds-table{width:100%;border-collapse:collapse;font-size:.84rem;min-width:62
       </div>
     </div>
     <div class="hero-mock">
-      <div class="mock-bar"><i></i><i></i><i></i><span>app.saborexpress.com.br — fila de pedidos</span></div>
+      <div class="mock-bar"><i></i><i></i><i></i><span>app.kardapiodigital.com.br — fila de pedidos</span></div>
       <div class="mock-body">
         <div class="mock-title"><b>Pedidos ativos</b><span class="pill pill-warning"><span class="pill-dot" style="background:var(--warning-500)"></span> 5 na fila</span></div>
         <div class="mock-row">
-          <div class="l"><span class="mock-avatar">👤</span><div><b>#1190 · Carlos M.</b><small>1 Pizza Calabresa · 2 Refrigerantes</small></div></div>
+          <div class="l"><span class="mock-avatar"><i data-lucide="user"></i></span><div><b>#1190 · Carlos M.</b><small>1 Pizza Calabresa · 2 Refrigerantes</small></div></div>
           <div><span class="pill pill-info">PREPARANDO</span></div>
         </div>
         <div class="mock-row">
-          <div class="l"><span class="mock-avatar">👤</span><div><b>#1191 · Ana Paula</b><small>1 X-Salada · Batata G · 1 Suco</small></div></div>
+          <div class="l"><span class="mock-avatar"><i data-lucide="user"></i></span><div><b>#1191 · Ana Paula</b><small>1 X-Salada · Batata G · 1 Suco</small></div></div>
           <div><span class="pill pill-warning">AGUARDANDO</span></div>
         </div>
         <div class="mock-row">
-          <div class="l"><span class="mock-avatar">👤</span><div><b>#1192 · J. Ribeiro</b><small>2 Esfihas · 1 Guaraná</small></div></div>
-          <div><span class="timer urgent">⏱ 2 min</span></div>
+          <div class="l"><span class="mock-avatar"><i data-lucide="user"></i></span><div><b>#1192 · J. Ribeiro</b><small>2 Esfihas · 1 Guaraná</small></div></div>
+          <div><span class="timer urgent"><i data-lucide="timer"></i> 2 min</span></div>
         </div>
         <div class="progress"><span></span></div>
         <div style="display:flex;justify-content:space-between;margin-top:.55rem">
@@ -723,10 +764,10 @@ table.ds-table{width:100%;border-collapse:collapse;font-size:.84rem;min-width:62
       <p>Os pilares que guiam cada decisão visual — agora com camadas novas para mobile-first e experiência do cliente.</p>
     </div>
     <div class="grid-4">
-      <div class="principle"><div class="ico">🍕</div><h3>Calor de marca</h3><p>Vermelho→laranja permanece protagonista, com gradientes mais profundos e dourado para valorização e fidelidade.</p></div>
-      <div class="principle"><div class="ico">👍</div><h3>Zona do polegar</h3><p>Ações principais movem-se para o alcance natural do polegar: barras inferiores, FABs e CTAs fixos. (novidade)</p></div>
-      <div class="principle"><div class="ico">🧭</div><h3>Foco no pedido</h3><p>Timer, status e total são sempre os elementos mais visíveis — no card do restaurante e no rastreio do cliente.</p></div>
-      <div class="principle"><div class="ico">♿</div><h3>Acessível desde o início</h3><p>Contraste AA, foco visível, alvos de toque ≥44px e dark mode com hierarquia preservada.</p></div>
+      <div class="principle"><div class="ico"><i data-lucide="flame"></i></div><h3>Calor de marca</h3><p>Vermelho→laranja permanece protagonista, com gradientes mais profundos e dourado para valorização e fidelidade.</p></div>
+      <div class="principle"><div class="ico"><i data-lucide="hand"></i></div><h3>Zona do polegar</h3><p>Ações principais movem-se para o alcance natural do polegar: barras inferiores, FABs e CTAs fixos. (novidade)</p></div>
+      <div class="principle"><div class="ico"><i data-lucide="compass"></i></div><h3>Foco no pedido</h3><p>Timer, status e total são sempre os elementos mais visíveis — no card do restaurante e no rastreio do cliente.</p></div>
+      <div class="principle"><div class="ico"><i data-lucide="accessibility"></i></div><h3>Acessível desde o início</h3><p>Contraste AA, foco visível, alvos de toque ≥44px e dark mode com hierarquia preservada.</p></div>
     </div>
   </div>
 </section>
@@ -741,46 +782,46 @@ table.ds-table{width:100%;border-collapse:collapse;font-size:.84rem;min-width:62
     </div>
 
     <div class="token-block">
-      <h4>🔴 Marca <span class="tag">--brand-*</span></h4>
+      <h4><i data-lucide="flame"></i> Marca <span class="tag">--brand-*</span></h4>
       <div class="swatches" id="brandSwatches"></div>
     </div>
 
     <div class="token-block">
-      <h4>🟠 Acento <span class="tag">--accent-*</span></h4>
+      <h4><i data-lucide="sun"></i> Acento <span class="tag">--accent-*</span></h4>
       <div class="swatches" id="accentSwatches"></div>
     </div>
 
     <div class="token-block">
-      <h4>🌟 Novo · Dourado <span class="tag">--gold-* (fidelidade, avaliação, destaque)</span></h4>
+      <h4><i data-lucide="crown"></i> Novo · Dourado <span class="tag">--gold-* (fidelidade, avaliação, destaque)</span></h4>
       <div class="swatches" id="goldSwatches"></div>
     </div>
 
     <div class="grid-2">
       <div class="token-block">
-        <h4>✅ Sucesso <span class="tag">--success-*</span></h4>
+        <h4><i data-lucide="circle-check"></i> Sucesso <span class="tag">--success-*</span></h4>
         <div class="swatches" id="successSwatches"></div>
       </div>
       <div class="token-block">
-        <h4>⚠️ Alerta <span class="tag">--warning-*</span></h4>
+        <h4><i data-lucide="triangle-alert"></i> Alerta <span class="tag">--warning-*</span></h4>
         <div class="swatches" id="warningSwatches"></div>
       </div>
       <div class="token-block">
-        <h4>🔵 Info <span class="tag">--info-*</span></h4>
+        <h4><i data-lucide="info"></i> Info <span class="tag">--info-*</span></h4>
         <div class="swatches" id="infoSwatches"></div>
       </div>
       <div class="token-block">
-        <h4>🟣 Destaque <span class="tag">--violet-*</span></h4>
+        <h4><i data-lucide="star"></i> Destaque <span class="tag">--violet-*</span></h4>
         <div class="swatches" id="violetSwatches"></div>
       </div>
     </div>
 
     <div class="token-block">
-      <h4>⬜ Neutros <span class="tag">--text-* / --surface / --border (nova: com toque quente)</span></h4>
+      <h4><i data-lucide="contrast"></i> Neutros <span class="tag">--text-* / --surface / --border (nova: com toque quente)</span></h4>
       <div class="swatches" id="neutralSwatches"></div>
     </div>
 
     <div class="token-block">
-      <h4>🌐 Gradientes (evolução)</h4>
+      <h4><i data-lucide="swatch-book"></i> Gradientes (evolução)</h4>
       <div class="swatches" style="flex-wrap:nowrap;min-width:0">
         <div class="swatch" data-copy="linear-gradient(135deg, #dc2626 0%, #f97316 100%)">
           <div class="chip" style="background:var(--grad-brand)"></div>
@@ -898,42 +939,42 @@ table.ds-table{width:100%;border-collapse:collapse;font-size:.84rem;min-width:62
     </div>
     <div class="evol-grid">
       <div class="evol-card">
-        <div class="evol-head"><span class="evol-ico">🔘</span><div><h3>Botões &amp; ações</h3><span class="evol-badge">posicionamento</span></div></div>
+        <div class="evol-head"><span class="evol-ico"><i data-lucide="mouse-pointer-click"></i></span><div><h3>Botões &amp; ações</h3><span class="evol-badge">posicionamento</span></div></div>
         <div class="versus">
           <div class="v old"><span class="vtag">V1</span>Ações só no topo/rodapé da página — fora do alcance do polegar em mobile.</div>
           <div class="v new"><span class="vtag">V2</span>CTA fixo inferior, FAB com ripple, tab bar e mini-carrinho na zona do polegar.</div>
         </div>
       </div>
       <div class="evol-card">
-        <div class="evol-head"><span class="evol-ico">🪟</span><div><h3>Superfícies</h3><span class="evol-badge">padrões</span></div></div>
+        <div class="evol-head"><span class="evol-ico"><i data-lucide="layers"></i></span><div><h3>Superfícies</h3><span class="evol-badge">padrões</span></div></div>
         <div class="versus">
           <div class="v old"><span class="vtag">V1</span>Modais centrais e telas inteiras para detalhes de produto.</div>
           <div class="v new"><span class="vtag">V2</span>Bottom sheets com handle, glass navbar e elev. shadow própria p/ sair de baixo.</div>
         </div>
       </div>
       <div class="evol-card">
-        <div class="evol-head"><span class="evol-ico">🎨</span><div><h3>Cor &amp; clima</h3><span class="evol-badge">tokens</span></div></div>
+        <div class="evol-head"><span class="evol-ico"><i data-lucide="palette"></i></span><div><h3>Cor &amp; clima</h3><span class="evol-badge">tokens</span></div></div>
         <div class="versus">
           <div class="v old"><span class="vtag">V1</span>Dois tons de marca + neutros frios (cinza-azulado).</div>
           <div class="v new"><span class="vtag">V2</span>Gradiente deep, dourado para fidelidade e neutros com toque quente (mais acolhedor).</div>
         </div>
       </div>
       <div class="evol-card">
-        <div class="evol-head"><span class="evol-ico">📐</span><div><h3>Forma &amp; sombra</h3><span class="evol-badge">tokens</span></div></div>
+        <div class="evol-head"><span class="evol-ico"><i data-lucide="ruler"></i></span><div><h3>Forma &amp; sombra</h3><span class="evol-badge">tokens</span></div></div>
         <div class="versus">
           <div class="v old"><span class="vtag">V1</span>Raio fixo 12px e sombras uniformes para tudo.</div>
           <div class="v new"><span class="vtag">V2</span>Escala de raio até 40px, sombras de elevação por camada e glow da marca em CTAs.</div>
         </div>
       </div>
       <div class="evol-card">
-        <div class="evol-head"><span class="evol-ico">🧾</span><div><h3>Experiência do cliente</h3><span class="evol-badge">flow</span></div></div>
+        <div class="evol-head"><span class="evol-ico"><i data-lucide="receipt-text"></i></span><div><h3>Experiência do cliente</h3><span class="evol-badge">flow</span></div></div>
         <div class="versus">
           <div class="v old"><span class="vtag">V1</span>Status só textual no pedido; nenhuma sensação de progresso.</div>
           <div class="v new"><span class="vtag">V2</span>Stepper visual de rastreio, countdown ao vivo, card do entregador e progresso em tempo real.</div>
         </div>
       </div>
       <div class="evol-card">
-        <div class="evol-head"><span class="evol-ico">⚡</span><div><h3>Estados de UI</h3><span class="evol-badge">feedback</span></div></div>
+        <div class="evol-head"><span class="evol-ico"><i data-lucide="zap"></i></span><div><h3>Estados de UI</h3><span class="evol-badge">feedback</span></div></div>
         <div class="versus">
           <div class="v old"><span class="vtag">V1</span>Loading genérico e listas vazias sem orientação.</div>
           <div class="v new"><span class="vtag">V2</span>Skeleton shimmer, empty states ilustrados e toasts com ações.</div>
@@ -968,7 +1009,7 @@ table.ds-table{width:100%;border-collapse:collapse;font-size:.84rem;min-width:62
           <div class="thumb-zone"><span>ZONA DO POLEGAR</span></div>
           <div class="mock-ui" style="top:20px;left:50%;transform:translateX(-50%);width:70%;height:120px;background:var(--surface-2)"></div>
           <div class="mini-cart">
-            <div class="mc-l"><span class="mc-ico">🛒</span><div class="mc-t"><b>2 itens</b>R$ 92,40 · ver carrinho</div></div>
+            <div class="mc-l"><span class="mc-ico"><i data-lucide="shopping-bag"></i></span><div class="mc-t"><b>2 itens</b>R$ 92,40 · ver carrinho</div></div>
             <span class="mc-go">→</span>
           </div>
         </div>
@@ -979,7 +1020,7 @@ table.ds-table{width:100%;border-collapse:collapse;font-size:.84rem;min-width:62
         <div class="pattern-canvas">
           <div class="thumb-zone"><span>ZONA DO POLEGAR</span></div>
           <div class="mock-ui" style="top:24px;left:50%;transform:translateX(-50%);width:70%;height:110px;background:var(--surface-2)"></div>
-          <button class="fab" title="Nova ação">＋</button>
+          <button class="fab" title="Nova ação"><i data-lucide="plus"></i></button>
         </div>
         <p style="font-size:.78rem;color:var(--text-2)">Para ações frequentes com ripple de atenção — ex.: “novo pedido” no KDS.</p>
       </div>
@@ -989,9 +1030,9 @@ table.ds-table{width:100%;border-collapse:collapse;font-size:.84rem;min-width:62
           <div class="thumb-zone"><span>ZONA DO POLEGAR</span></div>
           <div class="mock-ui" style="top:24px;left:50%;transform:translateX(-50%);width:70%;height:120px;background:var(--surface-2)"></div>
           <div class="tabbar">
-            <button class="tab active"><i>🍕</i>Cardápio</button>
-            <button class="tab"><i>📋</i>Pedidos</button>
-            <button class="tab"><i>👤</i>Perfil</button>
+            <button class="tab active"><i data-lucide="utensils-crossed"></i>Cardápio</button>
+            <button class="tab"><i data-lucide="receipt"></i>Pedidos</button>
+            <button class="tab"><i data-lucide="user"></i>Perfil</button>
           </div>
         </div>
         <p style="font-size:.78rem;color:var(--text-2)">Navegação principal sempre visível, com badge de notificação no item ativo.</p>
@@ -1049,7 +1090,7 @@ table.ds-table{width:100%;border-collapse:collapse;font-size:.84rem;min-width:62
         <button class="btn btn-primary btn-sm">Pequeno</button>
         <button class="btn btn-primary">Médio</button>
         <button class="btn btn-primary btn-lg">Grande</button>
-        <button class="btn btn-primary btn-icon" title="Ícone">➕</button>
+        <button class="btn btn-primary btn-icon" title="Ícone"><i data-lucide="plus"></i></button>
         <button class="btn btn-outline" disabled>Desabilitado</button>
         <button class="btn btn-primary"><span class="spin"></span> Salvando…</button>
       </div>
@@ -1067,7 +1108,7 @@ table.ds-table{width:100%;border-collapse:collapse;font-size:.84rem;min-width:62
         </div>
         <div class="field">
           <label>Telefone / WhatsApp</label>
-          <div class="input-affix"><span class="affix">📱</span><input class="input" placeholder="(11) 98765-4321"></div>
+          <div class="input-affix"><span class="affix"><i data-lucide="smartphone"></i></span><input class="input" placeholder="(11) 98765-4321"></div>
         </div>
         <div class="field">
           <label>Forma de pagamento</label>
@@ -1085,7 +1126,7 @@ table.ds-table{width:100%;border-collapse:collapse;font-size:.84rem;min-width:62
         <div class="field">
           <label>Com erro</label>
           <input class="input input-error" value="12345">
-          <div class="err-msg">⚠️ Número de telefone inválido.</div>
+          <div class="err-msg"><i data-lucide="triangle-alert"></i> Número de telefone inválido.</div>
         </div>
       </div>
       <div class="form-card">
@@ -1164,19 +1205,19 @@ table.ds-table{width:100%;border-collapse:collapse;font-size:.84rem;min-width:62
     <h4 style="font-size:.85rem;margin-bottom:var(--s-3)">Cards de métricas</h4>
     <div class="grid-4" style="margin-bottom:var(--s-5)">
       <div class="stat-card">
-        <div class="sc-top"><div><div class="sc-label">Faturamento hoje</div><div class="sc-value">R$ 1.284</div></div><span class="sc-ico red">💰</span></div>
+        <div class="sc-top"><div><div class="sc-label">Faturamento hoje</div><div class="sc-value">R$ 1.284</div></div><span class="sc-ico red"><i data-lucide="banknote"></i></span></div>
         <span class="sc-trend up">▲ 12,4% vs ontem</span>
       </div>
       <div class="stat-card">
-        <div class="sc-top"><div><div class="sc-label">Pedidos ativos</div><div class="sc-value">5</div></div><span class="sc-ico amber">📋</span></div>
+        <div class="sc-top"><div><div class="sc-label">Pedidos ativos</div><div class="sc-value">5</div></div><span class="sc-ico amber"><i data-lucide="clipboard-list"></i></span></div>
         <span class="sc-trend down">▼ 2 vs agora há pouco</span>
       </div>
       <div class="stat-card">
-        <div class="sc-top"><div><div class="sc-label">Ticket médio</div><div class="sc-value">R$ 46,70</div></div><span class="sc-ico green">🧾</span></div>
+        <div class="sc-top"><div><div class="sc-label">Ticket médio</div><div class="sc-value">R$ 46,70</div></div><span class="sc-ico green"><i data-lucide="receipt"></i></span></div>
         <span class="sc-trend up">▲ 3,1%</span>
       </div>
       <div class="stat-card">
-        <div class="sc-top"><div><div class="sc-label">Tempo de preparo</div><div class="sc-value">18 <span style="font-size:.9rem;font-weight:600">min</span></div></div><span class="sc-ico blue">⏱️</span></div>
+        <div class="sc-top"><div><div class="sc-label">Tempo de preparo</div><div class="sc-value">18 <span style="font-size:.9rem;font-weight:600">min</span></div></div><span class="sc-ico blue"><i data-lucide="timer"></i></span></div>
         <span class="sc-trend up">▲ 1 min</span>
       </div>
     </div>
@@ -1194,7 +1235,7 @@ table.ds-table{width:100%;border-collapse:collapse;font-size:.84rem;min-width:62
           <div class="oc-foot">
             <span class="oc-total">R$ 62,90</span>
             <div style="display:flex;gap:8px;align-items:center">
-              <span class="countdown" data-created="now-20min" data-total="45"><span class="cd-ico">⏱️</span><span class="cd-text">—</span></span>
+              <span class="countdown" data-created="now-20min" data-total="45"><span class="cd-ico"><i data-lucide="timer"></i></span><span class="cd-text">—</span></span>
               <button class="btn btn-success btn-sm">Pronto</button>
             </div>
           </div>
@@ -1208,7 +1249,7 @@ table.ds-table{width:100%;border-collapse:collapse;font-size:.84rem;min-width:62
           <div class="oc-foot">
             <span class="oc-total">R$ 41,50</span>
             <div style="display:flex;gap:8px;align-items:center">
-              <span class="countdown" data-created="now-38min" data-total="45"><span class="cd-ico">⏱️</span><span class="cd-text">—</span></span>
+              <span class="countdown" data-created="now-38min" data-total="45"><span class="cd-ico"><i data-lucide="timer"></i></span><span class="cd-text">—</span></span>
               <button class="btn btn-primary btn-sm">Iniciar</button>
             </div>
           </div>
@@ -1238,7 +1279,7 @@ table.ds-table{width:100%;border-collapse:collapse;font-size:.84rem;min-width:62
             <div class="kds-item"><span>Batata Frita M</span><span class="qty">×1</span></div>
           </div>
           <div class="kds-timer">
-            <span class="countdown warn" data-created="now-38min" data-total="45"><span class="cd-ico">⏱️</span><span class="cd-text">—</span></span>
+            <span class="countdown warn" data-created="now-38min" data-total="45"><span class="cd-ico"><i data-lucide="timer"></i></span><span class="cd-text">—</span></span>
             <b style="font-family:var(--font-display)">4 itens</b>
           </div>
           <div class="kds-progress"><span style="width:60%"></span></div>
@@ -1269,10 +1310,10 @@ table.ds-table{width:100%;border-collapse:collapse;font-size:.84rem;min-width:62
       <div class="form-card">
         <h4 style="font-size:.85rem;margin-bottom:var(--s-4)">Stepper de rastreio</h4>
         <div class="stepper">
-          <div class="stp done"><span class="st-ico">✓</span><span class="st-lbl">Recebido</span></div>
-          <div class="stp done"><span class="st-ico">✓</span><span class="st-lbl">Preparando</span></div>
-          <div class="stp active"><span class="st-ico">🚚</span><span class="st-lbl">Saiu p/ entrega</span></div>
-          <div class="stp"><span class="st-ico">🏠</span><span class="st-lbl">Entregue</span></div>
+          <div class="stp done"><span class="st-ico"><i data-lucide="check"></i></span><span class="st-lbl">Recebido</span></div>
+          <div class="stp done"><span class="st-ico"><i data-lucide="check"></i></span><span class="st-lbl">Preparando</span></div>
+          <div class="stp active"><span class="st-ico"><i data-lucide="truck"></i></span><span class="st-lbl">Saiu p/ entrega</span></div>
+          <div class="stp"><span class="st-ico"><i data-lucide="home"></i></span><span class="st-lbl">Entregue</span></div>
         </div>
         <p style="font-size:.78rem;color:var(--text-2);margin-top:var(--s-2)">Cada etapa concluída fica verde; a atual pulsa com a cor da marca. No simulador abaixo ele avança sozinho.</p>
       </div>
@@ -1288,7 +1329,7 @@ table.ds-table{width:100%;border-collapse:collapse;font-size:.84rem;min-width:62
       <div class="form-card">
         <h4 style="font-size:.85rem;margin-bottom:var(--s-4)">Empty state ilustrado</h4>
         <div class="empty-state">
-          <div class="e-ico">🛒</div>
+          <div class="e-ico"><i data-lucide="shopping-bag"></i></div>
           <h4>Seu carrinho está vazio</h4>
           <p>Que tal começar com uma pizza?</p>
           <button class="btn btn-primary btn-sm">Ver cardápio</button>
@@ -1319,7 +1360,7 @@ table.ds-table{width:100%;border-collapse:collapse;font-size:.84rem;min-width:62
     </div>
     <div class="queue-demo">
       <div class="queue-head">
-        <h3>🍕 Fila de pedidos</h3>
+        <h3><i data-lucide="clipboard-list"></i> Fila de pedidos</h3>
         <div class="filter-bar-demo" style="display:flex;gap:var(--s-3);align-items:center;flex-wrap:wrap">
           <div class="radio-group">
             <label class="radio-pill"><input type="radio" name="queueFilter" value="ativos" checked><span class="lbl">Ativos <span class="count">3</span></span></label>
@@ -1346,25 +1387,25 @@ table.ds-table{width:100%;border-collapse:collapse;font-size:.84rem;min-width:62
     <div class="sim-shell">
       <div class="phone" id="phone">
         <div class="phone-notch"></div>
-        <div class="phone-status"><span>20:42</span><span>📶 🔋 82%</span></div>
+        <div class="phone-status"><span>20:42</span><span><i data-lucide="wifi"></i> <i data-lucide="battery-full"></i> 82%</span></div>
         <div class="phone-screen">
           <div class="screen" id="simScreen"></div>
         </div>
         <div class="sim-minicart" id="simMiniCart" onclick="simOpenCart()">
-          <div class="mc-l"><span class="mc-ico">🛒</span><div class="mc-t" id="simMiniText"><b>0 itens</b>ver carrinho</div></div>
+          <div class="mc-l"><span class="mc-ico"><i data-lucide="shopping-bag"></i></span><div class="mc-t" id="simMiniText"><b>0 itens</b>ver carrinho</div></div>
           <span class="mc-go">→</span>
         </div>
         <div class="sim-tabbar">
-          <button class="active" data-tab="home" onclick="simGo('home')"><i>🍕</i>Cardápio</button>
-          <button data-tab="pedidos" onclick="simGo('pedidos')"><i>📋</i>Pedidos</button>
-          <button data-tab="perfil" onclick="simGo('perfil')"><i>👤</i>Perfil</button>
+          <button class="active" data-tab="home" onclick="simGo('home')"><i data-lucide="utensils-crossed"></i>Cardápio</button>
+          <button data-tab="pedidos" onclick="simGo('pedidos')"><i data-lucide="receipt"></i>Pedidos</button>
+          <button data-tab="perfil" onclick="simGo('perfil')"><i data-lucide="user"></i>Perfil</button>
         </div>
         <!-- bottom sheet de produto -->
         <div class="sim-sheet" id="simSheet">
           <div class="sheet-back" onclick="simCloseSheet()"></div>
           <div class="sheet">
-            <button class="sheet-close" onclick="simCloseSheet()">✕</button>
-            <div class="sheet-hero" id="simSheetHero">🍕</div>
+            <button class="sheet-close" onclick="simCloseSheet()"><i data-lucide="x"></i></button>
+            <div class="sheet-hero" id="simSheetHero"><i data-lucide="pizza"></i></div>
             <div class="sheet-title" id="simSheetTitle">Pizza Calabresa</div>
             <div class="sheet-desc" id="simSheetDesc"></div>
             <div class="sheet-opts" id="simSheetOpts"></div>
@@ -1392,13 +1433,13 @@ table.ds-table{width:100%;border-collapse:collapse;font-size:.84rem;min-width:62
         </div>
         <div class="pattern-demo">
           <h4 style="font-size:.85rem;margin-bottom:var(--s-3)">O que está em teste nesta tela</h4>
-          <div style="display:grid;gap:8px;font-size:.78rem;color:var(--text-2)">
-            <div>✅ Bottom sheet com handle e spring easing</div>
-            <div>✅ Mini-carrinho flutuante na zona do polegar</div>
-            <div>✅ Tab bar com badges e glassmorphism</div>
-            <div>✅ Stepper de rastreio auto-avançando</div>
-            <div>✅ Countdown com fórmula real do app (preparo 20 + entrega 25)</div>
-            <div>✅ Cardápio com cards de produto e categorias em pílulas</div>
+          <div class="demo-list" style="display:grid;gap:8px;font-size:.78rem;color:var(--text-2)">
+            <div class="demo-li"><i data-lucide="check"></i> Bottom sheet com handle e spring easing</div>
+            <div class="demo-li"><i data-lucide="check"></i> Mini-carrinho flutuante na zona do polegar</div>
+            <div class="demo-li"><i data-lucide="check"></i> Tab bar com badges e glassmorphism</div>
+            <div class="demo-li"><i data-lucide="check"></i> Stepper de rastreio auto-avançando</div>
+            <div class="demo-li"><i data-lucide="check"></i> Countdown com fórmula real do app (preparo 20 + entrega 25)</div>
+            <div class="demo-li"><i data-lucide="check"></i> Cardápio com cards de produto e categorias em pílulas</div>
           </div>
         </div>
       </div>
@@ -1409,20 +1450,21 @@ table.ds-table{width:100%;border-collapse:collapse;font-size:.84rem;min-width:62
 <!-- ============ FOOTER ============ -->
 <footer class="footer">
   <div class="container">
-    <p><b>SaborExpress · Design System v2.1</b> — proposta evoluída para revisão. Build <b>0.2.1-beta</b> · 08/2026</p>
+    <p><b>Kardapio Digital · Design System v2.1</b> — proposta evoluída para revisão. Build <b>0.2.1-beta</b> · 08/2026</p>
     <p style="margin-top:6px">Tokens em CSS custom properties · pronto para portar para Vue (main.css) e para o tema dinâmico do restaurante.</p>
+    <p style="margin-top:6px">Iconografia: <b>Lucide</b> — a mesma biblioteca dos apps (<code>lucide-vue-next</code>), sem emojis ou ícones ilustrativos.</p>
   </div>
 </footer>
 
 <!-- Modal -->
 <div class="modal-overlay" id="modalOverlay">
   <div class="modal">
-    <div class="m-ico">🗑️</div>
+    <div class="m-ico"><i data-lucide="trash-2"></i></div>
     <h3>Excluir pedido #1192?</h3>
     <p>Esta ação não pode ser desfeita. O pedido e o histórico associado serão removidos permanentemente.</p>
     <div class="m-actions">
       <button class="btn btn-ghost" onclick="closeModal()">Cancelar</button>
-      <button class="btn btn-danger" onclick="closeModal(); showToast('🧹 Pedido excluído','success')">Excluir</button>
+      <button class="btn btn-danger" onclick="closeModal(); showToast('Pedido excluído','success')">Excluir</button>
     </div>
   </div>
 </div>
@@ -1434,9 +1476,14 @@ table.ds-table{width:100%;border-collapse:collapse;font-size:.84rem;min-width:62
    TEMA
    ============================================================ */
 const themeToggle = document.getElementById('themeToggle');
+/* Converte <i data-lucide> → <svg>. Seguro se o CDN falhar. */
+function applyIcons() {
+  if (window.lucide && typeof lucide.createIcons === 'function') lucide.createIcons();
+}
 const applyTheme = (t) => {
   document.documentElement.setAttribute('data-theme', t);
-  themeToggle.textContent = t === 'dark' ? '☀️' : '🌙';
+  themeToggle.innerHTML = `<i data-lucide="${t === 'dark' ? 'sun' : 'moon'}"></i>`;
+  applyIcons();
   localStorage.setItem('ds-theme', t);
 };
 applyTheme(localStorage.getItem('ds-theme') || 'light');
@@ -1526,21 +1573,21 @@ tickCountdowns();
    SIMULADOR DO APP
    ============================================================ */
 const PRODUTOS = [
-  { id:1, nome:'Pizza Calabresa', emoji:'🍕', grad:'linear-gradient(135deg,#f97316,#dc2626)', preco:42.90, tag:'Popular', desc:'Molho, mussarela, calabresa, cebola e orégano.', cat:'pizzas' },
-  { id:2, nome:'X-Salada Completo', emoji:'🍔', grad:'linear-gradient(135deg,#f59e0b,#ef4444)', preco:29.90, tag:'Mais pedido', desc:'Pão brioche, 2 hambúrgueres, queijo, salada e maionese.', cat:'lanches' },
-  { id:3, nome:'Batata Frita M', emoji:'🍟', grad:'linear-gradient(135deg,#fbbf24,#f97316)', preco:18.50, desc:'Porção média com sal e orégano.', cat:'lanches' },
-  { id:4, nome:'Refrigerante Lata', emoji:'🥤', grad:'linear-gradient(135deg,#3b82f6,#8b5cf6)', preco:6.50, desc:'Coca-Cola, Guaraná ou Fanta.', cat:'bebidas' },
-  { id:5, nome:'Suco de Laranja', emoji:'🧃', grad:'linear-gradient(135deg,#f97316,#facc15)', preco:9.00, tag:'Natural', desc:'Suco natural, sem açúcar.', cat:'bebidas' },
-  { id:6, nome:'Pudim Caseiro', emoji:'🍮', grad:'linear-gradient(135deg,#dc2626,#fbbf24)', preco:12.00, desc:'Receita da casa, calda de caramelo.', cat:'sobremesas' },
-  { id:7, nome:'Esfiha de Carne', emoji:'🥙', grad:'linear-gradient(135deg,#ef4444,#f97316)', preco:8.50, tag:'Novo', desc:'Massa fina, carne temperada e limão.', cat:'pizzas' },
-  { id:8, nome:'Coca-Cola 2L', emoji:'🥤', grad:'linear-gradient(135deg,#dc2626,#ef4444)', preco:14.00, desc:'Gelada para compartilhar.', cat:'bebidas' },
+  { id:1, nome:'Pizza Calabresa', ico:'pizza', grad:'linear-gradient(135deg,#f97316,#dc2626)', preco:42.90, tag:'Popular', desc:'Molho, mussarela, calabresa, cebola e orégano.', cat:'pizzas' },
+  { id:2, nome:'X-Salada Completo', ico:'hamburger', grad:'linear-gradient(135deg,#f59e0b,#ef4444)', preco:29.90, tag:'Mais pedido', desc:'Pão brioche, 2 hambúrgueres, queijo, salada e maionese.', cat:'lanches' },
+  { id:3, nome:'Batata Frita M', ico:'utensils', grad:'linear-gradient(135deg,#fbbf24,#f97316)', preco:18.50, desc:'Porção média com sal e orégano.', cat:'lanches' },
+  { id:4, nome:'Refrigerante Lata', ico:'cup-soda', grad:'linear-gradient(135deg,#3b82f6,#8b5cf6)', preco:6.50, desc:'Coca-Cola, Guaraná ou Fanta.', cat:'bebidas' },
+  { id:5, nome:'Suco de Laranja', ico:'glass-water', grad:'linear-gradient(135deg,#f97316,#facc15)', preco:9.00, tag:'Natural', desc:'Suco natural, sem açúcar.', cat:'bebidas' },
+  { id:6, nome:'Pudim Caseiro', ico:'cake', grad:'linear-gradient(135deg,#dc2626,#fbbf24)', preco:12.00, desc:'Receita da casa, calda de caramelo.', cat:'sobremesas' },
+  { id:7, nome:'Esfiha de Carne', ico:'sandwich', grad:'linear-gradient(135deg,#ef4444,#f97316)', preco:8.50, tag:'Novo', desc:'Massa fina, carne temperada e limão.', cat:'pizzas' },
+  { id:8, nome:'Coca-Cola 2L', ico:'cup-soda', grad:'linear-gradient(135deg,#dc2626,#ef4444)', preco:14.00, desc:'Gelada para compartilhar.', cat:'bebidas' },
 ];
 const CATS = [
-  { id:'todos', nome:'Todos', emoji:'✨' },
-  { id:'pizzas', nome:'Pizzas', emoji:'🍕' },
-  { id:'lanches', nome:'Lanches', emoji:'🍔' },
-  { id:'bebidas', nome:'Bebidas', emoji:'🥤' },
-  { id:'sobremesas', nome:'Sobremesas', emoji:'🍮' },
+  { id:'todos', nome:'Todos', ico:'utensils-crossed' },
+  { id:'pizzas', nome:'Pizzas', ico:'pizza' },
+  { id:'lanches', nome:'Lanches', ico:'hamburger' },
+  { id:'bebidas', nome:'Bebidas', ico:'cup-soda' },
+  { id:'sobremesas', nome:'Sobremesas', ico:'ice-cream-2' },
 ];
 
 let simCat = 'todos';
@@ -1578,22 +1625,23 @@ function renderHome() {
   const prods = simCat === 'todos' ? PRODUTOS : PRODUTOS.filter(p => p.cat === simCat);
   screen.innerHTML = `
     <div class="sim-banner">
-      <div class="b-top"><span class="b-badge">🕐 35–50 min</span><span class="b-badge">⭐ 4,8</span></div>
+      <div class="b-top"><span class="b-badge"><i data-lucide="timer"></i> 35–50 min</span><span class="b-badge"><i data-lucide="star"></i> 4,8</span></div>
       <h2>Pizzaria do Beto</h2>
-      <p>🍕 Massa artesanal e entrega rápida</p>
-      <div class="b-meta"><span>🚴 Frete R$ 5</span><span>💳 PIX com 5% off</span></div>
+      <p><i data-lucide="pizza"></i> Massa artesanal e entrega rápida</p>
+      <div class="b-meta"><span><i data-lucide="bike"></i> Frete R$ 5</span><span><i data-lucide="credit-card"></i> PIX com 5% off</span></div>
     </div>
-    <div class="sim-search"><i>🔍</i><input placeholder="Buscar no cardápio…"></div>
-    <div class="sim-cats">${CATS.map(c => `<button class="sim-cat ${c.id === simCat ? 'active' : ''}" onclick="simSetCat('${c.id}')">${c.emoji} ${c.nome}</button>`).join('')}</div>
+    <div class="sim-search"><i data-lucide="search"></i><input placeholder="Buscar no cardápio…"></div>
+    <div class="sim-cats">${CATS.map(c => `<button class="sim-cat ${c.id === simCat ? 'active' : ''}" onclick="simSetCat('${c.id}')"><i data-lucide="${c.ico}"></i> ${c.nome}</button>`).join('')}</div>
     <div class="sim-grid">${prods.map(p => `
       <div class="sim-prod" onclick="simOpenProd(${p.id})">
-        <div class="p-img" style="background:${p.grad}">${p.emoji}${p.tag ? `<span class="p-tag">${p.tag}</span>` : ''}</div>
+        <div class="p-img" style="background:${p.grad}"><i data-lucide="${p.ico}"></i>${p.tag ? `<span class="p-tag">${p.tag}</span>` : ''}</div>
         <div class="p-body">
           <b>${p.nome}</b>
           <div class="p-desc">${p.desc}</div>
           <div class="p-foot"><span class="p-price">${fmt(p.preco)}</span><button class="p-add" onclick="event.stopPropagation();simOpenProd(${p.id})">+</button></div>
         </div>
       </div>`).join('')}</div>`;
+  applyIcons();
 }
 
 function simSetCat(c) { simCat = c; render(); }
@@ -1602,7 +1650,8 @@ function simOpenProd(id) {
   simSelProd = PRODUTOS.find(p => p.id === id);
   simQtyVal = 1;
   document.getElementById('simSheetHero').style.background = simSelProd.grad;
-  document.getElementById('simSheetHero').textContent = simSelProd.emoji;
+  document.getElementById('simSheetHero').innerHTML = `<i data-lucide="${simSelProd.ico}"></i>`;
+  applyIcons();
   document.getElementById('simSheetTitle').textContent = simSelProd.nome;
   document.getElementById('simSheetDesc').textContent = simSelProd.desc;
   document.getElementById('simSheetOpts').innerHTML = SIM_OPTS.map((o, i) =>
@@ -1633,7 +1682,7 @@ function simAddToCart() {
   simCart[simSelProd.id] = (simCart[simSelProd.id] || 0) + simQtyVal;
   simCloseSheet();
   renderMini();
-  showToast(`🛒 ${simSelProd.nome} (${SIM_OPTS[simSelOpt].nome}) · ${fmt(totalItem)}`, 'success');
+  showToast(`${simSelProd.nome} (${SIM_OPTS[simSelOpt].nome}) · ${fmt(totalItem)}`, 'success');
 }
 
 function renderMini() {
@@ -1655,7 +1704,7 @@ function simOpenCart() {
     ${itens.map(([id, q]) => {
       const p = PRODUTOS.find(x => x.id === +id);
       return `    <div class="cart-item">
-        <div class="ci-img" style="background:${p.grad}">${p.emoji}</div>
+        <div class="ci-img" style="background:${p.grad}"><i data-lucide="${p.ico}"></i></div>
         <div class="ci-body"><b>${p.nome}</b><small>${fmt(p.preco)} cada · Média</small></div>
         <div class="ci-qty">
           <button onclick="simCartQty(${p.id},-1)">−</button><b>${q}</b><button onclick="simCartQty(${p.id},1)">+</button>
@@ -1672,6 +1721,7 @@ function simOpenCart() {
   const sub = itens.reduce((s, [id, q]) => s + (PRODUTOS.find(p => p.id === +id).preco * q), 0);
   document.getElementById('ctSub').textContent = fmt(sub);
   document.getElementById('ctTotal').textContent = fmt(sub + 5);
+  applyIcons();
 }
 
 function simCartQty(id, d) {
@@ -1689,15 +1739,15 @@ function simCheckout() {
   document.querySelectorAll('.sim-tabbar button').forEach(b => b.classList.remove('active'));
   renderRastreio();
   simStartTracking();
-  showToast('🎉 Pedido enviado à cozinha!', 'success');
+  showToast('Pedido enviado à cozinha!', 'success');
 }
 
 function renderRastreio() {
   const statuses = [
-    { lbl:'Recebido', ico:'✓' },
-    { lbl:'Preparando', ico:'👨‍🍳' },
-    { lbl:'Saiu p/ entrega', ico:'🚚' },
-    { lbl:'Entregue', ico:'🏠' },
+    { lbl:'Recebido', ico:'check' },
+    { lbl:'Preparando', ico:'chef-hat' },
+    { lbl:'Saiu p/ entrega', ico:'truck' },
+    { lbl:'Entregue', ico:'home' },
   ];
   const stepAtual = Math.min(simTrackStep || 0, 3);
   screen.innerHTML = `
@@ -1706,8 +1756,8 @@ function renderRastreio() {
       <b style="font-family:var(--font-display);font-size:.95rem">Pedido #1200</b>
     </div>
     <div class="trk-status">
-      <div class="ts-top"><b>${statuses[stepAtual].lbl}</b><span class="b-badge" style="background:rgba(255,255,255,.16);padding:4px 10px;border-radius:999px;font-size:.58rem">${stepAtual === 3 ? '✔ Concluído' : 'EM ANDAMENTO'}</span></div>
-      <div class="ts-count">⏱ <span id="simCount">—</span></div>
+      <div class="ts-top"><b>${statuses[stepAtual].lbl}</b><span class="b-badge" style="background:rgba(255,255,255,.16);padding:4px 10px;border-radius:999px;font-size:.58rem">${stepAtual === 3 ? '<i data-lucide="circle-check"></i> Concluído' : 'EM ANDAMENTO'}</span></div>
+      <div class="ts-count"><i data-lucide="timer"></i> <span id="simCount">—</span></div>
       <div class="ts-sub">Previsão de entrega · <span id="simPrev">—</span></div>
     </div>
     <div class="trk-card">
@@ -1715,7 +1765,7 @@ function renderRastreio() {
       <div class="stepper" id="simStepper">
         ${statuses.map((s, i) => `
           <div class="stp ${i < stepAtual ? 'done' : ''} ${i === stepAtual ? 'active' : ''}">
-            <span class="st-ico">${i <= stepAtual ? s.ico : '·'}</span><span class="st-lbl">${s.lbl}</span>
+            <span class="st-ico">${i <= stepAtual ? '<i data-lucide="' + s.ico + '"></i>' : '·'}</span><span class="st-lbl">${s.lbl}</span>
           </div>`).join('')}
       </div>
     </div>
@@ -1724,7 +1774,7 @@ function renderRastreio() {
       <div class="courier">
         <div class="c-av">RM</div>
         <div style="flex:1"><b>Rafael M.</b><small>Entregador · a 1,2 km</small></div>
-        <span class="c-stars">⭐ 4,9</span>
+        <span class="c-stars"><i data-lucide="star"></i> 4,9</span>
       </div>
     </div>
     <div class="sim-promo">
@@ -1732,6 +1782,7 @@ function renderRastreio() {
       <b>Você ganhou 120 pontos!</b>
       <p>Use no próximo pedido como desconto de R$ 6.</p>
     </div>`;
+  applyIcons();
 }
 
 let simTrackStep = 0;
@@ -1780,6 +1831,7 @@ function renderPedidos() {
       <div class="oc-items">X-Salada Completo · Batata Frita M · Suco de Laranja</div>
       <div class="oc-foot"><span class="oc-total">R$ 57,40</span><button class="btn btn-outline btn-sm">Pedir de novo</button></div>
     </div>`;
+  applyIcons();
 }
 
 function renderPerfil() {
@@ -1794,10 +1846,11 @@ function renderPerfil() {
       <p>Faltam 80 pontos para R$ 20 de desconto.</p>
       <div class="progress" style="margin-top:10px;background:rgba(255,255,255,.25)"><span style="width:84%;background:#fff"></span></div>
     </div>
-    <div class="order-card" style="margin-bottom:10px"><div class="oc-head"><div><b>📦 Meus endereços</b></div><span>›</span></div></div>
-    <div class="order-card" style="margin-bottom:10px"><div class="oc-head"><div><b>💳 Formas de pagamento</b></div><span>›</span></div></div>
-    <div class="order-card" style="margin-bottom:10px"><div class="oc-head"><div><b>⭐ Avaliar app</b></div><span>›</span></div></div>
-    <div class="order-card"><div class="oc-head"><div><b>⚙️ Configurações</b></div><span>›</span></div></div>`;
+    <div class="order-card" style="margin-bottom:10px"><div class="oc-head"><div><b><i data-lucide="package"></i> Meus endereços</b></div><span>›</span></div></div>
+    <div class="order-card" style="margin-bottom:10px"><div class="oc-head"><div><b><i data-lucide="credit-card"></i> Formas de pagamento</b></div><span>›</span></div></div>
+    <div class="order-card" style="margin-bottom:10px"><div class="oc-head"><div><b><i data-lucide="star"></i> Avaliar app</b></div><span>›</span></div></div>
+    <div class="order-card"><div class="oc-head"><div><b><i data-lucide="settings"></i> Configurações</b></div><span>›</span></div></div>`;
+  applyIcons();
 }
 
 render();
@@ -1827,7 +1880,8 @@ function renderQueue(filter) {
     })
     .sort((a, b) => parseCreated(a.createdAt) - parseCreated(b.createdAt));
   if (!orders.length) {
-    list.innerHTML = `<div class="queue-empty"><div class="big">🎉</div>Nenhum pedido neste filtro.<br><small>Concluídos e cancelados somem da fila “Ativos”.</small></div>`;
+    list.innerHTML = `<div class="queue-empty"><div class="big"><i data-lucide="party-popper"></i></div>Nenhum pedido neste filtro.<br><small>Concluídos e cancelados somem da fila “Ativos”.</small></div>`;
+    applyIcons();
     return;
   }
   list.innerHTML = orders.map((o, i) => `
@@ -1841,12 +1895,13 @@ function renderQueue(filter) {
         <span class="oc-total">${o.total}</span>
         <div style="display:flex;gap:8px;align-items:center">
           ${['pendente','preparando','pronto'].includes(o.status)
-            ? `<span class="countdown" data-created="${o.createdAt}" data-total="45"><span class="cd-ico">⏱️</span><span class="cd-text">—</span></span>
+            ? `<span class="countdown" data-created="${o.createdAt}" data-total="45"><span class="cd-ico"><i data-lucide="timer"></i></span><span class="cd-text">—</span></span>
                <button class="btn ${o.status === 'preparando' ? 'btn-success' : 'btn-primary'} btn-sm">${o.status === 'pendente' ? 'Iniciar' : o.status === 'preparando' ? 'Pronto' : 'Entregar'}</button>`
             : `<button class="btn btn-outline btn-sm">Ver detalhes</button>`}
         </div>
       </div>
     </div>`).join('');
+  applyIcons();
   tickCountdowns();
 }
 
@@ -1871,8 +1926,9 @@ function showToast(msg, type) {
   const wrap = document.getElementById('toastWrap');
   const t = document.createElement('div');
   t.className = 'toast';
-  t.innerHTML = `<span class="t-ico">${type === 'success' ? '✅' : '⚠️'}</span>${msg}`;
+  t.innerHTML = `<span class="t-ico"><i data-lucide="${type === 'success' ? 'circle-check' : 'triangle-alert'}"></i></span>${msg}`;
   wrap.appendChild(t);
+  applyIcons();
   setTimeout(() => { t.classList.add('out'); setTimeout(() => t.remove(), 260); }, 3200);
 }
 </script>

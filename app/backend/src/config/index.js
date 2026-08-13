@@ -78,4 +78,32 @@ export const config = {
     // Cache do access_token OAuth2 (token válido por 24 min; renovamos com margem)
     tokenCacheMs: 20 * 60 * 1000,
   },
+
+  // iFood (API de pedidos e catálogo — parceiro de software / ISV)
+  // Credenciais OAuth são GLOBAIS da plataforma (IFOOD_CLIENT_ID/SECRET no env).
+  // Cada restaurante tem merchantId + flag ativo na tabela ifood_settings.
+  ifood: {
+    environment: process.env.IFOOD_ENV || 'sandbox',
+    clientId: process.env.IFOOD_CLIENT_ID || '',
+    clientSecret: process.env.IFOOD_CLIENT_SECRET || '',
+    // URLs de token OAuth2 (autenticação client_credentials)
+    tokenBaseUrls: {
+      sandbox: 'https://merchant-api.ifood.com.br',
+      production: 'https://merchant-api.ifood.com.br',
+    },
+    // URLs base dos serviços de negócio (pedidos, catálogo)
+    // ⚠️ Confirmar base exata por ambiente na homologação 2026.
+    apiBaseUrls: {
+      sandbox: 'https://merchant-api.ifood.com.br',
+      production: 'https://merchant-api.ifood.com.br',
+    },
+    // URL pública do backend (para imagens relativas do catálogo → absolutas).
+    // Ex.: https://api.kardapiodigital.com.br
+    publicBaseUrl: process.env.IFOOD_PUBLIC_BASE_URL || '',
+    requestTimeout: parseInt(process.env.IFOOD_REQUEST_TIMEOUT || '30000', 10),
+    // Token válido ~6h (expires_in); renovamos antecipadamente com margem de 5h
+    tokenCacheMs: 5 * 60 * 60 * 1000,
+    // Intervalo do polling de eventos (Fase 3)
+    pollingIntervalMs: parseInt(process.env.IFOOD_POLLING_INTERVAL || '5000', 10),
+  },
 };

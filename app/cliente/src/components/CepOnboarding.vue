@@ -101,7 +101,7 @@ async function buscarCEP() {
     addToast(`Entregamos na sua região!${freteMsg}`, 'success')
 
     // Salvar CEP no localStorage
-    localStorage.setItem('saborexpress_cep', cepLimpo)
+    localStorage.setItem('kardapio_cep', cepLimpo)
 
     resultado.value = {
       tipo: 'success',

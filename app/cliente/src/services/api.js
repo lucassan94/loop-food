@@ -8,7 +8,7 @@ const api = axios.create({
   withCredentials: true,
 })
 
-// Lê slug da URL (ex: ?slug=saborexpress) uma vez e armazena
+// Lê slug da URL (ex: ?slug=kardapio) uma vez e armazena
 let _urlSlug = null
 try {
   const params = new URLSearchParams(window.location.search)

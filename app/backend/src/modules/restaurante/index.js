@@ -5,7 +5,8 @@ import { query } from '../../config/database.js';
 import { config } from '../../config/index.js';
 import { authenticate, authorize } from '../../middleware/auth.js';
 import { AppError } from '../../middleware/errorHandler.js';
-import { emitToRestaurant } from '../../services/realtime.js';
+import { emitToRestaurant, emitNovaMensagem, emitMensagemLida } from '../../services/realtime.js';
+import { notificarMensagem } from '../../services/push.js';
 import { TZ_RESTAURANTE, timeZoneValido } from '../../services/horarios.js';
 
 const router = Router();
@@ -200,28 +201,95 @@ router.delete('/raios-entrega/:id', authenticate, authorize('admin', 'gerente'),
 });
 
 // ============================
-// MENSAGENS DO PEDIDO (Admin -> Cliente)
+// CHAT RESTAURANTE ↔ CLIENTE
 // ============================
+
+// Enviar mensagem do restaurante para o cliente (chat do pedido)
 router.post('/mensagens', authenticate, authorize('admin', 'gerente', 'chef'), async (req, res, next) => {
   try {
     const restaurantId = req.restaurantId || config.restaurantId;
     const { pedido_id, mensagem } = req.body;
+    if (!mensagem || !String(mensagem).trim()) {
+      throw new AppError('Mensagem vazia.', 400);
+    }
+    const texto = String(mensagem).trim().slice(0, 1000);
     const result = await query(
-      `INSERT INTO mensagens_pedido (pedido_id, restaurante_id, mensagem)
-       VALUES ($1, $2, $3) RETURNING *`,
-      [pedido_id, restaurantId, mensagem]
+      `INSERT INTO mensagens_pedido (pedido_id, restaurante_id, mensagem, remetente)
+       VALUES ($1, $2, $3, 'restaurante') RETURNING *`,
+      [pedido_id, restaurantId, texto]
     );
 
     // Buscar o cliente_id do pedido para notificar
     const pedido = await query('SELECT cliente_id FROM pedidos WHERE id = $1', [pedido_id]);
+    const clienteId = pedido.rows[0]?.cliente_id;
 
-    emitToRestaurant('mensagem:novo', result.rows[0], restaurantId);
-    if (pedido.rows[0]?.cliente_id) {
-      const { emitNovaMensagem } = await import('../../services/realtime.js');
-      emitNovaMensagem(result.rows[0], pedido.rows[0].cliente_id, restaurantId);
+    // ÚNICO emissor: emite para a sala do restaurante E para o usuário cliente.
+    // (Emitir duas vezes aqui duplicaria os eventos no painel e inflaria badges.)
+    emitNovaMensagem(result.rows[0], clienteId, restaurantId);
+
+    // Push para o cliente (se tiver permissão de notificação)
+    if (clienteId) {
+      notificarMensagem(pedido_id, clienteId, texto).catch(() => {});
     }
 
     res.status(201).json(result.rows[0]);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Lista as conversas (pedidos com mensagens) para a SuperSide bar do painel
+router.get('/mensagens/conversas', authenticate, authorize('admin', 'gerente', 'chef', 'caixa'), async (req, res, next) => {
+  try {
+    const restaurantId = req.restaurantId || config.restaurantId;
+    const result = await query(
+      `SELECT p.id as pedido_id, p.pedido_id as ref, p.status, p.origem, p.nome_cliente,
+              p.criado_em, p.mesa,
+              (SELECT COUNT(*) FROM mensagens_pedido m
+               WHERE m.pedido_id = p.id AND m.remetente = 'cliente' AND NOT m.lida)::int as nao_lidas,
+              (SELECT json_build_object('id', m2.id, 'mensagem', m2.mensagem,
+                                        'remetente', m2.remetente, 'criado_em', m2.criado_em)
+               FROM mensagens_pedido m2 WHERE m2.pedido_id = p.id
+               ORDER BY m2.criado_em DESC LIMIT 1) as ultima
+       FROM pedidos p
+       WHERE p.restaurant_id = $1
+         AND EXISTS (SELECT 1 FROM mensagens_pedido m WHERE m.pedido_id = p.id)
+       ORDER BY COALESCE((SELECT MAX(m3.criado_em) FROM mensagens_pedido m3 WHERE m3.pedido_id = p.id), p.criado_em) DESC
+       LIMIT 100`,
+      [restaurantId]
+    );
+
+    const conversas = result.rows.map((c) => ({ ...c, nao_lidas: parseInt(c.nao_lidas || 0) }));
+    const totalNaoLidas = conversas.reduce((acc, c) => acc + c.nao_lidas, 0);
+
+    res.json({ conversas, total_nao_lidas: totalNaoLidas });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Restaurante marca as mensagens do cliente como lidas
+router.post('/mensagens/ler', authenticate, authorize('admin', 'gerente', 'chef', 'caixa'), async (req, res, next) => {
+  try {
+    const restaurantId = req.restaurantId || config.restaurantId;
+    const { pedido_id } = req.body;
+    if (!pedido_id) {
+      throw new AppError('pedido_id é obrigatório.', 400);
+    }
+
+    await query(
+      `UPDATE mensagens_pedido SET lida = TRUE
+       WHERE pedido_id = $1 AND restaurante_id = $2 AND remetente = 'cliente' AND NOT lida`,
+      [pedido_id, restaurantId]
+    );
+
+    const pedido = await query(
+      'SELECT cliente_id FROM pedidos WHERE id = $1 AND restaurant_id = $2',
+      [pedido_id, restaurantId]
+    );
+    emitMensagemLida({ pedido_id: parseInt(pedido_id, 10), lida: true }, pedido.rows[0]?.cliente_id, restaurantId);
+
+    res.json({ ok: true });
   } catch (err) {
     next(err);
   }

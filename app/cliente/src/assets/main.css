@@ -1,8 +1,8 @@
 /* ============================
-   SABOREXPRESS - Cliente Design System
+   KARDAPIO DIGITAL - Cliente Design System
    ============================ */
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Sora:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
 :root {
   --primary: #dc2626;
@@ -17,24 +17,31 @@
   --error-light: #fee2e2;
   --info: #3b82f6;
   --info-light: #dbeafe;
-  --background: #f8fafc;
+  --background: #f7f5f2;
   --surface: #ffffff;
-  --text: #1e293b;
-  --text-secondary: #64748b;
-  --text-muted: #94a3b8;
-  --border: #e2e8f0;
-  --border-light: #f1f5f9;
+  --text: #211d1a;
+  --text-secondary: #5d564f;
+  --text-muted: #a89f95;
+  --border: #eae5de;
+  --border-light: #f1ece4;
   --shadow-sm: 0 1px 2px rgba(0,0,0,0.05);
   --shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -2px rgba(0,0,0,0.1);
   --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -4px rgba(0,0,0,0.1);
   --shadow-xl: 0 20px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1);
-  --radius-sm: 6px;
-  --radius: 12px;
-  --radius-lg: 16px;
-  --radius-xl: 20px;
+  --radius-sm: 10px;
+  --radius: 16px;
+  --radius-lg: 20px;
+  --radius-xl: 28px;
   --radius-full: 9999px;
   --transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   --font: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-display: 'Sora','Inter',system-ui,sans-serif;
+  --font-mono: 'JetBrains Mono',ui-monospace,monospace;
+  --grad-brand: linear-gradient(135deg, #dc2626 0%, #f97316 100%);
+  --grad-brand-deep: linear-gradient(135deg, #991b1b 0%, #dc2626 45%, #f97316 100%);
+  --grad-brand-soft: linear-gradient(135deg, rgba(220,38,38,.12) 0%, rgba(249,115,22,.12) 100%);
+  --shadow-glow: 0 8px 26px -6px rgba(220,38,38,.38);
+  --shadow-card-hover: 0 18px 44px -14px rgba(33,29,26,.18);
 }
 
 *, *::before, *::after {
@@ -2265,3 +2272,91 @@ input, textarea, select { font-family: inherit; }
 .flex-col { flex-direction: column; }
 .items-center { align-items: center; }
 .justify-between { justify-content: space-between; }
+
+/* ============================
+   KARDAPIO DIGITAL - tokens v2.1 aplicados
+   ============================ */
+/* Tipografia de destaque: Sora nos títulos */
+.hero-overlay h2,
+.section-title,
+.category-group-title,
+.product-card-body h3,
+.modal-body h3,
+.drawer-header h3,
+.order-number,
+.tracking-header h2,
+.profile-header h2,
+.auth-card h2,
+.checkout-step h4,
+.modal-extras-title,
+.product-price,
+.modal-footer .price,
+.order-summary-total,
+.order-total,
+.cart-bar-left b,
+.cart-bar-right strong {
+  font-family: var(--font-display);
+  letter-spacing: -0.02em;
+}
+/* Dados e tempos: JetBrains Mono */
+.countdown,
+.order-date,
+.order-kitchen-msg {
+  font-family: var(--font-mono);
+}
+/* CTAs: gradiente de marca + glow */
+.btn-primary,
+.btn-add-cart,
+.btn-add-modal,
+.btn-track,
+.btn-cart-checkout {
+  background: var(--grad-brand);
+  box-shadow: var(--shadow-glow);
+  border: none;
+}
+.btn-primary:hover,
+.btn-add-cart:hover,
+.btn-add-modal:hover,
+.btn-track:hover {
+  background: linear-gradient(135deg, #b91c1c 0%, #ea580c 100%);
+  box-shadow: 0 14px 30px -8px rgba(220,38,38,.5);
+  transform: translateY(-1px);
+}
+.category-tab.active {
+  background: var(--grad-brand);
+  border-color: transparent;
+  box-shadow: 0 6px 18px -4px rgba(220,38,38,.4);
+}
+/* Cart bar: gradiente profundo de marca */
+.cart-bar {
+  background: var(--grad-brand-deep);
+  box-shadow: 0 -4px 24px rgba(153,27,27,.35);
+}
+.cart-bar:hover {
+  background: var(--grad-brand);
+}
+/* Bottom nav: vidro translúcido */
+.bottom-nav {
+  background: rgba(255,255,255,.86);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-top: 1px solid var(--border-light);
+}
+.bottom-nav-item.active::before {
+  background: var(--grad-brand);
+}
+/* Cards: hover elevado */
+.product-card:hover,
+.order-card:hover,
+.tracking-card:hover {
+  box-shadow: var(--shadow-card-hover);
+}
+/* Avatar do perfil: glow de marca */
+.profile-avatar {
+  box-shadow: var(--shadow-glow);
+}
+/* Drawer e modal de produto: cantos maiores */
+.checkout-drawer,
+.product-modal {
+  border-radius: 32px 32px 0 0;
+}

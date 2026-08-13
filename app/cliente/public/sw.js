@@ -1,5 +1,5 @@
-// SaborExpress - Service Worker para Push Notifications
-const CACHE_NAME = 'saborexpress-v1';
+// Kardapio Digital - Service Worker para Push Notifications
+const CACHE_NAME = 'kardapio-v1';
 
 // Instalação: pré-cache básico
 self.addEventListener('install', (event) => {
@@ -49,14 +49,14 @@ self.addEventListener('push', (event) => {
       vibrate: data.vibrate || [200, 100, 200],
       data: data.data || {},
       actions: data.actions || [],
-      tag: data.data?.url || 'saborexpress',
+      tag: data.data?.url || 'kardapio',
       renotify: true,
       requireInteraction: true,
       silent: false,
     };
 
     event.waitUntil(
-      self.registration.showNotification(data.title || 'SaborExpress', options)
+      self.registration.showNotification(data.title || 'Kardapio Digital', options)
     );
   } catch (err) {
     console.error('[SW] Erro ao processar push:', err);

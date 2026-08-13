@@ -180,4 +180,14 @@ export function emitNovaMensagem(mensagem, clienteId, restaurantId) {
   }
 }
 
+// Avisa os dois lados que mensagens de um pedido foram lidas (recibo de leitura)
+export function emitMensagemLida(payload, clienteId, restaurantId) {
+  if (restaurantId) {
+    emitToRestaurant('mensagem:lida', payload, restaurantId);
+  }
+  if (clienteId) {
+    emitToUser('cliente', clienteId, 'mensagem:lida', payload);
+  }
+}
+
 export { io };

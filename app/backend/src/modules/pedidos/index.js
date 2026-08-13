@@ -4,7 +4,8 @@ import { query, transaction } from '../../config/database.js';
 import { config } from '../../config/index.js';
 import { authenticate, authorize, optionalAuth } from '../../middleware/auth.js';
 import { AppError } from '../../middleware/errorHandler.js';
-import { emitPedidoAtualizado, emitNovoPedido, emitEntregaDisponivel } from '../../services/realtime.js';
+import { emitPedidoAtualizado, emitNovoPedido, emitEntregaDisponivel, emitNovaMensagem, emitMensagemLida } from '../../services/realtime.js';
+import { espelharStatusIfood } from '../ifood/orders.js';
 import { orderLimiter } from '../../middleware/rateLimiter.js';
 import { validarEntrega } from '../../services/frete.js';
 import { validarItensPedido } from '../../services/itemValidation.js';
@@ -25,8 +26,10 @@ const createOrderSchema = z.object({
   cep_cliente: z.string().optional().default(''),
   cidade_cliente: z.string().optional().default('São Paulo'),
   estado_cliente: z.string().optional().default('SP'),
-  latitude_cliente: z.number().optional(),
-  longitude_cliente: z.number().optional(),
+  // Coordenadas podem chegar como string (ex.: fonte de CEP que devolve string) —
+  // normaliza para número; null/vazio/NaN são tratados como ausentes (evita coords 0,0).
+  latitude_cliente: z.preprocess((v) => { const n = v === null || v === undefined || String(v).trim() === '' ? NaN : Number(v); return Number.isFinite(n) ? n : undefined; }, z.number().optional()),
+  longitude_cliente: z.preprocess((v) => { const n = v === null || v === undefined || String(v).trim() === '' ? NaN : Number(v); return Number.isFinite(n) ? n : undefined; }, z.number().optional()),
   subtotal: z.number().positive(),
   valor_frete: z.number().min(0).optional().default(0),
   total: z.number().positive(),
@@ -315,6 +318,131 @@ router.post('/pdv', authenticate, async (req, res, next) => {
 });
 
 // ============================
+// CHAT RESTAURANTE ↔ CLIENTE (lado do cliente)
+// ============================
+
+// Lista as conversas do cliente (pedidos com mensagens) + total de não lidas
+router.get('/mensagens/conversas', authenticate, async (req, res, next) => {
+  try {
+    const { id, role } = req.user;
+    if (role !== 'cliente') {
+      throw new AppError('Apenas clientes podem listar conversas.', 403);
+    }
+    const restaurantId = req.restaurantId || config.restaurantId;
+    const result = await query(
+      `SELECT p.id as pedido_id, p.pedido_id as ref, p.status, p.origem, p.nome_cliente, p.criado_em,
+              (SELECT COUNT(*) FROM mensagens_pedido m
+               WHERE m.pedido_id = p.id AND m.remetente = 'restaurante' AND NOT m.lida_cliente)::int as nao_lidas,
+              (SELECT json_build_object('id', m2.id, 'mensagem', m2.mensagem,
+                                        'remetente', m2.remetente, 'criado_em', m2.criado_em)
+               FROM mensagens_pedido m2 WHERE m2.pedido_id = p.id
+               ORDER BY m2.criado_em DESC LIMIT 1) as ultima
+       FROM pedidos p
+       WHERE p.cliente_id = $1 AND p.restaurant_id = $2
+         AND EXISTS (SELECT 1 FROM mensagens_pedido m WHERE m.pedido_id = p.id)
+       ORDER BY COALESCE((SELECT MAX(m3.criado_em) FROM mensagens_pedido m3 WHERE m3.pedido_id = p.id), p.criado_em) DESC`,
+      [id, restaurantId]
+    );
+
+    const conversas = result.rows.map((c) => ({ ...c, nao_lidas: parseInt(c.nao_lidas || 0) }));
+    const totalNaoLidas = conversas.reduce((acc, c) => acc + c.nao_lidas, 0);
+
+    res.json({ conversas, total_nao_lidas: totalNaoLidas });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Total de mensagens não lidas do cliente (badge da aba Mensagens)
+router.get('/mensagens/nao-lidas', authenticate, async (req, res, next) => {
+  try {
+    const { id, role } = req.user;
+    if (role !== 'cliente') {
+      throw new AppError('Apenas clientes podem consultar mensagens.', 403);
+    }
+    const result = await query(
+      `SELECT COUNT(*)::int as total
+       FROM mensagens_pedido m
+       JOIN pedidos p ON p.id = m.pedido_id
+       WHERE p.cliente_id = $1 AND m.remetente = 'restaurante' AND NOT m.lida_cliente`,
+      [id]
+    );
+    res.json({ total: result.rows[0]?.total || 0 });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Cliente envia uma mensagem no chat do pedido
+router.post('/:id/mensagens', authenticate, async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { id: clienteId, role } = req.user;
+    if (role !== 'cliente') {
+      throw new AppError('Apenas clientes podem enviar mensagens.', 403);
+    }
+    const { mensagem } = req.body;
+    if (!mensagem || !String(mensagem).trim()) {
+      throw new AppError('Mensagem vazia.', 400);
+    }
+    const texto = String(mensagem).trim().slice(0, 1000);
+
+    // CWE-862: só permite mensagens em pedidos do próprio cliente
+    const pedido = await query(
+      'SELECT id, restaurante_id FROM pedidos WHERE id = $1 AND cliente_id = $2',
+      [id, clienteId]
+    );
+    if (pedido.rows.length === 0) {
+      throw new AppError('Pedido não encontrado.', 404);
+    }
+
+    const result = await query(
+      `INSERT INTO mensagens_pedido (pedido_id, restaurante_id, mensagem, remetente)
+       VALUES ($1, $2, $3, 'cliente') RETURNING *`,
+      [id, pedido.rows[0].restaurante_id, texto]
+    );
+    const msg = result.rows[0];
+
+    // Emite para a sala do restaurante E para o próprio cliente (outros dispositivos)
+    emitNovaMensagem(msg, clienteId, pedido.rows[0].restaurante_id);
+
+    res.status(201).json(msg);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Cliente marca as mensagens do restaurante como lidas
+router.post('/:id/mensagens/ler', authenticate, async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { id: clienteId, role } = req.user;
+    if (role !== 'cliente') {
+      throw new AppError('Apenas clientes podem marcar mensagens como lidas.', 403);
+    }
+    const pedido = await query(
+      'SELECT id, restaurante_id FROM pedidos WHERE id = $1 AND cliente_id = $2',
+      [id, clienteId]
+    );
+    if (pedido.rows.length === 0) {
+      throw new AppError('Pedido não encontrado.', 404);
+    }
+
+    await query(
+      `UPDATE mensagens_pedido SET lida_cliente = TRUE
+       WHERE pedido_id = $1 AND remetente = 'restaurante' AND NOT lida_cliente`,
+      [id]
+    );
+
+    emitMensagemLida({ pedido_id: parseInt(id, 10), lida_cliente: true }, clienteId, pedido.rows[0].restaurante_id);
+
+    res.json({ ok: true });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ============================
 // LISTAR PEDIDOS
 // ============================
 router.get('/', authenticate, async (req, res, next) => {
@@ -346,8 +474,9 @@ router.get('/', authenticate, async (req, res, next) => {
       sql += ' AND p.cliente_id = $' + (params.length + 1);
       params.push(id);
     } else if (role === 'entregador') {
-      // Entregadores só veem ENTREGAS — retirada não entra na fila de entregas
-      sql += " AND p.origem = 'delivery' AND (p.entregador_id = $" + (params.length + 1) + ' OR (p.entregador_id IS NULL AND p.status = $' + (params.length + 2) + '))';
+      // Entregadores só veem ENTREGAS — retirada não entra na fila de entregas.
+      // Pedidos iFood (entrega própria) também aparecem na fila de entregas.
+      sql += " AND p.origem IN ('delivery', 'ifood') AND (p.entregador_id = $" + (params.length + 1) + ' OR (p.entregador_id IS NULL AND p.status = $' + (params.length + 2) + '))';
       params.push(id, 'pronto_entrega');
     }
 
@@ -438,7 +567,8 @@ router.get('/:id', authenticate, async (req, res, next) => {
               COALESCE(
                 (SELECT json_agg(json_build_object(
                   'id', mp.id, 'mensagem', mp.mensagem,
-                  'lida', mp.lida, 'criado_em', mp.criado_em
+                  'lida', mp.lida, 'lida_cliente', mp.lida_cliente,
+                  'remetente', mp.remetente, 'criado_em', mp.criado_em
                 ) ORDER BY mp.criado_em DESC)
                 FROM mensagens_pedido mp WHERE mp.pedido_id = p.id),
                 '[]'::json
@@ -656,6 +786,14 @@ router.patch('/:id/status', authenticate, async (req, res, next) => {
     });
 
     emitPedidoAtualizado(result);
+
+    // Fase 4: pedidos do iFood espelham o novo status no iFood (fire-and-forget;
+    // nunca bloqueia a resposta — falha é logada e registrada em ultimo_erro).
+    if (result.origem === 'ifood') {
+      espelharStatusIfood(result, data.status, data.motivo).catch((err) => {
+        console.error(`[iFood] Espelho de status do pedido ${result.id} falhou:`, err.message);
+      });
+    }
 
     res.json(result);
   } catch (err) {
