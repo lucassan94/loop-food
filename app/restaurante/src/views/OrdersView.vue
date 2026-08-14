@@ -470,6 +470,7 @@ function showFeedback(texto, tipo = 'erro') {
 const viewMode = ref('cards')
 const orders = ref([])
 const resumo = ref(null)
+const infoRestaurante = ref({}) // nome/endereço do restaurante (impressão)
 const selectedOrder = ref(null)
 // Quadro kanban: coluna recolhida? (chave: aceitar/preparo/pronto/rota/finalizados)
 const laneCollapsed = ref({})
@@ -1002,6 +1003,7 @@ function imprimirPedido(order) {
   const itensHTML = order.itens?.map(item =>
     `<tr><td style="padding:4px 0;">${item.quantidade}x ${item.nome_produto}</td><td style="text-align:right;padding:4px 0;">R$ ${parseFloat(item.subtotal).toFixed(2)}</td></tr>`
   ).join('') || ''
+  const restaurante = infoRestaurante.value
 
   printWindow.document.write(`
     <html><head>
@@ -1031,8 +1033,8 @@ function imprimirPedido(order) {
       </style>
     </head><body>
       <div class="header">
-        <h2>PALAZZO</h2>
-        <div class="info">Mooca - São Paulo/SP</div>
+        <h2>${(restaurante.nome || 'Pedido').toUpperCase()}</h2>
+        <div class="info">${[restaurante.cidade, restaurante.estado].filter(Boolean).join(' - ') || restaurante.endereco}</div>
         <div class="info">${order.pedido_id} | ${new Date(order.criado_em).toLocaleString('pt-BR')}</div>
       </div>
       <div class="divider"></div>
@@ -1055,7 +1057,7 @@ function imprimirPedido(order) {
       ${order.observacoes ? `<div class="obs">📝 ${order.observacoes}</div>` : ''}
       <div class="footer">
         Obrigado pela preferência! 🍕<br />
-        Palazzo Mooca
+        ${restaurante.nome}
       </div>
     </body></html>
   `)
@@ -1073,6 +1075,12 @@ async function loadConfig() {
   try {
     const { data } = await api.get('/restaurante')
     modoSemEntregador.value = data.modo_sem_entregador || false
+    infoRestaurante.value = {
+      nome: data.nome || '',
+      endereco: data.endereco || '',
+      cidade: data.cidade || '',
+      estado: data.estado || '',
+    }
   } catch { /* ignore */ }
 }
 
