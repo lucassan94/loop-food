@@ -272,10 +272,10 @@
             </div>
 
             <template v-if="catalogForm.tipo === 'manual'">
-              <div class="editor-subtitle">Itens do grupo <span>imagem e descrição são opcionais</span></div>
+              <div class="editor-subtitle">Itens do grupo <span>imagem e descrição são opcionais · imagens até 5MB</span></div>
 
               <div v-for="(item, i) in catalogForm.itens" :key="i" class="catalog-item-card">
-                <label class="catalog-item-thumb" title="Enviar imagem do item">
+                <label class="catalog-item-thumb" title="Enviar imagem do item (máx. 5MB)">
                   <img v-if="itemImgSrc(item)" :src="itemImgSrc(item)" alt="" />
                   <i-lucide-image v-else style="width:18px;height:18px" />
                   <input type="file" accept="image/png,image/jpeg,image/webp" style="display:none" @change="onItemImageSelected($event, item)" />
@@ -524,7 +524,7 @@
                   <label>Ou cole uma URL externa</label>
                   <input v-model="form.imagem_url" placeholder="https://..." @input="onUrlChange" />
                 </div>
-                <p class="image-hint">Formatos: PNG, JPG, WebP · Tamanho máximo: 2MB</p>
+                <p class="image-hint">Formatos: PNG, JPG, WebP · Tamanho máximo: 5MB</p>
               </div>
             </div>
           </div>
@@ -882,6 +882,14 @@
         </div>
       </aside>
     </Transition>
+
+    <!-- Dialog de erro de upload -->
+    <AlertDialog
+      :show="!!uploadError"
+      title="Imagem muito grande"
+      :message="uploadError"
+      @close="uploadError = ''"
+    />
   </div>
 </template>
 
@@ -890,8 +898,10 @@ import { ref, reactive, computed, onMounted, markRaw, watch } from 'vue'
 import { Info, Image, CirclePlus, ListChecks, CalendarClock } from 'lucide-vue-next'
 import api from '../services/api'
 import { PRODUCT_PLACEHOLDER } from '../utils/images'
+import AlertDialog from '../components/AlertDialog.vue'
 
 const produtos = ref([])
+const uploadError = ref('')
 const categorias = ref([])
 const showForm = ref(false)
 const editingId = ref(null)
@@ -1196,7 +1206,7 @@ function cancelarCatalogoEdit() {
 function onItemImageSelected(event, item) {
   const file = event.target.files[0]
   if (!file) return
-  if (file.size > 2 * 1024 * 1024) { alert('Imagem muito grande! Máximo 2MB.'); return }
+  if (file.size > 5 * 1024 * 1024) { uploadError.value = 'Imagem muito grande! O tamanho máximo permitido é 5MB.'; return }
   const reader = new FileReader()
   reader.onload = (e) => {
     item.imagem_base64 = e.target.result.split(',')[1]
@@ -1341,7 +1351,7 @@ async function editar(p) {
 function onImageSelected(event) {
   const file = event.target.files[0]
   if (!file) return
-  if (file.size > 2 * 1024 * 1024) { alert('Imagem muito grande! Máximo 2MB.'); return }
+  if (file.size > 5 * 1024 * 1024) { uploadError.value = 'Imagem muito grande! O tamanho máximo permitido é 5MB.'; return }
   const reader = new FileReader()
   reader.onload = (e) => { form.imagem_base64 = e.target.result.split(',')[1]; previewImage.value = e.target.result; form.imagem_url = '' }
   reader.readAsDataURL(file)

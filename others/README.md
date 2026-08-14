@@ -131,6 +131,11 @@ npm run dev
 
 > 💡 Use `others/run.bat` para iniciar todos os dev servers de uma vez (backend, cliente, entregador, restaurante, god).
 
+> 🏪 **Acessando outro tenant localmente (multi-tenant):** o backend local usa `RESTAURANT_ID` do `.env` (default `1`).
+> Para testar outro restaurante sem mudar o `.env`, adicione `?slug=<slug>` na URL do módulo — o frontend envia
+> o header `X-Tenant-Slug` e o backend resolve o tenant correto para o login e todas as chamadas. Ex.: o tenant
+> **Loop** (slug `loop`) fica em `http://localhost:5174/admin/?slug=loop` (restaurante), e os demais módulos usam o mesmo recurso.
+
 ## 🔐 Credenciais Padrão (Seed)
 
 > **Importante:** o login NÃO é por e-mail. Cada módulo usa identificador próprio.
@@ -143,9 +148,15 @@ npm run dev
 
 - **Todos os módulos aceitam login por usuário (apelido) OU telefone.**
 - **Tenant 2 (SaborExpress):** `admin` / `admin123` · `cliente` / `cliente123` · `entregador` / `entregador123`
+- **Tenant 3 (Loop) — restaurante PADRÃO PARA TESTES LOCAIS (ADR-008):** `admin` / `admin123` · `cliente` / `cliente123` · `joao` / `cliente123` · `ana` / `cliente123` · `entregador` / `entregador123`
 - Novos usuários de equipe criados no painel usam **apelido** (username) como login, com senha padrão `senha123`
 - Novo tenant criado no painel **god** (LoopFood Admin, porta `3002`): `admin` / `admin123`
 - E-mails continuam sendo coletados, mas apenas como dado complementar
+
+> 🧪 **Seed (ADR-008):** `npm run seed` (em `app/backend`) popula o tenant do `RESTAURANT_ID` (local = Loop) com cardápio,
+> clientes, entregador, raios, mesas, banners e **11 pedidos de exemplo** (delivery + salão + retirada). O seed é
+> **idempotente** — pode rodar quantas vezes quiser sem duplicar. Para testar outro tenant sem mudar o `.env`,
+> use `?slug=<slug>` (ex.: `http://localhost:5174/admin/?slug=kardapio`).
 
 ## 🏪 Multi-tenant
 

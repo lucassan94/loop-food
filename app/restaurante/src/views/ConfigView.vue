@@ -139,7 +139,7 @@
           </div>
           <div style="flex:1;">
             <p style="font-size:0.85rem;font-weight:600;margin-bottom:6px;">Logo do Restaurante</p>
-            <p style="font-size:0.78rem;color:var(--text-muted);margin-bottom:8px;">Substitui o ícone da coroa no menu lateral. PNG ou JPG, até 500KB.</p>
+            <p style="font-size:0.78rem;color:var(--text-muted);margin-bottom:8px;">Substitui o ícone da coroa no menu lateral. PNG ou JPG, até 5MB.</p>
             <div style="display:flex;gap:8px;">
               <input type="file" accept="image/png,image/jpeg" @change="onLogoSelected" style="font-size:0.8rem;" />
               <button v-if="logoPreview" class="btn btn-sm btn-danger" @click="removerLogo">Remover</button>
@@ -555,6 +555,7 @@
           <div class="form-group">
             <label>Ou enviar imagem</label>
             <input type="file" accept="image/*" @change="onBannerImageSelected" />
+            <p style="font-size:0.75rem;color:var(--text-muted);margin-top:0.4rem;">Formatos: PNG, JPG, WebP · Tamanho máximo: 5MB</p>
             <div v-if="bannerForm.preview" class="banner-upload-preview"><img :src="bannerForm.preview" alt="Preview" /></div>
           </div>
           <div class="form-group">
@@ -686,6 +687,14 @@
         </div>
       </div>
     </div>
+
+    <!-- Dialog de erro de upload -->
+    <AlertDialog
+      :show="!!uploadError"
+      title="Imagem muito grande"
+      :message="uploadError"
+      @close="uploadError = ''"
+    />
   </div>
 </template>
 
@@ -693,6 +702,7 @@
 import { ref, onMounted, reactive, computed, markRaw } from 'vue'
 import api from '../services/api'
 import { Power, Store, Palette, MapPin, CreditCard, Table2, Users, Images, PlugZap } from 'lucide-vue-next'
+import AlertDialog from '../components/AlertDialog.vue'
 
 // ── Tabs ──
 const tabs = [
@@ -779,6 +789,9 @@ const pagamentoMsg = ref(null)
 const editUserModal = ref(false)
 const editUserForm = reactive({ id: null, nome: '', apelido: '', password: '', cargo: 'caixa', ativo: true })
 const salvandoEditUser = ref(false)
+
+// ── Upload de imagens ──
+const uploadError = ref('')
 
 // ── Banner ──
 const banners = ref([])
@@ -931,7 +944,7 @@ async function toggleLoja() {
 function onLogoSelected(event) {
   const file = event.target.files?.[0]
   if (!file) return
-  if (file.size > 500 * 1024) { alert('Logo deve ter no máximo 500KB.'); return }
+  if (file.size > 5 * 1024 * 1024) { uploadError.value = 'Logo muito grande! O tamanho máximo permitido é 5MB.'; return }
   const reader = new FileReader()
   reader.onload = async (e) => {
     const base64 = e.target.result.split(',')[1]
@@ -1064,7 +1077,7 @@ function abrirBannerEditor(banner) {
 function onBannerImageSelected(event) {
   const file = event.target.files?.[0]
   if (!file) return
-  if (file.size > 2 * 1024 * 1024) { alert('A imagem deve ter no máximo 2MB.'); return }
+  if (file.size > 5 * 1024 * 1024) { uploadError.value = 'Imagem muito grande! O tamanho máximo permitido é 5MB.'; return }
   const reader = new FileReader()
   reader.onload = (e) => {
     const base64 = e.target.result.split(',')[1]

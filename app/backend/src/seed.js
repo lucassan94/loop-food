@@ -4,42 +4,93 @@ import { query } from './config/database.js';
 import { config } from './config/index.js';
 import 'dotenv/config';
 
+// ============================================================================
+// SEED — popula o tenant configurado (config.restaurantId / RESTAURANT_ID)
+// ============================================================================
+// O tenant padrão para TESTES LOCAIS é o LOOP (RESTAURANT_ID=3, slug 'loop').
+// O seed é idempotente: pode ser re-executado sem duplicar dados
+// (categorias/produtos/extras/opções são verificados antes de inserir;
+// clientes/entregador/admin fazem upsert; pedidos só são criados se o tenant
+// ainda não tiver nenhum).
+// ============================================================================
+
+const minAtras = (n) => new Date(Date.now() - n * 60000);
+
 async function seed() {
+  const rid = config.restaurantId;
   console.log('\n🌱 Seeding database...\n');
+  console.log(`🏪 Tenant alvo: #${rid}`);
 
   try {
-    // Gerar JWT secret para o tenant se não existir
+    // ────────────────────────────────────────────────────────────────────────
+    // JWT SECRET DO TENANT
+    // ────────────────────────────────────────────────────────────────────────
     const jwtSecret = crypto.randomBytes(32).toString('hex');
     await query(
       'UPDATE restaurantes SET jwt_secret = COALESCE(jwt_secret, $1) WHERE id = $2',
-      [jwtSecret, config.restaurantId]
+      [jwtSecret, rid]
     );
     console.log('✅ JWT secret gerado/verificado para o tenant');
 
-    // Admin user
+    // ────────────────────────────────────────────────────────────────────────
+    // ADMIN — upsert determinístico (admin / admin123)
+    // ────────────────────────────────────────────────────────────────────────
     const adminHash = await bcrypt.hash('admin123', 12);
-    // Migrar email antigo da marca (SaborExpress) — torna o re-seed idempotente
-    // e evita criar um segundo admin quando o banco já foi populado antes.
-    await query(
-      `UPDATE restaurante_users SET email = 'admin@kardapiodigital.com'
-       WHERE restaurant_id = $1 AND apelido = 'admin'
-         AND email IS DISTINCT FROM 'admin@kardapiodigital.com'`,
-      [config.restaurantId]
+    const adminExistente = await query(
+      `SELECT id FROM restaurante_users
+       WHERE restaurant_id = $1 AND (apelido = 'admin' OR cargo = 'admin')
+       ORDER BY id LIMIT 1`,
+      [rid]
     );
-    await query(
-      `INSERT INTO restaurante_users (restaurant_id, nome, email, apelido, senha_hash, cargo)
-       VALUES ($1, 'Administrador', 'admin@kardapiodigital.com', 'admin', $2, 'admin')
-       ON CONFLICT (restaurant_id, email) DO NOTHING`,
-      [config.restaurantId, adminHash]
-    );
-    // Garantir apelido se o usuário já existia
-    await query(
-      "UPDATE restaurante_users SET apelido = COALESCE(apelido, 'admin') WHERE restaurant_id = $1 AND nome = 'Administrador'",
-      [config.restaurantId]
-    );
-    console.log('✅ Admin user created: admin / admin123');
+    if (adminExistente.rows[0]) {
+      await query(
+        `UPDATE restaurante_users
+         SET nome = 'Administrador', email = 'admin@kardapiodigital.com', apelido = 'admin',
+             senha_hash = $2, cargo = 'admin', ativo = true
+         WHERE id = $1`,
+        [adminExistente.rows[0].id, adminHash]
+      );
+    } else {
+      await query(
+        `INSERT INTO restaurante_users (restaurant_id, nome, email, apelido, senha_hash, cargo)
+         VALUES ($1, 'Administrador', 'admin@kardapiodigital.com', 'admin', $2, 'admin')
+         ON CONFLICT (restaurant_id, email) DO NOTHING`,
+        [rid, adminHash]
+      );
+    }
+    console.log('✅ Admin garantido: admin / admin123');
 
-    // Sample products
+    // ────────────────────────────────────────────────────────────────────────
+    // CATEGORIAS (idempotente por slug)
+    // ────────────────────────────────────────────────────────────────────────
+    const categorias = [
+      { nome: 'Burguers', slug: 'burguers', ordem: 1 },
+      { nome: 'Pizzas', slug: 'pizzas', ordem: 2 },
+      { nome: 'Bebidas', slug: 'bebidas', ordem: 3 },
+      { nome: 'Sobremesas', slug: 'sobremesas', ordem: 4 },
+      { nome: 'Porções', slug: 'porcoes', ordem: 5 },
+    ];
+    const catIds = {};
+    for (const c of categorias) {
+      const existente = await query(
+        'SELECT id FROM categorias WHERE restaurant_id = $1 AND slug = $2',
+        [rid, c.slug]
+      );
+      if (existente.rows[0]) {
+        catIds[c.slug] = existente.rows[0].id;
+      } else {
+        const criada = await query(
+          'INSERT INTO categorias (restaurant_id, nome, slug, ordem) VALUES ($1, $2, $3, $4) RETURNING id',
+          [rid, c.nome, c.slug, c.ordem]
+        );
+        catIds[c.slug] = criada.rows[0].id;
+      }
+    }
+    console.log(`✅ ${categorias.length} categorias garantidas`);
+
+    // ────────────────────────────────────────────────────────────────────────
+    // PRODUTOS (idempotente por restaurant_id + nome)
+    // ────────────────────────────────────────────────────────────────────────
     const produtos = [
       { nome: 'X-Burguer', descricao: 'Hambúrguer 180g, queijo cheddar, alface, tomate e molho especial.', preco: 28.90, categoria_slug: 'burguers', talheres: true, modulos: ['delivery', 'salao'] },
       { nome: 'X-Salada', descricao: 'Hambúrguer 180g, queijo mussarela, alface, tomate, cebola roxa e maionese.', preco: 25.90, categoria_slug: 'burguers', talheres: false, modulos: ['delivery', 'salao'] },
@@ -55,23 +106,27 @@ async function seed() {
       { nome: 'Batata Frita', descricao: 'Porção de batata frita crocante com queijo cheddar e bacon.', preco: 22.00, categoria_slug: 'porcoes', talheres: true, modulos: ['delivery', 'salao'] },
     ];
 
+    const produtoIds = {};
     for (const p of produtos) {
-      const catResult = await query(
-        'SELECT id FROM categorias WHERE slug = $1 AND restaurant_id = $2',
-        [p.categoria_slug, config.restaurantId]
+      const existente = await query(
+        'SELECT id FROM produtos WHERE nome = $1 AND restaurant_id = $2',
+        [p.nome, rid]
       );
-      const categoriaId = catResult.rows[0]?.id;
-
-      await query(
+      if (existente.rows[0]) {
+        produtoIds[p.nome] = existente.rows[0].id;
+        continue;
+      }
+      const criado = await query(
         `INSERT INTO produtos (restaurant_id, nome, descricao, preco, categoria_id, talheres_obrigatorio, modulos)
          VALUES ($1, $2, $3, $4, $5, $6, $7)
-         ON CONFLICT DO NOTHING`,
-        [config.restaurantId, p.nome, p.descricao, p.preco, categoriaId, p.talheres, JSON.stringify(p.modulos)]
+         RETURNING id`,
+        [rid, p.nome, p.descricao, p.preco, catIds[p.categoria_slug], p.talheres, JSON.stringify(p.modulos)]
       );
+      produtoIds[p.nome] = criado.rows[0].id;
     }
-    console.log(`✅ ${produtos.length} products created`);
+    console.log(`✅ ${produtos.length} produtos garantidos`);
 
-    // Extras for some products
+    // Extras de produtos (idempotente por produto + nome)
     const extras = [
       { produto_nome: 'X-Burguer', extra_nome: 'Bacon Extra', extra_preco: 4.00 },
       { produto_nome: 'X-Burguer', extra_nome: 'Cheddar Extra', extra_preco: 3.00 },
@@ -82,21 +137,21 @@ async function seed() {
       { produto_nome: 'Pizza Calabresa', extra_nome: 'Borda de Cheddar', extra_preco: 5.00 },
       { produto_nome: 'Pizza Calabresa', extra_nome: 'Cebola Extra', extra_preco: 2.00 },
     ];
-
     for (const e of extras) {
-      const prodResult = await query(
-        'SELECT id FROM produtos WHERE nome = $1 AND restaurant_id = $2',
-        [e.produto_nome, config.restaurantId]
+      const pid = produtoIds[e.produto_nome];
+      if (!pid) continue;
+      const existente = await query(
+        'SELECT id FROM produtos_extras WHERE produto_id = $1 AND nome = $2',
+        [pid, e.extra_nome]
       );
-      if (prodResult.rows[0]) {
+      if (!existente.rows[0]) {
         await query(
-          `INSERT INTO produtos_extras (produto_id, nome, preco)
-           VALUES ($1, $2, $3) ON CONFLICT DO NOTHING`,
-          [prodResult.rows[0].id, e.extra_nome, e.extra_preco]
+          'INSERT INTO produtos_extras (produto_id, nome, preco) VALUES ($1, $2, $3)',
+          [pid, e.extra_nome, e.extra_preco]
         );
       }
     }
-    console.log(`✅ ${extras.length} extras created`);
+    console.log(`✅ ${extras.length} extras garantidos`);
 
     // Opções do prato (gratuitas) — grupos + escolhas por produto
     const opcoes = [
@@ -106,29 +161,25 @@ async function seed() {
       { produto_nome: 'Pizza Margherita', grupo: 'Espessura da borda', tipo: 'unica', obrigatoria: true, opcoes: ['Fina', 'Média', 'Grossa'] },
       { produto_nome: 'Pizza Calabresa', grupo: 'Espessura da borda', tipo: 'unica', obrigatoria: true, opcoes: ['Fina', 'Média', 'Grossa'] },
     ];
-
     for (const o of opcoes) {
-      const prodResult = await query(
-        'SELECT id FROM produtos WHERE nome = $1 AND restaurant_id = $2',
-        [o.produto_nome, config.restaurantId]
-      );
-      if (!prodResult.rows[0]) continue;
+      const pid = produtoIds[o.produto_nome];
+      if (!pid) continue;
       let ordem = 0;
       for (const nome of o.opcoes) {
         const existente = await query(
           'SELECT id FROM produto_opcoes WHERE produto_id = $1 AND grupo = $2 AND nome = $3 LIMIT 1',
-          [prodResult.rows[0].id, o.grupo, nome]
+          [pid, o.grupo, nome]
         );
         if (!existente.rows[0]) {
           await query(
             `INSERT INTO produto_opcoes (produto_id, grupo, nome, tipo, obrigatoria, ordem)
              VALUES ($1, $2, $3, $4, $5, $6)`,
-            [prodResult.rows[0].id, o.grupo, nome, o.tipo, o.obrigatoria, ordem++]
+            [pid, o.grupo, nome, o.tipo, o.obrigatoria, ordem++]
           );
         }
       }
     }
-    console.log(`✅ ${opcoes.length} grupos de opções created`);
+    console.log(`✅ ${opcoes.length} grupos de opções garantidos`);
 
     // Subcategorias de adicionais (catálogo compartilhado)
     const subcategorias = [
@@ -155,7 +206,7 @@ async function seed() {
     for (const sub of subcategorias) {
       const existente = await query(
         'SELECT id FROM extra_subcategorias WHERE restaurant_id = $1 AND nome = $2 LIMIT 1',
-        [config.restaurantId, sub.nome]
+        [rid, sub.nome]
       );
       let subId;
       if (existente.rows[0]) {
@@ -163,7 +214,7 @@ async function seed() {
       } else {
         const criada = await query(
           'INSERT INTO extra_subcategorias (restaurant_id, nome, ordem) VALUES ($1, $2, $3) RETURNING id',
-          [config.restaurantId, sub.nome, Object.keys(subIds).length]
+          [rid, sub.nome, Object.keys(subIds).length]
         );
         subId = criada.rows[0].id;
       }
@@ -192,83 +243,89 @@ async function seed() {
       { nome: 'Pizza Calabresa', subs: ['Extra', 'Bebidas'] },
     ];
     for (const p of produtosComSubcats) {
-      const prodResult = await query(
-        'SELECT id FROM produtos WHERE nome = $1 AND restaurant_id = $2',
-        [p.nome, config.restaurantId]
-      );
-      if (!prodResult.rows[0]) continue;
+      const pid = produtoIds[p.nome];
+      if (!pid) continue;
       for (const subNome of p.subs) {
         const sid = subIds[subNome];
         if (!sid) continue;
         await query(
           'INSERT INTO produto_extra_subcategorias (produto_id, subcategoria_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
-          [prodResult.rows[0].id, sid]
+          [pid, sid]
         );
       }
     }
-    console.log(`✅ ${subcategorias.length} subcategorias de adicionais created`);
+    console.log(`✅ ${subcategorias.length} subcategorias de adicionais garantidas`);
 
-    // Sample cliente — login por username: cliente / cliente123 (ou telefone)
-    const clienteHash = await bcrypt.hash('cliente123', 12);
-    await query(
-      `INSERT INTO clientes (restaurant_id, nome, sobrenome, apelido, email, telefone, senha_hash, endereco, cep, bairro, cidade, estado)
-       VALUES ($1, 'Maria', 'Silva', 'cliente', 'maria@email.com', '(11) 99999-8888', $2, 'Av. Paulista, 1000', '01310-100', 'Bela Vista', 'São Paulo', 'SP')
-       ON CONFLICT (restaurant_id, email) DO NOTHING`,
-      [config.restaurantId, clienteHash]
-    );
-    // Backfill: garantir apelido 'cliente' caso o registro já existisse
-    await query(
-      `UPDATE clientes SET apelido = COALESCE(NULLIF(apelido, ''), 'cliente')
-       WHERE restaurant_id = $1 AND email = 'maria@email.com'`,
-      [config.restaurantId]
-    );
-    console.log('✅ Test client created: cliente / cliente123 (ou telefone (11) 99999-8888)');
+    // ────────────────────────────────────────────────────────────────────────
+    // CLIENTES (upsert por restaurant_id + email)
+    // ────────────────────────────────────────────────────────────────────────
+    const clientes = [
+      { nome: 'Maria', sobrenome: 'Silva', apelido: 'cliente', email: 'cliente@email.com', telefone: '(11) 99999-8888', senha: 'cliente123', endereco: 'Av. Paulista, 1000', numero: '1000', bairro: 'Bela Vista', cep: '01310-100', cidade: 'São Paulo', estado: 'SP' },
+      { nome: 'João', sobrenome: 'Pereira', apelido: 'joao', email: 'joao@email.com', telefone: '(11) 98888-1111', senha: 'cliente123', endereco: 'Rua Augusta, 500', numero: '500', bairro: 'Consolação', cep: '01304-000', cidade: 'São Paulo', estado: 'SP' },
+      { nome: 'Ana', sobrenome: 'Costa', apelido: 'ana', email: 'ana@email.com', telefone: '(11) 97777-2222', senha: 'cliente123', endereco: 'Alameda Santos, 1200', numero: '1200', bairro: 'Cerqueira César', cep: '01418-100', cidade: 'São Paulo', estado: 'SP' },
+    ];
+    const clienteIds = {};
+    for (const cli of clientes) {
+      const hash = await bcrypt.hash(cli.senha, 12);
+      const existente = await query(
+        'SELECT id FROM clientes WHERE restaurant_id = $1 AND email = $2',
+        [rid, cli.email]
+      );
+      if (existente.rows[0]) {
+        await query(
+          `UPDATE clientes
+           SET nome = $2, sobrenome = $3, apelido = $4, telefone = $5, senha_hash = $6,
+               endereco = $7, numero = $8, bairro = $9, cep = $10, cidade = $11, estado = $12, ativo = true
+           WHERE id = $1`,
+          [existente.rows[0].id, cli.nome, cli.sobrenome, cli.apelido, cli.telefone, hash,
+           cli.endereco, cli.numero, cli.bairro, cli.cep, cli.cidade, cli.estado]
+        );
+        clienteIds[cli.apelido] = existente.rows[0].id;
+      } else {
+        const criado = await query(
+          `INSERT INTO clientes (restaurant_id, nome, sobrenome, apelido, email, telefone, senha_hash, endereco, numero, bairro, cep, cidade, estado)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+           RETURNING id`,
+          [rid, cli.nome, cli.sobrenome, cli.apelido, cli.email, cli.telefone, hash,
+           cli.endereco, cli.numero, cli.bairro, cli.cep, cli.cidade, cli.estado]
+        );
+        clienteIds[cli.apelido] = criado.rows[0].id;
+      }
+    }
+    console.log(`✅ ${clientes.length} clientes garantidos (cliente / cliente123 · joao · ana)`);
 
-    // Sample entregador — login por username: entregador / entregador123
+    // ────────────────────────────────────────────────────────────────────────
+    // ENTREGADOR (upsert por restaurant_id + email)
+    // ────────────────────────────────────────────────────────────────────────
     const entregadorHash = await bcrypt.hash('entregador123', 12);
-    // Migrar email antigo da marca (SaborExpress) — idempotente como o admin
-    await query(
-      `UPDATE entregadores SET email = 'entregador@kardapiodigital.com'
-       WHERE restaurant_id = $1 AND apelido = 'entregador'
-         AND email IS DISTINCT FROM 'entregador@kardapiodigital.com'`,
-      [config.restaurantId]
+    const entregadorExistente = await query(
+      "SELECT id FROM entregadores WHERE restaurant_id = $1 AND email = 'entregador@kardapiodigital.com'",
+      [rid]
     );
-    await query(
-      `INSERT INTO entregadores (restaurant_id, nome, apelido, email, telefone, senha_hash, status)
-       VALUES ($1, 'Entregador', 'entregador', 'entregador@kardapiodigital.com', '(11) 98888-7777', $2, 'ativo')
-       ON CONFLICT (restaurant_id, email) DO NOTHING`,
-      [config.restaurantId, entregadorHash]
-    );
-    // Backfill: garantir apelido 'entregador' caso o registro já existisse
-    await query(
-      `UPDATE entregadores SET apelido = COALESCE(NULLIF(apelido, ''), 'entregador')
-       WHERE restaurant_id = $1 AND email = 'entregador@kardapiodigital.com'`,
-      [config.restaurantId]
-    );
-    console.log('✅ Test driver created: entregador / entregador123');
+    let entregadorId;
+    if (entregadorExistente.rows[0]) {
+      await query(
+        `UPDATE entregadores
+         SET nome = 'Entregador', apelido = 'entregador', telefone = '(11) 98888-7777',
+             senha_hash = $2, status = 'ativo'
+         WHERE id = $1`,
+        [entregadorExistente.rows[0].id, entregadorHash]
+      );
+      entregadorId = entregadorExistente.rows[0].id;
+    } else {
+      const criado = await query(
+        `INSERT INTO entregadores (restaurant_id, nome, apelido, email, telefone, senha_hash, status)
+         VALUES ($1, 'Entregador', 'entregador', 'entregador@kardapiodigital.com', '(11) 98888-7777', $2, 'ativo')
+         RETURNING id`,
+        [rid, entregadorHash]
+      );
+      entregadorId = criado.rows[0].id;
+    }
+    console.log('✅ Entregador garantido: entregador / entregador123');
 
-    // Configurar retirada e horários de funcionamento
-    await query(
-      `UPDATE restaurantes SET
-        retirada_habilitada = true,
-        horarios_funcionamento = $1
-       WHERE id = $2`,
-      [JSON.stringify([
-        { aberto: false, abre: '', fecha: '' },         // domingo
-        { aberto: true, abre: '08:00', fecha: '23:00' }, // segunda
-        { aberto: true, abre: '08:00', fecha: '23:00' }, // terça
-        { aberto: true, abre: '08:00', fecha: '23:00' }, // quarta
-        { aberto: true, abre: '08:00', fecha: '23:00' }, // quinta
-        { aberto: true, abre: '08:00', fecha: '23:59' }, // sexta
-        { aberto: true, abre: '09:00', fecha: '23:00' }, // sábado
-      ]), config.restaurantId]
-    );
-    console.log('✅ Retirada habilitada com horários de funcionamento');
-
-    // Raios de entrega
-    // Calibração (BUG-018): a distância calculada é EM LINHA RETA — a rota real
-    // é ~1,4× maior. Valores de tempo/frete refletem o deslocamento real
-    // (moto ~22 km/h) + margem de operação.
+    // ────────────────────────────────────────────────────────────────────────
+    // RAIOS DE ENTREGA (idempotente por raio_km)
+    // ────────────────────────────────────────────────────────────────────────
     const raios = [
       { km: 1, min: 10, max: 15, custo: 6.00 },
       { km: 3, min: 15, max: 25, custo: 8.00 },
@@ -280,28 +337,61 @@ async function seed() {
         `INSERT INTO raios_entrega (restaurant_id, raio_km, tempo_min, tempo_max, custo)
          VALUES ($1, $2, $3, $4, $5)
          ON CONFLICT (restaurant_id, raio_km) DO NOTHING`,
-        [config.restaurantId, r.km, r.min, r.max, r.custo]
+        [rid, r.km, r.min, r.max, r.custo]
       );
     }
-    console.log(`✅ ${raios.length} delivery zones created`);
+    console.log(`✅ ${raios.length} raios de entrega garantidos`);
 
-    // Mesas
-    const mesaCount = await query('SELECT COUNT(*) as total FROM mesas WHERE restaurant_id = $1', [config.restaurantId]);
+    // ────────────────────────────────────────────────────────────────────────
+    // CONFIGURAÇÕES: coordenadas + endereço (fallback), retirada + horários
+    // ────────────────────────────────────────────────────────────────────────
+    // Coordenadas são OBRIGATÓRIAS para o cálculo de frete por distância
+    // (services/frete.js). Sem elas, /calcular-frete cai no fallback de frete
+    // fixo e nunca bloqueia entregas fora do raio (API-07). Padrão: Osasco/SP,
+    // mesma região dos raios calibrados no seed.
+    await query(
+      `UPDATE restaurantes SET
+        latitude = COALESCE(latitude, $1),
+        longitude = COALESCE(longitude, $2),
+        endereco = CASE WHEN endereco IS NULL OR endereco = '' THEN $3 ELSE endereco END,
+        cidade = CASE WHEN cidade IS NULL OR cidade = '' THEN $4 ELSE cidade END,
+        estado = CASE WHEN estado IS NULL OR estado = '' THEN $5 ELSE estado END,
+        retirada_habilitada = true,
+        horarios_funcionamento = $6
+       WHERE id = $7`,
+      [-23.5451884, -46.8149413, 'Avenida João Paulo II, 500', 'Osasco', 'SP', JSON.stringify([
+        { aberto: false, abre: '', fecha: '' },         // domingo
+        { aberto: true, abre: '08:00', fecha: '23:00' }, // segunda
+        { aberto: true, abre: '08:00', fecha: '23:00' }, // terça
+        { aberto: true, abre: '08:00', fecha: '23:00' }, // quarta
+        { aberto: true, abre: '08:00', fecha: '23:00' }, // quinta
+        { aberto: true, abre: '08:00', fecha: '23:59' }, // sexta
+        { aberto: true, abre: '09:00', fecha: '23:00' }, // sábado
+      ]), rid]
+    );
+    console.log('✅ Coordenadas/endereço garantidos + retirada habilitada com horários');
+
+    // ────────────────────────────────────────────────────────────────────────
+    // MESAS (só se o tenant não tiver nenhuma)
+    // ────────────────────────────────────────────────────────────────────────
+    const mesaCount = await query('SELECT COUNT(*) as total FROM mesas WHERE restaurant_id = $1', [rid]);
     if (parseInt(mesaCount.rows[0].total) === 0) {
       for (let i = 1; i <= 10; i++) {
         await query(
           `INSERT INTO mesas (restaurant_id, nome, capacidade, status)
            VALUES ($1, $2, $3, $4)`,
-          [config.restaurantId, `Mesa ${i}`, i === 1 ? 2 : (i <= 3 ? 6 : 4), 'livre']
+          [rid, `Mesa ${i}`, i === 1 ? 2 : (i <= 3 ? 6 : 4), 'livre']
         );
       }
-      console.log('✅ 10 tables created (2-6 seats each)');
+      console.log('✅ 10 mesas criadas (2-6 lugares)');
     } else {
-      console.log(`⏩ ${mesaCount.rows[0].total} tables already exist, skipping`);
+      console.log(`⏩ ${mesaCount.rows[0].total} mesas já existem, pulando`);
     }
 
-    // Banners
-    const bannerCount = await query('SELECT COUNT(*) as total FROM banners WHERE restaurant_id = $1', [config.restaurantId]);
+    // ────────────────────────────────────────────────────────────────────────
+    // BANNERS (só se o tenant não tiver nenhum)
+    // ────────────────────────────────────────────────────────────────────────
+    const bannerCount = await query('SELECT COUNT(*) as total FROM banners WHERE restaurant_id = $1', [rid]);
     if (parseInt(bannerCount.rows[0].total) === 0) {
       const banners = [
         { titulo: 'Promoção do Dia!', subtitulo: 'Desconto especial em todos os burguers', ordem: 1 },
@@ -313,14 +403,39 @@ async function seed() {
           `INSERT INTO banners (restaurant_id, titulo, subtitulo, ordem, ativo)
            VALUES ($1, $2, $3, $4, true)
            ON CONFLICT DO NOTHING`,
-          [config.restaurantId, b.titulo, b.subtitulo, b.ordem]
+          [rid, b.titulo, b.subtitulo, b.ordem]
         );
       }
-      console.log(`✅ ${banners.length} banners created`);
+      console.log(`✅ ${banners.length} banners criados`);
     } else {
-      console.log(`⏩ ${bannerCount.rows[0].total} banners already exist, skipping`);
+      console.log(`⏩ ${bannerCount.rows[0].total} banners já existem, pulando`);
     }
 
+    // ────────────────────────────────────────────────────────────────────────
+    // PEDIDOS DE EXEMPLO (só se o tenant NÃO tiver nenhum pedido)
+    // ────────────────────────────────────────────────────────────────────────
+    const pedidoCount = await query('SELECT COUNT(*) as total FROM pedidos WHERE restaurant_id = $1', [rid]);
+    if (parseInt(pedidoCount.rows[0].total) > 0) {
+      console.log(`⏩ ${pedidoCount.rows[0].total} pedidos já existem, pulando seeds de pedidos`);
+    } else {
+      await seedPedidos(rid, clienteIds, entregadorId, produtoIds);
+    }
+
+    // ────────────────────────────────────────────────────────────────────────
+    // RESUMO
+    // ────────────────────────────────────────────────────────────────────────
+    const resumo = await query(
+      `SELECT
+        (SELECT COUNT(*) FROM clientes WHERE restaurant_id = $1) AS clientes,
+        (SELECT COUNT(*) FROM entregadores WHERE restaurant_id = $1) AS entregadores,
+        (SELECT COUNT(*) FROM produtos WHERE restaurant_id = $1) AS produtos,
+        (SELECT COUNT(*) FROM pedidos WHERE restaurant_id = $1) AS pedidos,
+        (SELECT COUNT(*) FROM mesas WHERE restaurant_id = $1) AS mesas,
+        (SELECT COUNT(*) FROM banners WHERE restaurant_id = $1) AS banners`,
+      [rid]
+    );
+    const r = resumo.rows[0];
+    console.log('\n📊 Resumo do tenant:', JSON.stringify(r));
     console.log('\n🌱 Seed completed successfully!\n');
   } catch (err) {
     console.error('❌ Seed failed:', err);
@@ -328,6 +443,262 @@ async function seed() {
   }
 
   process.exit(0);
+}
+
+// ============================================================================
+// PEDIDOS DE EXEMPLO — delivery + salão + retirada, com itens e timeline
+// ============================================================================
+async function seedPedidos(rid, clienteIds, entregadorId, produtoIds) {
+  const criarItem = (produto, quantidade = 1, extras = [], opcoes = []) => {
+    const somaExtras = extras.reduce((acc, e) => acc + e.preco, 0);
+    const precoUnitario = produto.preco;
+    return {
+      produtoId: produtoIds[produto.nome],
+      nome: produto.nome,
+      quantidade,
+      precoUnitario,
+      extras,
+      opcoes,
+      subtotal: (precoUnitario + somaExtras) * quantidade,
+    };
+  };
+
+  const criaTimeline = (marcos) =>
+    marcos.map((m) => ({
+      anterior: m.anterior ?? null,
+      novo: m.novo,
+      usuario: m.usuario || 'sistema',
+      notas: m.notas || null,
+      quando: m.quando || null,
+    }));
+
+  const pedidos = [
+    // ── DELIVERY ────────────────────────────────────────────────────────────
+    {
+      origem: 'delivery', status: 'pendente', metodoPagamento: 'pix_online',
+      clienteId: clienteIds.joao, nomeCliente: 'João Pereira', telefone: '(11) 98888-1111',
+      endereco: 'Rua Augusta, 500', numero: '500', bairro: 'Consolação', cep: '01304-000', cidade: 'São Paulo', estado: 'SP',
+      subtotal: 75.80, valorFrete: 8.00, observacoes: 'Sem cebola, por favor.',
+      tempoPreparo: 20, tempoEntrega: 30,
+      itens: [
+        criarItem({ nome: 'X-Burguer', preco: 28.90 }, 2, [{ nome: 'Bacon Extra', preco: 4.00 }], [{ grupo: 'Ponto da carne', nome: 'Ao ponto' }]),
+        criarItem({ nome: 'Coca-Cola 2L', preco: 10.00 }),
+      ],
+      timeline: criaTimeline([{ novo: 'pendente', usuario: 'cliente', quando: minAtras(8) }]),
+    },
+    {
+      origem: 'delivery', status: 'preparando', metodoPagamento: 'dinheiro', detalhesPagamento: 'Troco para R$ 100',
+      clienteId: clienteIds.cliente, nomeCliente: 'Maria Silva', telefone: '(11) 99999-8888',
+      endereco: 'Av. Paulista, 1000', numero: '1000', bairro: 'Bela Vista', cep: '01310-100', cidade: 'São Paulo', estado: 'SP',
+      subtotal: 33.90, valorFrete: 10.00,
+      tempoPreparo: 15, tempoEntrega: 35,
+      aceito: minAtras(20), preparo: minAtras(15),
+      itens: [
+        criarItem({ nome: 'X-Salada', preco: 25.90 }),
+        criarItem({ nome: 'Suco de Laranja', preco: 8.00 }),
+      ],
+      timeline: criaTimeline([
+        { novo: 'pendente', usuario: 'cliente', quando: minAtras(25) },
+        { anterior: 'pendente', novo: 'preparando', usuario: 'restaurante', quando: minAtras(20) },
+      ]),
+    },
+    {
+      origem: 'delivery', status: 'pronto_entrega', metodoPagamento: 'pix',
+      clienteId: clienteIds.ana, nomeCliente: 'Ana Costa', telefone: '(11) 97777-2222',
+      endereco: 'Alameda Santos, 1200', numero: '1200', bairro: 'Cerqueira César', cep: '01418-100', cidade: 'São Paulo', estado: 'SP',
+      subtotal: 57.00, valorFrete: 6.00,
+      tempoPreparo: 25, tempoEntrega: 20,
+      aceito: minAtras(50), preparo: minAtras(48), pronto: minAtras(25),
+      itens: [
+        criarItem({ nome: 'Pizza Calabresa', preco: 48.00 }, 1, [{ nome: 'Borda de Cheddar', preco: 5.00 }], [{ grupo: 'Espessura da borda', nome: 'Média' }]),
+        criarItem({ nome: 'Água Mineral', preco: 4.00 }),
+      ],
+      timeline: criaTimeline([
+        { novo: 'pendente', usuario: 'cliente', quando: minAtras(55) },
+        { anterior: 'pendente', novo: 'preparando', usuario: 'restaurante', quando: minAtras(50) },
+        { anterior: 'preparando', novo: 'pronto_entrega', usuario: 'restaurante', quando: minAtras(25) },
+      ]),
+    },
+    {
+      origem: 'delivery', status: 'em_transito', metodoPagamento: 'pix',
+      clienteId: clienteIds.joao, nomeCliente: 'João Pereira', telefone: '(11) 98888-1111',
+      endereco: 'Rua Augusta, 500', numero: '500', bairro: 'Consolação', cep: '01304-000', cidade: 'São Paulo', estado: 'SP',
+      subtotal: 57.90, valorFrete: 10.00,
+      tempoPreparo: 20, tempoEntrega: 30,
+      aceito: minAtras(80), preparo: minAtras(78), pronto: minAtras(55), transito: minAtras(40),
+      entregadorId,
+      itens: [
+        criarItem({ nome: 'X-Bacon', preco: 32.90 }, 1, [{ nome: 'Cheddar Extra', preco: 3.00 }], [{ grupo: 'Ponto da carne', nome: 'Bem passado' }]),
+        criarItem({ nome: 'Batata Frita', preco: 22.00 }),
+      ],
+      timeline: criaTimeline([
+        { novo: 'pendente', usuario: 'cliente', quando: minAtras(85) },
+        { anterior: 'pendente', novo: 'preparando', usuario: 'restaurante', quando: minAtras(80) },
+        { anterior: 'preparando', novo: 'pronto_entrega', usuario: 'restaurante', quando: minAtras(55) },
+        { anterior: 'pronto_entrega', novo: 'em_transito', usuario: 'entregador', quando: minAtras(40) },
+      ]),
+    },
+    {
+      origem: 'delivery', status: 'entregue', metodoPagamento: 'debito',
+      clienteId: clienteIds.cliente, nomeCliente: 'Maria Silva', telefone: '(11) 99999-8888',
+      endereco: 'Av. Paulista, 1000', numero: '1000', bairro: 'Bela Vista', cep: '01310-100', cidade: 'São Paulo', estado: 'SP',
+      subtotal: 61.00, valorFrete: 8.00,
+      tempoPreparo: 20, tempoEntrega: 25,
+      aceito: minAtras(200), preparo: minAtras(198), pronto: minAtras(175), transito: minAtras(160), destino: minAtras(148), entregue: minAtras(145),
+      entregadorId,
+      itens: [
+        criarItem({ nome: 'Pizza Margherita', preco: 45.00 }, 1, [{ nome: 'Queijo Extra', preco: 6.00 }], [{ grupo: 'Espessura da borda', nome: 'Fina' }]),
+        criarItem({ nome: 'Coca-Cola 2L', preco: 10.00 }),
+      ],
+      timeline: criaTimeline([
+        { novo: 'pendente', usuario: 'cliente', quando: minAtras(205) },
+        { anterior: 'pendente', novo: 'preparando', usuario: 'restaurante', quando: minAtras(200) },
+        { anterior: 'preparando', novo: 'pronto_entrega', usuario: 'restaurante', quando: minAtras(175) },
+        { anterior: 'pronto_entrega', novo: 'em_transito', usuario: 'entregador', quando: minAtras(160) },
+        { anterior: 'em_transito', novo: 'cheguei_destino', usuario: 'entregador', quando: minAtras(148) },
+        { anterior: 'cheguei_destino', novo: 'entregue', usuario: 'entregador', quando: minAtras(145) },
+      ]),
+    },
+    {
+      origem: 'delivery', status: 'cancelado', metodoPagamento: 'pix', motivoCancelamento: 'Cliente desistiu',
+      clienteId: clienteIds.ana, nomeCliente: 'Ana Costa', telefone: '(11) 97777-2222',
+      endereco: 'Alameda Santos, 1200', numero: '1200', bairro: 'Cerqueira César', cep: '01418-100', cidade: 'São Paulo', estado: 'SP',
+      subtotal: 28.90, valorFrete: 10.00,
+      tempoPreparo: 20, tempoEntrega: 30,
+      cancelado: minAtras(120),
+      itens: [criarItem({ nome: 'X-Burguer', preco: 28.90 })],
+      timeline: criaTimeline([
+        { novo: 'pendente', usuario: 'cliente', quando: minAtras(125) },
+        { anterior: 'pendente', novo: 'cancelado', usuario: 'restaurante', notas: 'Cliente desistiu', quando: minAtras(120) },
+      ]),
+    },
+    {
+      origem: 'delivery', status: 'aguardando_pagamento', metodoPagamento: 'pix_online',
+      clienteId: clienteIds.joao, nomeCliente: 'João Pereira', telefone: '(11) 98888-1111',
+      endereco: 'Rua Augusta, 500', numero: '500', bairro: 'Consolação', cep: '01304-000', cidade: 'São Paulo', estado: 'SP',
+      subtotal: 53.40, valorFrete: 8.00,
+      tempoPreparo: 20, tempoEntrega: 30,
+      itens: [
+        criarItem({ nome: 'X-Burguer', preco: 28.90 }, 1, [{ nome: 'Ovo', preco: 2.50 }]),
+        criarItem({ nome: 'Batata Frita', preco: 22.00 }),
+      ],
+      timeline: criaTimeline([{ novo: 'aguardando_pagamento', usuario: 'cliente', quando: minAtras(3) }]),
+    },
+
+    // ── SALÃO (PDV) ─────────────────────────────────────────────────────────
+    {
+      origem: 'salao', status: 'pendente', metodoPagamento: 'conta', mesa: 'Mesa 1',
+      clienteId: null, nomeCliente: 'Cliente da mesa 1',
+      subtotal: 38.90, valorFrete: 0,
+      tempoPreparo: 15,
+      itens: [
+        criarItem({ nome: 'X-Burguer', preco: 28.90 }),
+        criarItem({ nome: 'Coca-Cola 2L', preco: 10.00 }),
+      ],
+      timeline: criaTimeline([{ novo: 'pendente', usuario: 'restaurante', quando: minAtras(12) }]),
+    },
+    {
+      origem: 'salao', status: 'preparando', metodoPagamento: 'conta', mesa: 'Mesa 3',
+      clienteId: null, nomeCliente: 'Cliente da mesa 3',
+      subtotal: 56.00, valorFrete: 0,
+      tempoPreparo: 20,
+      aceito: minAtras(18), preparo: minAtras(15),
+      itens: [
+        criarItem({ nome: 'Pizza Calabresa', preco: 48.00 }),
+        criarItem({ nome: 'Suco de Laranja', preco: 8.00 }),
+      ],
+      timeline: criaTimeline([
+        { novo: 'pendente', usuario: 'restaurante', quando: minAtras(20) },
+        { anterior: 'pendente', novo: 'preparando', usuario: 'restaurante', quando: minAtras(15) },
+      ]),
+    },
+    {
+      origem: 'salao', status: 'finalizado', metodoPagamento: 'dinheiro', mesa: 'Mesa 5',
+      clienteId: null, nomeCliente: 'Cliente da mesa 5',
+      subtotal: 37.90, valorFrete: 0,
+      tempoPreparo: 15,
+      aceito: minAtras(90), preparo: minAtras(88), pronto: minAtras(70),
+      itens: [
+        criarItem({ nome: 'X-Salada', preco: 25.90 }),
+        criarItem({ nome: 'Pudim', preco: 12.00 }),
+      ],
+      timeline: criaTimeline([
+        { novo: 'pendente', usuario: 'restaurante', quando: minAtras(95) },
+        { anterior: 'pendente', novo: 'preparando', usuario: 'restaurante', quando: minAtras(90) },
+        { anterior: 'preparando', novo: 'pronto', usuario: 'restaurante', quando: minAtras(70) },
+        { anterior: 'pronto', novo: 'finalizado', usuario: 'restaurante', quando: minAtras(45) },
+      ]),
+    },
+
+    // ── RETIRADA ─────────────────────────────────────────────────────────────
+    {
+      origem: 'retirada', status: 'pronto_entrega', metodoPagamento: 'pix',
+      clienteId: clienteIds.cliente, nomeCliente: 'Maria Silva', telefone: '(11) 99999-8888',
+      subtotal: 43.90, valorFrete: 0,
+      tempoPreparo: 15,
+      aceito: minAtras(30), preparo: minAtras(28), pronto: minAtras(10),
+      itens: [
+        criarItem({ nome: 'X-Burguer', preco: 28.90 }),
+        criarItem({ nome: 'Brownie', preco: 15.00 }),
+      ],
+      timeline: criaTimeline([
+        { novo: 'pendente', usuario: 'cliente', quando: minAtras(35) },
+        { anterior: 'pendente', novo: 'preparando', usuario: 'restaurante', quando: minAtras(30) },
+        { anterior: 'preparando', novo: 'pronto_entrega', usuario: 'restaurante', quando: minAtras(10) },
+      ]),
+    },
+  ];
+
+  let criados = 0;
+  for (const p of pedidos) {
+    const pedido = await query(
+      `INSERT INTO pedidos (
+         restaurant_id, cliente_id, entregador_id,
+         nome_cliente, telefone_cliente, endereco_cliente, numero_cliente, bairro_cliente,
+         cep_cliente, cidade_cliente, estado_cliente,
+         subtotal, valor_frete, total,
+         metodo_pagamento, detalhes_pagamento, status, motivo_cancelamento,
+         origem, mesa, observacoes,
+         tempo_preparo_estimado, tempo_entrega_estimado,
+         aceito_em, preparo_inicio_em, pronto_em, transito_inicio_em, destino_chegada_em, entregue_em, cancelado_em
+       ) VALUES (
+         $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,
+         $12,$13,$14,$15,$16,$17,$18,
+         $19,$20,$21,$22,$23,
+         $24,$25,$26,$27,$28,$29,$30
+       )
+       RETURNING id, pedido_id`,
+      [rid, p.clienteId, p.entregadorId || null,
+       p.nomeCliente, p.telefone || null, p.endereco || null, p.numero || null, p.bairro || null,
+       p.cep || null, p.cidade || null, p.estado || null,
+       p.subtotal, p.valorFrete, p.subtotal + p.valorFrete,
+       p.metodoPagamento, p.detalhesPagamento || null, p.status, p.motivoCancelamento || null,
+       p.origem, p.mesa || null, p.observacoes || null,
+       p.tempoPreparo || null, p.tempoEntrega || null,
+       p.aceito || null, p.preparo || null, p.pronto || null, p.transito || null, p.destino || null, p.entregue || null, p.cancelado || null]
+    );
+
+    for (const item of p.itens) {
+      await query(
+        `INSERT INTO pedido_itens (pedido_id, produto_id, nome_produto, quantidade, preco_unitario, extras, opcoes, subtotal)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+        [pedido.rows[0].id, item.produtoId, item.nome, item.quantidade, item.precoUnitario,
+         JSON.stringify(item.extras), JSON.stringify(item.opcoes), item.subtotal]
+      );
+    }
+
+    for (const t of p.timeline) {
+      await query(
+        `INSERT INTO pedido_timeline (pedido_id, pedido_id_ref, status_anterior, status_novo, usuario_tipo, notas, mudado_em)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        [pedido.rows[0].id, pedido.rows[0].pedido_id, t.anterior, t.novo, t.usuario, t.notas, t.quando]
+      );
+    }
+
+    criados++;
+  }
+
+  console.log(`✅ ${criados} pedidos de exemplo criados (delivery + salão + retirada)`);
 }
 
 seed();

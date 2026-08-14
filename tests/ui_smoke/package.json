@@ -1,0 +1,13 @@
+{
+  "name": "ui-smoke-loop",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Smoke de UI funcional (CL/RS/EN) contra o tenant LOOP — usa Chrome local via puppeteer-core",
+  "scripts": {
+    "smoke": "node smoke.js"
+  },
+  "dependencies": {
+    "puppeteer-core": "^23.0.0"
+  }
+}

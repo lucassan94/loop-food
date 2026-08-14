@@ -79,6 +79,18 @@
 
 ---
 
+## ADR-008 — Loop (tenant 3) é o restaurante padrão para testes locais + seeds idempotentes
+
+- **ID:** ADR-008
+- **Data:** 13/08/2026
+- **Contexto:** havia três tenants no banco (1 = Palazzo, 2 = Kardapio Digital, 3 = Loop). O backend local usava `RESTAURANT_ID=1` (Palazzo) como fallback, então o usuário criado para o Loop não logava na execução local (o login consultava o tenant errado — e o apelido do usuário ainda tinha um ponto a mais: `admin.`).
+- **Problema:** qual tenant usar como referência para desenvolvimento/testes locais e quais dados de exemplo garantir?
+- **Alternativas:** manter Palazzo (tenant 1) como padrão local; usar o Loop com `?slug=loop` pontualmente; **adotar o Loop como tenant padrão de testes**.
+- **Decisão:** o **Loop (slug `loop`, id 3) é o restaurante padrão para testes locais**. O `.env` local usa `RESTAURANT_ID=3`; o `seed.js` é idempotente (pode re-executar sem duplicar) e popula o tenant configurado com: cardápio (5 categorias, 12 produtos, extras, opções, subcategorias de adicionais), 3 clientes, 1 entregador, raios de entrega, 10 mesas, 3 banners, retirada + horários e **11 pedidos de exemplo** (delivery: pendente/preparando/pronto_entrega/em_transito/entregue/cancelado/aguardando_pagamento · salão: pendente/preparando/finalizado · retirada: pronto_entrega), com itens e timeline. Credenciais determinísticas: `admin`/`admin123`, `cliente`/`cliente123`, `entregador`/`entregador123` (o seed faz upsert do admin do tenant para `admin`/`admin123`).
+- **Consequências:** ambiente local de testes sempre com dados previsíveis no Loop; produção continua com `RESTAURANT_ID=1` (docker-compose, fallback Palazzo); para testar outro tenant localmente sem mudar o `.env`, usar `?slug=<slug>` (ex.: `http://localhost:5174/admin/?slug=kardapio` — o frontend envia `X-Tenant-Slug` e o `tenantResolver` resolve o tenant correto).
+
+---
+
 ## ADR-007 — Valores monetários em centavos na integração Rede
 
 - **ID:** ADR-007
