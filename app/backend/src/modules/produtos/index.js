@@ -170,7 +170,7 @@ async function buscarOpcoesPadraoDoProduto(db, produtoId) {
   const run = typeof db === 'function' ? db : (sql, params) => db.query(sql, params);
   try {
     const link = await run(
-      'SELECT opcao_padrao_id FROM produto_opcoes_padrao WHERE produto_id = $1 ORDER BY id',
+      'SELECT opcao_padrao_id FROM produto_opcoes_padrao WHERE produto_id = $1 ORDER BY opcao_padrao_id',
       [produtoId]
     );
     const ids = link.rows.map(r => r.opcao_padrao_id);
@@ -566,7 +566,7 @@ router.get('/com-extras', optionalAuth, async (req, res, next) => {
     // Grupos padrão vinculados (vínculo ao vivo) — adiciona após as avulsas
     try {
       const padraoLinkResult = await query(
-        'SELECT produto_id, opcao_padrao_id FROM produto_opcoes_padrao WHERE produto_id = ANY($1) ORDER BY id',
+        'SELECT produto_id, opcao_padrao_id FROM produto_opcoes_padrao WHERE produto_id = ANY($1) ORDER BY opcao_padrao_id',
         [produtoIds]
       );
       if (padraoLinkResult.rows.length > 0) {
@@ -890,7 +890,7 @@ router.get('/:id', async (req, res, next) => {
     let padraoVinculados = [];
     try {
       padraoVinculados = (await query(
-        'SELECT opcao_padrao_id FROM produto_opcoes_padrao WHERE produto_id = $1 ORDER BY id',
+        'SELECT opcao_padrao_id FROM produto_opcoes_padrao WHERE produto_id = $1 ORDER BY opcao_padrao_id',
         [id]
       )).rows.map(r => r.opcao_padrao_id);
     } catch (e) { /* tabela pode não existir ainda */ }
@@ -956,10 +956,16 @@ router.post('/', authenticate, authorize('admin', 'gerente', 'chef'), async (req
       await inserirOpcoes(client, produto.id, data.opcoes);
 
       // Vincular grupos padrão de opções (catálogo compartilhado — vínculo ao vivo)
+      // SAVEPOINT: erro defensivo (tabela/coluna ausente) não pode abortar a
+      // transação inteira — rollback só do trecho e segue.
       try {
+        await client.query('SAVEPOINT opcoes_padrao_write');
         await validarOpcoesPadraoDoRestaurante(client, restaurantId, data.opcoes_padrao);
         await substituirOpcoesPadraoDoProduto(client, produto.id, data.opcoes_padrao);
-      } catch (e) { /* tabela pode não existir ainda */ }
+        await client.query('RELEASE SAVEPOINT opcoes_padrao_write');
+      } catch (e) {
+        try { await client.query('ROLLBACK TO SAVEPOINT opcoes_padrao_write'); } catch {}
+      }
 
       // Vincular subcategorias de adicionais (catálogo compartilhado)
       await validarSubcategoriasDoRestaurante(client, restaurantId, data.subcategorias);
@@ -1062,12 +1068,18 @@ router.put('/:id', authenticate, authorize('admin', 'gerente', 'chef'), async (r
         await inserirOpcoes(client, id, data.opcoes);
       }
 
-      // Atualizar grupos padrão vinculados somente se enviado explicitamente
+      // Atualizar grupos padrão vinculados somente se enviado explicitamente.
+      // SAVEPOINT: erro defensivo (tabela/coluna ausente) não pode abortar a
+      // transação inteira — rollback só do trecho e segue.
       if ('opcoes_padrao' in req.body) {
         try {
+          await client.query('SAVEPOINT opcoes_padrao_write');
           await validarOpcoesPadraoDoRestaurante(client, restaurantId, data.opcoes_padrao);
           await substituirOpcoesPadraoDoProduto(client, id, data.opcoes_padrao);
-        } catch (e) { /* tabela pode não existir ainda */ }
+          await client.query('RELEASE SAVEPOINT opcoes_padrao_write');
+        } catch (e) {
+          try { await client.query('ROLLBACK TO SAVEPOINT opcoes_padrao_write'); } catch {}
+        }
       }
 
       // Atualizar subcategorias de adicionais somente se enviado explicitamente
@@ -1089,15 +1101,24 @@ router.put('/:id', authenticate, authorize('admin', 'gerente', 'chef'), async (r
         [id]
       );
 
-      const opcoes = await buscarOpcoesComPadrao(client, id);
-      const subcategorias = (await buscarSubcategoriasDeProdutos(client, [id]))[id] || [];
+      // Leituras de tabelas novas (opcoes_padrao) são defensivas — qualquer erro
+      // (coluna/relação ausente) não pode abortar a transação inteira.
+      let opcoes = [];
       let padraoVinculados = [];
       try {
-        padraoVinculados = (await client.query(
-          'SELECT opcao_padrao_id FROM produto_opcoes_padrao WHERE produto_id = $1 ORDER BY id',
-          [id]
-        )).rows.map(r => r.opcao_padrao_id);
-      } catch (e) { /* tabela pode não existir ainda */ }
+        await client.query('SAVEPOINT leituras_opcoes');
+        opcoes = await buscarOpcoesComPadrao(client, id);
+        try {
+          padraoVinculados = (await client.query(
+            'SELECT opcao_padrao_id FROM produto_opcoes_padrao WHERE produto_id = $1 ORDER BY opcao_padrao_id',
+            [id]
+          )).rows.map(r => r.opcao_padrao_id);
+        } catch (e) { /* tabela pode não existir ainda */ }
+        await client.query('RELEASE SAVEPOINT leituras_opcoes');
+      } catch (e) {
+        try { await client.query('ROLLBACK TO SAVEPOINT leituras_opcoes'); } catch {}
+      }
+      const subcategorias = (await buscarSubcategoriasDeProdutos(client, [id]))[id] || [];
       const opcoesSeguro = Array.isArray(opcoes) ? opcoes : [];
 
       return { ...updated.rows[0], extras: extras.rows, opcoes: opcoesSeguro, opcoes_padrao: padraoVinculados, subcategorias };
