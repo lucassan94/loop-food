@@ -25,7 +25,7 @@
           <img v-if="logoUrl" :src="logoUrl" alt="Logo" class="sidebar-logo-img" />
           <i-lucide-crown v-else style="width:24px;height:24px" />
         </div>
-        <h2>🏰 Palazzo</h2>
+        <h2>{{ nomeRestaurante || 'Painel' }}</h2>
         <button class="sidebar-toggle" @click.stop="sidebarCollapsed = !sidebarCollapsed" :title="sidebarCollapsed ? 'Expandir menu' : 'Recolher menu'">
           <i-lucide-chevron-right v-if="sidebarCollapsed" />
           <i-lucide-chevron-left v-else />
@@ -144,6 +144,7 @@ const loadingMessage = ref('Carregando...')
 const sidebarCollapsed = ref(false)
 const features = ref({ salao: true, delivery: true })
 const logoUrl = ref('')
+const nomeRestaurante = ref('')
 
 // Menu completo com cargos permitidos para cada seção
 const sidebarGroups = computed(() => [
@@ -251,6 +252,9 @@ onMounted(async () => {
     if (data.features) {
       features.value = data.features
     }
+    if (data.nome) {
+      nomeRestaurante.value = data.nome
+    }
     if (data.logo_base64) {
       logoUrl.value = data.logo_base64.startsWith('data:') ? data.logo_base64 : 'data:image/png;base64,' + data.logo_base64
     }
@@ -259,6 +263,7 @@ onMounted(async () => {
   try {
     const { data } = await api.get('/restaurante')
     storeOpen.value = data.status_loja
+    nomeRestaurante.value = data.nome || ''
     features.value = data.features || { salao: true, delivery: true }
     // Carregar logo
     if (data.logo_base64) {
