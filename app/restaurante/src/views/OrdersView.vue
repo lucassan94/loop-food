@@ -88,7 +88,7 @@
   <div class="stat-card"><div class="label">Ativos na Fila</div><div class="value info">{{ resumo?.pedidos_ativos || 0 }}</div></div>
 </div>    <!-- View Mode Tabs -->
     <div class="tabs">
-      <button class="tab" :class="{ active: viewMode === 'cards' }" @click="viewMode = 'cards'">Quadro</button>
+      <button class="tab" :class="{ active: viewMode === 'cards' }" @click="viewMode = 'cards'">Cartões</button>
       <button class="tab" :class="{ active: viewMode === 'lista' }" @click="viewMode = 'lista'">Lista</button>
       <button class="chat-toggle-btn" @click="abrirChatDrawer()">
         <i-lucide-message-circle style="width:16px;height:16px" />
@@ -97,47 +97,119 @@
       </button>
     </div>
 
-    <!-- Quadro de Expedição (réplica iFood Gestor de Pedidos) -->
-    <div v-if="viewMode === 'cards'" class="ifood-board">
-      <div
-        v-for="col in boardColumns"
-        :key="col.key"
-        class="ifood-lane"
-      >
-        <button class="ifood-lane-header" @click="toggleLane(col.key)">
-          <div class="ifood-lane-title">
-            <h3>{{ col.label }}</h3>
-            <span class="ifood-lane-count">{{ col.orders.length }}</span>
+    <!-- Cards View (formato anterior) -->
+    <div v-if="viewMode === 'cards'">
+      <div v-for="order in filteredOrders" :key="order.id" class="order-card" :class="order.status">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+          <div>
+            <strong>{{ order.pedido_id }}</strong>
+            <span class="origem-badge" :class="order.origem || 'delivery'">
+              <i-lucide-store v-if="order.origem === 'salao'" style="width:12px;height:12px" />
+              <i-lucide-store v-else-if="order.origem === 'retirada'" style="width:12px;height:12px" />
+              <i-lucide-utensils v-else-if="order.origem === 'ifood'" style="width:12px;height:12px" />
+              <i-lucide-truck v-else style="width:12px;height:12px" />
+              {{ order.origem === 'salao' ? 'Salão' : (order.origem === 'retirada' ? 'Retirada' : (order.origem === 'ifood' ? 'iFood' : 'Delivery')) }}
+            </span>
+            — {{ order.nome_cliente }}
+            <div style="font-size:0.8rem;color:var(--text-muted);">{{ formatDate(order.criado_em) }}</div>
           </div>
-          <i-lucide-chevron-up style="width:16px;height:16px" :class="{ rotated: laneCollapsed[col.key] }" />
-        </button>
+          <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;">
+            <span v-if="order.mesa" class="mesa-badge">Mesa {{ order.mesa }}</span>
+            <span class="status-badge" :class="order.status">{{ statusLabel(order.status) }}</span>
+            <!-- Badge de refund (restaurante) -->
+            <div v-if="(order.status === 'cancelado' || order.status === 'recusado') && isOnlinePayment(order.metodo_pagamento)"
+                 class="refund-status" :class="refundClass(order.id)" style="margin-top:4px;">
+              <i-lucide-clock v-if="refundIcon(order.id) === 'clock'" style="width:16px;height:16px" />
+              <i-lucide-circle-check-big v-else-if="refundIcon(order.id) === 'check-circle'" style="width:16px;height:16px" />
+              <i-lucide-circle-x v-else-if="refundIcon(order.id) === 'x-circle'" style="width:16px;height:16px" />
+              <i-lucide-loader v-else class="spinning" style="width:16px;height:16px" />
+              {{ refundLabel(order.id) }}
+            </div>
+          </div>
+        </div>
 
-        <div v-if="!laneCollapsed[col.key]" class="ifood-lane-cards">
-          <div v-if="col.orders.length === 0" class="ifood-lane-empty">{{ col.vazio }}</div>
+        <div v-if="order.entregador_nome" style="font-size:0.85rem;color:var(--text-secondary);margin-top:4px;">
+          <i-lucide-bike style="width:14px;height:14px;vertical-align:middle;" /> {{ order.entregador_nome }}
+        </div>
 
-          <div
-            v-for="order in col.orders"
-            :key="order.id"
-            class="ifood-card"
-            :class="cardClasse(order)"
-            :data-order-id="order.id"
-            @click="abrirDetalhes(order)"
-          >
-            <div class="ifood-card-num">{{ orderNumero(order) }}</div>
-            <div class="ifood-card-nome" :title="order.nome_cliente">{{ order.nome_cliente }}</div>
-            <div v-if="order.mesa" class="ifood-card-chip">🪑 {{ order.mesa }}</div>
-            <template v-if="cardActions[order.id]">
-              <button
-                v-if="cardActions[order.id].fn"
-                class="ifood-card-btn"
-                @click.stop="cardActions[order.id].fn()"
-              >
-                <span class="ifood-card-btn-bar" :style="slaBarStyle(order)"></span>
-                <span class="ifood-card-btn-label">{{ cardActions[order.id].label }}</span>
-              </button>
-              <div v-else class="ifood-card-btn ifood-card-btn-muted">{{ cardActions[order.id].label }}</div>
+        <!-- Timer: mesmo countdown/previsão que o cliente vê (TrackingView) -->
+        <div v-if="isActiveOrder(order.status)" style="margin-top:8px;font-size:0.85rem;">
+          <span :style="{ color: timers[order.id]?.cor }" :title="`Prazo estimado: ${timers[order.id]?.previsao}`">
+            <i-lucide-clock style="width:14px;height:14px" />
+            {{ timers[order.id]?.texto }} · prev. {{ timers[order.id]?.previsao }}
+          </span>
+        </div>
+
+        <div style="font-size:0.85rem;margin-top:8px;">
+          <strong>{{ order.itens?.length }} item(ns)</strong> — {{ formatPrice(order.total) }}
+          <br />{{ paymentLabel(order.metodo_pagamento) }}
+        </div>
+
+        <div v-if="order.observacoes" class="order-obs-badge">
+          <i-lucide-pen-line style="width:14px;height:14px" /> {{ order.observacoes }}
+        </div>
+
+        <div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap;">
+          <!-- Aguardando Pagamento: a confirmação é automática (webhook + polling de 15s) -->
+          <template v-if="order.status === 'aguardando_pagamento'">
+            <span style="font-size:0.85rem;color:var(--text-muted);">⏳ Aguardando confirmação do pagamento...</span>
+          </template>
+
+          <!-- Pendente: Aceitar (admin/gerente/chef), Recusar (admin/gerente) -->
+          <template v-if="order.status === 'pendente'">
+            <button v-if="podeAceitar" class="btn btn-success btn-sm" @click="changeStatus(order.id, 'preparando')">Aceitar</button>
+            <button v-if="podeRecusar" class="btn btn-danger btn-sm" @click="abrirModalCancelamento(order, 'recusado')">Recusar</button>
+          </template>
+
+          <!-- Preparando: Pronto (admin/gerente/chef) -->
+          <template v-if="order.status === 'preparando'">
+            <button v-if="order.origem === 'salao' && podeMarcarPronto" class="btn btn-primary btn-sm" @click="changeStatus(order.id, 'pronto')"><i-lucide-circle-check-big style="width:14px;height:14px" /> Pronto para Servir</button>
+            <button v-else-if="podeMarcarPronto" class="btn btn-primary btn-sm" @click="changeStatus(order.id, 'pronto_entrega')"><i-lucide-circle-check-big style="width:14px;height:14px" /> {{ order.origem === 'retirada' ? 'Pronto para Retirada' : 'Pronto para Entrega' }}</button>
+          </template>
+
+          <!-- Pronto (Salão) - Finalizar Conta -->
+          <template v-if="order.status === 'pronto'">
+            <button v-if="podeMarcarPronto || isCaixa" class="btn btn-warning btn-sm" @click="changeStatus(order.id, 'finalizado')">
+              <i-lucide-wallet style="width:14px;height:14px" />
+              Finalizar Conta
+            </button>
+          </template>
+
+          <!-- Pronto para entrega -->
+          <template v-if="order.status === 'pronto_entrega'">
+            <template v-if="modoSemEntregador">
+              <button v-if="podeMarcarPronto" class="btn btn-success btn-sm" @click="changeStatus(order.id, 'entregue')"><i-lucide-circle-check-big style="width:14px;height:14px" /> Confirmar Entrega</button>
             </template>
-          </div>
+            <template v-else>
+              <span style="font-size:0.85rem;color:var(--text-muted);">Aguardando Entregador...</span>
+            </template>
+          </template>
+
+          <!-- Em trânsito / Chegou destino -->
+          <template v-if="order.status === 'em_transito'">
+            <span style="font-size:0.85rem;">Pedido em Rota de Entrega</span>
+          </template>
+          <template v-if="order.status === 'cheguei_destino'">
+            <span style="font-size:0.85rem;color:var(--primary);">Entregador no Local</span>
+          </template>
+
+          <!-- Entregue / Finalizado -->
+          <template v-if="order.status === 'entregue'">
+            <span style="font-size:0.85rem;color:var(--success);">✓ Entrega Concluída</span>
+          </template>
+          <template v-if="order.status === 'finalizado'">
+            <span style="font-size:0.85rem;color:var(--success);">✓ Conta Finalizada</span>
+          </template>
+
+          <!-- Cancelado / Recusado -->
+          <template v-if="order.status === 'cancelado' || order.status === 'recusado'">
+            <span style="font-size:0.85rem;color:var(--error);"><i-lucide-x style="width:14px;height:14px" /> {{ order.motivo_cancelamento || 'Sem motivo' }}</span>
+          </template>
+
+          <button class="btn btn-secondary btn-sm" @click="abrirDetalhes(order)">Detalhes</button>
+          <button v-if="podeAbrirChat && !['entregue','finalizado','cancelado','recusado'].includes(order.status)" class="btn btn-secondary btn-sm" @click="abrirChatDoPedido(order)"><i-lucide-message-square style="width:14px;height:14px" /> Mensagem</button>
+          <!-- Cancelar disponível durante toda jornada do pedido (antes de entregue/cancelado) -->
+          <button v-if="podeCancelar && isActiveOrder(order.status) && order.status !== 'aguardando_pagamento'" class="btn btn-danger btn-sm" @click="abrirModalCancelamento(order, 'cancelado')">Cancelar</button>
         </div>
       </div>
     </div>
@@ -472,8 +544,6 @@ const orders = ref([])
 const resumo = ref(null)
 const infoRestaurante = ref({}) // nome/endereço do restaurante (impressão)
 const selectedOrder = ref(null)
-// Quadro kanban: coluna recolhida? (chave: aceitar/preparo/pronto/rota/finalizados)
-const laneCollapsed = ref({})
 const cancelModalOrder = ref(null)     // pedido alvo do cancelamento/recusa
 const cancelModalAction = ref('cancelado') // 'cancelado' | 'recusado'
 const cancelModalMotivo = ref('')      // motivo digitado
@@ -580,35 +650,6 @@ const filteredOrders = computed(() => {
   return [...base].sort((a, b) => new Date(a.criado_em) - new Date(b.criado_em))
 })
 
-// ── Quadro kanban estilo iFood Gestor de Pedidos ──
-// Colunas de expedição — cancelados/recusados ficam de fora (só na Lista/filtros).
-// boardOrders: NÃO aplica o filtro 'ativos' (o quadro precisa dos Finalizados);
-// os status fora das colunas (cancelado/recusado) simplesmente não aparecem.
-const boardOrders = computed(() => {
-  const base = filtroOrigem.value === 'todos'
-    ? orders.value
-    : orders.value.filter(o => o.origem === filtroOrigem.value)
-  return [...base].sort((a, b) => new Date(a.criado_em) - new Date(b.criado_em))
-})
-
-const boardColumns = computed(() => {
-  const colunas = [
-    { key: 'aceitar', label: 'Aceitar', statuses: ['aguardando_pagamento', 'pendente'], vazio: 'Pedidos aguardando confirmação' },
-    { key: 'preparo', label: 'Em preparo', statuses: ['preparando'], vazio: 'Pedidos sendo preparados na cozinha' },
-    { key: 'pronto', label: 'Pronto', statuses: ['pronto_entrega', 'pronto'], vazio: 'Pedidos prontos para coleta' },
-    { key: 'rota', label: 'Em rota', statuses: ['em_transito', 'cheguei_destino'], vazio: 'Pedidos a caminho do cliente' },
-    { key: 'finalizados', label: 'Finalizados', statuses: ['entregue', 'finalizado'], vazio: 'Pedidos finalizados hoje' },
-  ]
-  return colunas.map(c => ({
-    ...c,
-    orders: boardOrders.value.filter(o => c.statuses.includes(o.status)),
-  }))
-})
-
-function toggleLane(key) {
-  laneCollapsed.value = { ...laneCollapsed.value, [key]: !laneCollapsed.value[key] }
-}
-
 // ── SLA / barra de countdown (estilo iFood) ──
 function slaSegundos(order) {
   if (order.status === 'pendente') return 5 * 60
@@ -655,27 +696,6 @@ function statusCor(order) {
   return el?.cor || '#151515'
 }
 
-// Card com borda vermelha iFood quando aguarda aceite ou estourou o SLA
-function cardClasse(order) {
-  const el = elapsedMap.value[order.id]
-  const urgente = order.status === 'pendente' || (el && el.pct >= 100)
-  return urgente ? 'urgente' : ''
-}
-
-// Barra de countdown dentro do botão: animação com duração = SLA e delay
-// negativo = tempo decorrido (mesmo mecanismo do iFood: 0%→100% em N segundos)
-function slaBarStyle(order) {
-  const el = elapsedMap.value[order.id]
-  if (!el || el.sla <= 0) return null
-  return {
-    animation: `ifood-countdown ${el.sla}s linear -${el.elapsed}s`,
-  }
-}
-
-function orderNumero(order) {
-  return (order.pedido_id || '').replace('#', '') || String(order.id)
-}
-
 function horaFeito(order) {
   return new Date(order.criado_em).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
 }
@@ -691,48 +711,6 @@ function origemIcon(order) {
   if (order.origem === 'ifood') return '🍽️'
   return '🛵'
 }
-
-// Ação principal exibida na base do card (estilo iFood)
-function acaoCard(order) {
-  if (order.status === 'pendente') {
-    if (podeAceitar.value) {
-      return { label: 'Aceitar', cor: 'success', fn: () => changeStatus(order.id, 'preparando') }
-    }
-    return { label: 'Aguardando confirmação', cor: 'muted', fn: null }
-  }
-  if (order.status === 'aguardando_pagamento') {
-    return { label: 'Aguardando pagamento…', cor: 'muted', fn: null }
-  }
-  if (order.status === 'preparando' && podeMarcarPronto.value) {
-    const isSalao = order.origem === 'salao'
-    const label = isSalao ? 'Pronto p/ servir' : (order.origem === 'retirada' ? 'Pronto p/ retirada' : 'Pronto p/ entrega')
-    return { label, cor: 'primary', fn: () => changeStatus(order.id, isSalao ? 'pronto' : 'pronto_entrega') }
-  }
-  if (order.status === 'pronto' && (podeMarcarPronto.value || isCaixa.value)) {
-    return { label: 'Finalizar conta', cor: 'warning', fn: () => changeStatus(order.id, 'finalizado') }
-  }
-  if (order.status === 'pronto_entrega' && !modoSemEntregador.value) {
-    return { label: 'Aguardando entregador…', cor: 'muted', fn: null }
-  }
-  if (order.status === 'pronto_entrega' && podeMarcarPronto.value) {
-    return { label: 'Confirmar entrega', cor: 'success', fn: () => changeStatus(order.id, 'entregue') }
-  }
-  if (order.status === 'em_transito') return { label: 'Em rota', cor: 'muted', fn: null }
-  if (order.status === 'cheguei_destino') return { label: 'Entregador no local', cor: 'muted', fn: null }
-  if (order.status === 'entregue') return { label: '✓ Entregue', cor: 'success', fn: null }
-  if (order.status === 'finalizado') return { label: '✓ Finalizado', cor: 'success', fn: null }
-  return null
-}
-
-// Ações cacheadas por pedido (evita recriar objetos a cada render do board)
-const cardActions = computed(() => {
-  const map = {}
-  for (const o of orders.value) {
-    const acao = acaoCard(o)
-    if (acao) map[o.id] = acao
-  }
-  return map
-})
 
 function formatPrice(v) { return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v) }
 
@@ -1186,190 +1164,6 @@ onUnmounted(() => {
 .modal-overlay {
   position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 400;
   display: flex; align-items: center; justify-content: center; padding: 1rem;
-}
-
-/* ── Quadro de Expedição — réplica iFood Gestor de Pedidos ──
-   Valores extraídos do pedidos.mhtml (styled-components do iFood) */
-.ifood-board {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.ifood-lane {
-  display: flex;
-  flex-direction: column;
-  padding: 8px;
-  border-radius: 16px;
-  background-color: #F5F5F5;
-  gap: 4px;
-  overflow: hidden;
-}
-.ifood-lane-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  width: 100%;
-  padding: 0 8px;
-  border: none;
-  background: none;
-  cursor: pointer;
-  font-family: inherit;
-}
-.ifood-lane-title {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-}
-.ifood-lane-title h3 {
-  margin: 0;
-  font-size: 18px;
-  line-height: 24px;
-  color: #151515;
-  font-weight: 500;
-}
-.ifood-lane-count {
-  display: inline-block;
-  border: 1px solid #666;
-  background-color: #666;
-  color: #fff;
-  font-size: 12px;
-  font-weight: 700;
-  border-radius: 16px;
-  line-height: 16px;
-  padding: 0 8px;
-}
-.ifood-lane-header svg {
-  color: #EB0033;
-  flex-shrink: 0;
-  transition: transform 0.2s ease;
-}
-.ifood-lane-header svg.rotated { transform: rotate(180deg); }
-
-.ifood-lane-cards {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-  grid-auto-rows: max-content;
-  gap: 4px;
-}
-.ifood-lane-empty {
-  text-align: center;
-  color: #A3A3A3;
-  font-size: 14px;
-  font-weight: 500;
-  line-height: 16px;
-  padding: 18px 8px;
-  width: 100%;
-}
-
-/* Card (120–146px, número grande, nome, botão pill) */
-.ifood-card {
-  min-width: 120px;
-  max-width: 146px;
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  box-sizing: border-box;
-  padding: 8px 12px;
-  background: #fff;
-  cursor: pointer;
-  border-radius: 16px;
-  border: 1px solid #EBEBEB;
-  position: relative;
-  transition: border-color 0.15s;
-}
-.ifood-card:hover { border-color: #CCC; }
-.ifood-card.urgente {
-  border-color: #EB0033;
-  box-shadow: #EB0033 0 0 0 1px inset;
-}
-.ifood-card.urgente:hover { border-color: #EB0033; }
-
-.ifood-card-num {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 500;
-  font-size: 32px;
-  line-height: 32px;
-  color: #151515;
-}
-.ifood-card-nome {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-  overflow: hidden;
-  text-transform: capitalize;
-  text-align: center;
-  font-weight: 500;
-  font-size: 14px;
-  line-height: 16px;
-  color: #666;
-}
-.ifood-card-chip {
-  text-align: center;
-  font-size: 11px;
-  color: #999;
-  margin-top: 2px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-/* Botão pill do card (igual ao iFood, com barra de countdown branca) */
-.ifood-card-btn {
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  overflow: hidden;
-  box-sizing: border-box;
-  margin-top: 12px;
-  width: 100%;
-  border-radius: 9999px;
-  font-family: inherit;
-  font-weight: 500;
-  font-size: 12px;
-  line-height: 16px;
-  padding: 2px 8px;
-  white-space: nowrap;
-  background-color: #EB0033;
-  color: #fff;
-  border: none;
-  cursor: pointer;
-  height: 24px;
-}
-.ifood-card-btn:hover { background-color: #FA5266; }
-.ifood-card-btn-bar {
-  position: absolute;
-  top: 0;
-  right: 0;
-  height: 100%;
-  width: 0;
-  background-color: rgba(255, 255, 255, 0.64);
-  pointer-events: none;
-}
-.ifood-card-btn-label {
-  position: relative;
-  z-index: 1;
-}
-.ifood-card-btn-muted {
-  background: transparent;
-  border: 1px solid #EBEBEB;
-  color: #666;
-  cursor: default;
-}
-.ifood-card-btn-muted:hover { background: transparent; }
-
-/* Barra de countdown: 0% → 100% no tempo do SLA (delay negativo = decorrido) */
-@keyframes ifood-countdown {
-  from { width: 0; }
-  to { width: 100%; }
 }
 
 /* ── Painel lateral de detalhes (estilo iFood) ── */
