@@ -107,7 +107,9 @@ app.use(cors({
 app.use(cookieParser());
 
 // JSON body parsing (webhook da Rede usa o body normal do express.json)
-app.use(express.json({ limit: '10mb' }));
+// 50mb: uploads de imagens em base64 (arquivo de 5MB vira ~6.7MB; uma
+// subcategoria pode conter vários itens com imagem no mesmo payload).
+app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true }));
 
 // ============================
