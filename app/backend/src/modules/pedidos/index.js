@@ -389,7 +389,7 @@ router.post('/:id/mensagens', authenticate, async (req, res, next) => {
 
     // CWE-862: só permite mensagens em pedidos do próprio cliente
     const pedido = await query(
-      'SELECT id, restaurante_id FROM pedidos WHERE id = $1 AND cliente_id = $2',
+      'SELECT id, restaurant_id FROM pedidos WHERE id = $1 AND cliente_id = $2',
       [id, clienteId]
     );
     if (pedido.rows.length === 0) {
@@ -399,12 +399,12 @@ router.post('/:id/mensagens', authenticate, async (req, res, next) => {
     const result = await query(
       `INSERT INTO mensagens_pedido (pedido_id, restaurante_id, mensagem, remetente)
        VALUES ($1, $2, $3, 'cliente') RETURNING *`,
-      [id, pedido.rows[0].restaurante_id, texto]
+      [id, pedido.rows[0].restaurant_id, texto]
     );
     const msg = result.rows[0];
 
     // Emite para a sala do restaurante E para o próprio cliente (outros dispositivos)
-    emitNovaMensagem(msg, clienteId, pedido.rows[0].restaurante_id);
+    emitNovaMensagem(msg, clienteId, pedido.rows[0].restaurant_id);
 
     res.status(201).json(msg);
   } catch (err) {
@@ -421,7 +421,7 @@ router.post('/:id/mensagens/ler', authenticate, async (req, res, next) => {
       throw new AppError('Apenas clientes podem marcar mensagens como lidas.', 403);
     }
     const pedido = await query(
-      'SELECT id, restaurante_id FROM pedidos WHERE id = $1 AND cliente_id = $2',
+      'SELECT id, restaurant_id FROM pedidos WHERE id = $1 AND cliente_id = $2',
       [id, clienteId]
     );
     if (pedido.rows.length === 0) {
@@ -434,7 +434,7 @@ router.post('/:id/mensagens/ler', authenticate, async (req, res, next) => {
       [id]
     );
 
-    emitMensagemLida({ pedido_id: parseInt(id, 10), lida_cliente: true }, clienteId, pedido.rows[0].restaurante_id);
+    emitMensagemLida({ pedido_id: parseInt(id, 10), lida_cliente: true }, clienteId, pedido.rows[0].restaurant_id);
 
     res.json({ ok: true });
   } catch (err) {
