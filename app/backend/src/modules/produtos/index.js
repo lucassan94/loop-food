@@ -663,12 +663,17 @@ router.post('/extra-subcategorias', authenticate, authorize('admin', 'gerente'),
         [restaurantId]
       );
       let sub;
+      // SAVEPOINT: se o INSERT com colunas novas falhar (coluna ausente), o
+      // fallback roda sem abortar a transação inteira.
       try {
+        await client.query('SAVEPOINT sub_insert');
         sub = await client.query(
           'INSERT INTO extra_subcategorias (restaurant_id, nome, tipo, categoria_id, ordem) VALUES ($1, $2, $3, $4, $5) RETURNING *',
           [restaurantId, data.nome.trim(), tipo, tipo === 'categoria' ? data.categoria_id : null, ordemRes.rows[0].o]
         );
+        await client.query('RELEASE SAVEPOINT sub_insert');
       } catch (e) {
+        try { await client.query('ROLLBACK TO SAVEPOINT sub_insert'); } catch {}
         // Colunas tipo/categoria_id podem não existir — inserir sem elas
         sub = await client.query(
           'INSERT INTO extra_subcategorias (restaurant_id, nome, ordem) VALUES ($1, $2, $3) RETURNING *',
@@ -679,12 +684,15 @@ router.post('/extra-subcategorias', authenticate, authorize('admin', 'gerente'),
         let ordem = 0;
         for (const item of data.itens) {
           try {
+            await client.query('SAVEPOINT item_insert');
             await client.query(
               `INSERT INTO extra_subcategoria_itens (subcategoria_id, nome, preco, maximo, descricao, imagem_url, imagem_base64, ordem)
                VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
               [sub.rows[0].id, item.nome, item.preco, item.maximo, item.descricao || '', item.imagem_url || '', item.imagem_base64 || '', ordem++]
             );
+            await client.query('RELEASE SAVEPOINT item_insert');
           } catch (e) {
+            try { await client.query('ROLLBACK TO SAVEPOINT item_insert'); } catch {}
             await client.query(
               `INSERT INTO extra_subcategoria_itens (subcategoria_id, nome, preco, maximo, ordem)
                VALUES ($1, $2, $3, $4, $5)`,
@@ -723,23 +731,28 @@ router.put('/extra-subcategorias/:id', authenticate, authorize('admin', 'gerente
           if (cat.rows.length === 0) throw new AppError('Categoria não pertence ao restaurante.', 400);
         }
         try {
+          await client.query('SAVEPOINT sub_tipo_update');
           await client.query('UPDATE extra_subcategorias SET tipo = $1, categoria_id = $2 WHERE id = $3', [tipo, tipo === 'categoria' ? catId : null, id]);
           if (tipo === 'categoria') {
             await client.query('DELETE FROM extra_subcategoria_itens WHERE subcategoria_id = $1', [id]);
           }
-        } catch (e) { /* colunas tipo/categoria_id podem não existir */ }
+          await client.query('RELEASE SAVEPOINT sub_tipo_update');
+        } catch (e) { try { await client.query('ROLLBACK TO SAVEPOINT sub_tipo_update'); } catch {} /* colunas tipo/categoria_id podem não existir */ }
       }
       if ('itens' in req.body && (data.tipo || 'manual') !== 'categoria') {
         await client.query('DELETE FROM extra_subcategoria_itens WHERE subcategoria_id = $1', [id]);
         let ordem = 0;
         for (const item of data.itens) {
           try {
+            await client.query('SAVEPOINT item_insert');
             await client.query(
               `INSERT INTO extra_subcategoria_itens (subcategoria_id, nome, preco, maximo, descricao, imagem_url, imagem_base64, ordem)
                VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
               [id, item.nome, item.preco, item.maximo, item.descricao || '', item.imagem_url || '', item.imagem_base64 || '', ordem++]
             );
+            await client.query('RELEASE SAVEPOINT item_insert');
           } catch (e) {
+            try { await client.query('ROLLBACK TO SAVEPOINT item_insert'); } catch {}
             await client.query(
               `INSERT INTO extra_subcategoria_itens (subcategoria_id, nome, preco, maximo, ordem)
                VALUES ($1, $2, $3, $4, $5)`,
