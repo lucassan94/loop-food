@@ -1,21 +1,24 @@
-import { setUserContext, clearUserContext } from '../config/database.js';
+import { requestContext } from '../config/database.js';
 import { config } from '../config/index.js';
 
 /**
- * Middleware: Armazena o contexto do tenant e usuário para o RLS.
- * 
- * O database.js lê _userContext a cada query() e define as variáveis
- * de sessão (app.restaurant_id, app.user_role, app.user_id) na MESMA
- * conexão que executará a query.
- * 
+ * Middleware: escopa o contexto do tenant e usuário ao request (RLS).
+ *
+ * O database.js lê requestContext.getStore() a cada query() e define as
+ * variáveis de sessão (app.restaurant_id, app.user_role, app.user_id) na
+ * MESMA conexão que executará a query.
+ *
  * Fluxo:
  * 1. tenantResolver (executado antes) define req.restaurantId
- * 2. pgContext define ao menos o restaurant_id no contexto
+ * 2. pgContext escopa ao request o restaurant_id (no mínimo)
  * 3. authenticate (executado depois, nas rotas protegidas)
- *    complementa o contexto com user_role e user_id
+ *    complementa o contexto com user_role e user_id via mergeRequestContext
  *
- * Isto garante que mesmo requisições não autenticadas tenham
- * o app.restaurant_id definido para o RLS.
+ * ⚠️ Antes usava estado global (setUserContext + clear no finish): requests
+ * concorrentes sobrescreviam/limpavam o contexto uns dos outros, fazendo
+ * queries rodarem com o app.restaurant_id de OUTRO tenant (ex.: signup no
+ * Loop falhava RLS com o contexto do Palazzo). AsyncLocalStorage garante
+ * que cada request só enxerga o PRÓPRIO contexto.
  */
 export function pgContext(req, res, next) {
   // Sempre define ao menos o restaurant_id no contexto
@@ -31,7 +34,5 @@ export function pgContext(req, res, next) {
     context.cargo = req.user.cargo;
   }
 
-  setUserContext(context);
-  res.on('finish', clearUserContext);
-  next();
+  requestContext.run(context, () => next());
 }

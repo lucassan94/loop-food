@@ -1,7 +1,7 @@
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import { config } from '../config/index.js';
-import { setUserContext } from '../config/database.js';
+import { mergeRequestContext } from '../config/database.js';
 
 // ============================================================================
 // CACHE DE JWT SECRET POR TENANT
@@ -137,8 +137,8 @@ export async function authenticate(req, res, next) {
     }
     req.user = decoded;
 
-    // Atualizar o contexto RLS com os dados do usuário logado
-    setUserContext({
+    // Atualizar o contexto RLS do request com os dados do usuário logado
+    mergeRequestContext({
       restaurantId: rid,
       id: decoded.id,
       role: decoded.role,
@@ -180,8 +180,8 @@ export async function optionalAuth(req, res, next) {
         }
         req.user = decoded;
 
-        // Atualizar contexto RLS
-        setUserContext({
+        // Atualizar contexto RLS do request
+        mergeRequestContext({
           restaurantId: rid,
           id: decoded.id,
           role: decoded.role,

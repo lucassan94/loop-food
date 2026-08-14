@@ -48,25 +48,38 @@ pool.on('connect', () => {
 });
 
 // ============================================================================
-// USER CONTEXT para RLS
+// CONTEXTO POR REQUEST para RLS — AsyncLocalStorage
 // ============================================================================
-// Armazenado em módulo-level (seguro pois Node.js é single-thread)
-// Middleware pgContext.js chama setUserContext() antes de cada request
-let _userContext = null;
+// ⚠️ NÃO usar estado em módulo-level (variável global): requests concorrentes
+// compartilham o mesmo processo — o request A podia sobrescrever/limpar o
+// contexto do request B antes da query rodar, fazendo o B executar com o
+// `app.restaurant_id` de OUTRO tenant (bug real: signup no Loop falhava RLS
+// porque o contexto caía no fallback RESTAURANT_ID=1 do Palazzo).
+//
+// O pgContext.js roda `requestContext.run(context, () => next())`, escopando
+// o contexto à cadeia async do request. buildContextSQL() lê o store do
+// request atual; fora de request (jobs de background) usa o fallback
+// config.restaurantId (ou tenant explícito via queryForTenant/transactionForTenant).
+import { AsyncLocalStorage } from 'async_hooks';
 
-export function setUserContext(user) {
-  _userContext = user;
-}
+export const requestContext = new AsyncLocalStorage();
 
-export function clearUserContext() {
-  _userContext = null;
+/** Merge de dados no contexto do request atual (usado por authenticate/optionalAuth). */
+export function mergeRequestContext(dados) {
+  const store = requestContext.getStore();
+  if (store) {
+    Object.assign(store, dados);
+  } else {
+    // Fora de um request HTTP (ex.: chamada direta em testes/jobs)
+    requestContext.enterWith({ ...dados });
+  }
 }
 
 function buildContextSQL(ctx) {
-  // ctx: contexto explícito (ex: jobs de background por tenant) ou o contexto
-  // do request atual (_userContext). restaurantId usa o valor dinâmico
+  // ctx: contexto explícito (ex: jobs de background por tenant) ou o store
+  // do request atual (requestContext). restaurantId usa o valor dinâmico
   // (tenantResolver) ou fallback para config.restaurantId (dev/migrações).
-  const user = ctx || _userContext;
+  const user = ctx || requestContext.getStore();
   const restaurantId = user?.restaurantId || config.restaurantId;
   const settings = [`SET app.restaurant_id = ${restaurantId}`];
 
