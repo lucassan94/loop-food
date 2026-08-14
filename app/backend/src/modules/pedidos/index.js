@@ -651,7 +651,12 @@ router.patch('/:id/status', authenticate, async (req, res, next) => {
         [req.restaurantId || config.restaurantId]
       );
       const modoSemEntregador = restResult.rows[0]?.modo_sem_entregador || false;
-      
+
+      // Origem do pedido: retirada não envolve entregador — dar baixa (→ entregue)
+      // é permitido para chef/caixa mesmo fora do modo sem entregador
+      const pedidoOrigemResult = await query('SELECT origem FROM pedidos WHERE id = $1', [id]);
+      const isRetirada = pedidoOrigemResult.rows[0]?.origem === 'retirada';
+
       if (['admin', 'gerente'].includes(effectiveCargo)) {
         // Admin/gerente: qualquer transição
         // Se modo_sem_entregador, permitir pronto_entrega → entregue
@@ -659,15 +664,19 @@ router.patch('/:id/status', authenticate, async (req, res, next) => {
         // Chef: transições de cozinha + cancelar
         // Salão: pendente→preparando→pronto→finalizado
         // Delivery: pendente→preparando→pronto_entrega, cancelado
-        const allowedChef = ['preparando', 'pronto_entrega', 'cancelado'];
-        allowedChef.push('pronto', 'finalizado'); // salão transitions
+        const allowedChef = ['preparando', 'pronto_entrega', 'cancelado', 'pronto', 'finalizado'];
+        // Retirada: dar baixa (→ entregue) mesmo com entregadores ativos
+        if (isRetirada && data.status === 'entregue') allowedChef.push('entregue');
         if (modoSemEntregador) allowedChef.push('entregue');
         if (!allowedChef.includes(data.status)) {
           throw new AppError('Chef só pode preparar, finalizar ou cancelar pedidos.', 403);
         }
       } else if (effectiveCargo === 'caixa') {
         // Caixa: checkout (finalizado), cancelar/recusar
-        if (!['finalizado', 'cancelado', 'recusado'].includes(data.status)) {
+        // Retirada: caixa pode dar baixa (→ entregue)
+        const allowedCaixa = ['finalizado', 'cancelado', 'recusado'];
+        if (isRetirada && data.status === 'entregue') allowedCaixa.push('entregue');
+        if (!allowedCaixa.includes(data.status)) {
           throw new AppError('Caixa só pode finalizar conta, cancelar ou recusar pedidos.', 403);
         }
       } else {

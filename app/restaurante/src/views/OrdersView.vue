@@ -175,9 +175,12 @@
             </button>
           </template>
 
-          <!-- Pronto para entrega -->
+          <!-- Pronto para entrega / Retirada pronta -->
           <template v-if="order.status === 'pronto_entrega'">
-            <template v-if="modoSemEntregador">
+            <template v-if="order.origem === 'retirada'">
+              <button v-if="podeDarBaixaRetirada" class="btn btn-success btn-sm" @click="changeStatus(order.id, 'entregue')"><i-lucide-circle-check-big style="width:14px;height:14px" /> Dar Baixa na Retirada</button>
+            </template>
+            <template v-else-if="modoSemEntregador">
               <button v-if="podeMarcarPronto" class="btn btn-success btn-sm" @click="changeStatus(order.id, 'entregue')"><i-lucide-circle-check-big style="width:14px;height:14px" /> Confirmar Entrega</button>
             </template>
             <template v-else>
@@ -375,7 +378,12 @@
                 <i-lucide-wallet style="width:16px;height:16px" /> Finalizar Conta
               </button>
             </template>
-            <template v-if="selectedOrder.status === 'pronto_entrega' && modoSemEntregador">
+            <template v-if="selectedOrder.status === 'pronto_entrega' && selectedOrder.origem === 'retirada'">
+              <button v-if="podeDarBaixaRetirada" class="btn btn-success" @click="changeStatus(selectedOrder.id, 'entregue')">
+                <i-lucide-circle-check-big style="width:16px;height:16px" /> Dar Baixa na Retirada
+              </button>
+            </template>
+            <template v-else-if="selectedOrder.status === 'pronto_entrega' && modoSemEntregador">
               <button v-if="podeMarcarPronto" class="btn btn-success" @click="changeStatus(selectedOrder.id, 'entregue')">
                 <i-lucide-circle-check-big style="width:16px;height:16px" /> Confirmar Entrega
               </button>
@@ -743,6 +751,8 @@ const podeRecusar = computed(() => isAdmin.value)
 const podeMarcarPronto = computed(() => isAdmin.value || isChef.value)
 const podeCancelar = computed(() => isAdmin.value || isCaixa.value)
 const podeAbrirChat = computed(() => isAdmin.value || isChef.value || isCaixa.value)
+// Dar baixa na retirada (cliente retirou no balcão) — admin/gerente/chef/caixa
+const podeDarBaixaRetirada = computed(() => isAdmin.value || isChef.value || isCaixa.value)
 const chatPodeEnviar = computed(() => isAdmin.value || isChef.value)
 
 // ── Chat SuperSide bar ──
