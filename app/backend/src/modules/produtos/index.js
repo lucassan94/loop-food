@@ -540,7 +540,9 @@ router.get('/', async (req, res, next) => {
              (SELECT COUNT(*) FROM produtos_extras pe WHERE pe.produto_id = p.id)
                + (SELECT COUNT(*) FROM extra_subcategoria_itens esi
                   JOIN produto_extra_subcategorias pes ON pes.subcategoria_id = esi.subcategoria_id
-                  WHERE pes.produto_id = p.id) as extras_count
+                  WHERE pes.produto_id = p.id) as extras_count,
+             (SELECT COUNT(*) FROM produto_opcoes po WHERE po.produto_id = p.id)
+               + (SELECT COUNT(*) FROM produto_opcoes_padrao pop WHERE pop.produto_id = p.id) as opcoes_count
       FROM produtos p
       LEFT JOIN categorias c ON p.categoria_id = c.id
       WHERE p.restaurant_id = $1

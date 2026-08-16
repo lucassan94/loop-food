@@ -109,6 +109,23 @@
             </div>
           </div>
         </div>
+
+        <!-- Cancelados/recusados hoje (BUG-013) -->
+        <div v-if="cancelamentosHoje.length" style="margin-top:1.5rem;">
+          <h3 class="section-title" style="font-size:0.9rem;color:var(--text-muted);">Cancelados Hoje</h3>
+          <div v-for="e in cancelamentosHoje" :key="e.id" class="delivery-card done">
+            <div style="display:flex;justify-content:space-between;font-size:0.85rem;">
+              <span><strong>{{ e.pedido_id }}</strong> — {{ e.nome_cliente }}</span>
+              <span
+                class="badge badge-cancelado"
+                style="font-size:0.7rem;padding:2px 8px;border-radius:999px;background:var(--danger-light,#fee2e2);color:var(--danger,#dc2626);font-weight:700;"
+              >{{ e.status === 'recusado' ? 'Recusado' : 'Cancelado' }}</span>
+            </div>
+            <div v-if="e.motivo_cancelamento" style="font-size:0.8rem;color:var(--text-muted);margin-top:4px;">
+              Motivo: {{ e.motivo_cancelamento }}
+            </div>
+          </div>
+        </div>
       </div>
 
       <div v-if="currentTab === 'financeiro'">
@@ -297,6 +314,7 @@ provide('loadingMessage', loadingMessage)
 const entregasDisponiveis = ref([])
 const entregaAtiva = ref(null)
 const entregasConcluidas = ref([])
+const cancelamentosHoje = ref([])
 const selectedEntrega = ref(null)
 const tempoTolerancia = ref(0)
 const financeiro = ref({ hoje: 0, semana: 0, mes: 0, dias: [] })
@@ -380,6 +398,13 @@ async function loadData() {
     entregasConcluidas.value = concluidos.data.filter(ee =>
       ee.entregador_id === user.value?.id &&
       ee.entregue_em?.startsWith(hoje)
+    )
+
+    // Cancelados/recusados de hoje (BUG-013: o entregador precisa ver o motivo)
+    const cancelados = await api.get('/pedidos?status=cancelados')
+    cancelamentosHoje.value = cancelados.data.filter(ee =>
+      ee.entregador_id === user.value?.id &&
+      (ee.cancelado_em || ee.recusado_em || ee.atualizado_em)?.startsWith(hoje)
     )
   } catch { /* ignore */ }
 }

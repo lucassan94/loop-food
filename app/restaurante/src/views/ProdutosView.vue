@@ -57,7 +57,7 @@
               <th>Nome</th>
               <th>Categoria</th>
               <th>Preço</th>
-              <th>Extras</th>
+              <th>Extras/Opcões</th>
               <th>Ativo</th>
               <th>Ações</th>
             </tr>
@@ -72,7 +72,7 @@
               <td><strong>{{ p.nome }}</strong></td>
               <td><span class="cat-badge">{{ p.categoria_nome }}</span></td>
               <td><strong>{{ formatPrice(p.preco) }}</strong></td>
-              <td><span class="extras-count">{{ p.extras_count || 0 }}</span></td>
+              <td><span class="extras-count">{{ (p.extras_count || 0) + (p.opcoes_count || 0) }}</span></td>
               <td>
                 <label class="toggle" @click.stop>
                   <input type="checkbox" :checked="p.ativo" @change="toggleAtivo(p)" />
