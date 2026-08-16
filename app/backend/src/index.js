@@ -34,8 +34,21 @@ const server = http.createServer(app);
 // TRUST PROXY (para IP real atrás do nginx)
 // Necessário para:
 //   - Logs corretos de IP do cliente (ipAddress no bloco 3DS da Rede)
+//   - Rate limit por IP do cliente (BUG-014)
 // ============================
-app.set('trust proxy', 1);
+// Em produção o tráfego da UI passa por 2 proxies (NPM externo → router
+// nginx → backend). Um número fixo de hops (ex.: 1) era insuficiente e o
+// req.ip virava o IP do NPM para todos os clientes — todos compartilhavam
+// um único bucket do loginLimiter (um atacante bloqueava o login de todos).
+// Confiar apenas em IPs privados (rede Docker/nginx) é robusto para vários
+// proxies e não aceita spoofing de X-Forwarded-For vindo de IPs públicos.
+app.set('trust proxy', (ip) => {
+  if (ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1') return true;
+  if (ip.startsWith('10.')) return true;
+  if (/^172\.(1[6-9]|2\d|3[01])\./.test(ip)) return true; // 172.16.0.0/12
+  if (ip.startsWith('192.168.')) return true;
+  return false;
+});
 
 // ============================
 // SECURITY MIDDLEWARE
