@@ -1,0 +1,3 @@
+- Sempre use o tenant loop para realizar testes
+- Sempre faça git push commit
+- Sempre exclua pedidos, clientes, produtos e entregadores criados para teste.
