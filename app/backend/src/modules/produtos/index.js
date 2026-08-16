@@ -435,6 +435,10 @@ router.put('/categorias/reordenar', authenticate, authorize('admin', 'gerente'),
       'SELECT id, nome, slug, ordem FROM categorias WHERE restaurant_id = $1 ORDER BY ordem ASC',
       [restaurantId]
     );
+
+    // Cardápio mudou — cliente recarrega categorias/produtos ao vivo
+    emitToRestaurant('cardapio:atualizado', { tipo: 'categorias' }, restaurantId);
+
     res.json(result.rows);
   } catch (err) { next(err); }
 });
@@ -464,6 +468,9 @@ router.post('/categorias', authenticate, authorize('admin', 'gerente'), async (r
       [restaurantId, nome.trim(), slug, ordem]
     );
 
+    // Cardápio mudou — cliente recarrega categorias/produtos ao vivo
+    emitToRestaurant('cardapio:atualizado', { tipo: 'categorias' }, restaurantId);
+
     res.status(201).json(result.rows[0]);
   } catch (err) {
     if (err.code === '23505') {
@@ -492,6 +499,10 @@ router.put('/categorias/:id', authenticate, authorize('admin', 'gerente'), async
     );
 
     if (result.rows.length === 0) throw new AppError('Categoria não encontrada.', 404);
+
+    // Cardápio mudou — cliente recarrega categorias/produtos ao vivo
+    emitToRestaurant('cardapio:atualizado', { tipo: 'categorias' }, restaurantId);
+
     res.json(result.rows[0]);
   } catch (err) {
     if (err.code === '23505') {
@@ -519,6 +530,10 @@ router.delete('/categorias/:id', authenticate, authorize('admin', 'gerente'), as
     }
 
     await query('DELETE FROM categorias WHERE id = $1 AND restaurant_id = $2', [id, restaurantId]);
+
+    // Cardápio mudou — cliente recarrega categorias/produtos ao vivo
+    emitToRestaurant('cardapio:atualizado', { tipo: 'categorias' }, restaurantId);
+
     res.json({ message: 'Categoria excluída.' });
   } catch (err) {
     next(err);
@@ -1085,6 +1100,7 @@ router.post('/', authenticate, authorize('admin', 'gerente', 'chef'), async (req
     });
 
     emitToRestaurant('produto:novo', result, restaurantId);
+    emitToRestaurant('cardapio:atualizado', { tipo: 'produtos' }, restaurantId);
     res.status(201).json(result);
   } catch (err) {
     next(err);
@@ -1235,6 +1251,7 @@ router.put('/:id', authenticate, authorize('admin', 'gerente', 'chef'), async (r
     });
 
     emitToRestaurant('produto:atualizado', result, restaurantId);
+    emitToRestaurant('cardapio:atualizado', { tipo: 'produtos' }, restaurantId);
     res.json(result);
   } catch (err) {
     next(err);
@@ -1259,6 +1276,7 @@ router.delete('/:id', authenticate, authorize('admin', 'gerente', 'chef'), async
     }
 
     emitToRestaurant('produto:deletado', { id: parseInt(id) }, restaurantId);
+    emitToRestaurant('cardapio:atualizado', { tipo: 'produtos' }, restaurantId);
     res.json({ message: 'Produto excluído com sucesso.', id: parseInt(id) });
   } catch (err) {
     next(err);

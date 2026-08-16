@@ -250,9 +250,10 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, inject } from 'vue'
+import { ref, computed, onMounted, onUnmounted, inject } from 'vue'
 import api from '../services/api'
 import BannerCarousel from '../components/BannerCarousel.vue'
+import { onEvent, offEvent } from '../services/realtime'
 import { PRODUCT_PLACEHOLDER } from '../utils/images'
 
 const addToast = inject('addToast')
@@ -269,17 +270,9 @@ const bannerSlides = ref([
 
 // Data
 const products = ref([])
-const categories = ref([
-  { nome: 'Todos', slug: 'todos' },
-  { nome: 'Em Destaque', slug: 'destaques' },
-  { nome: 'Pratos', slug: 'principais' },
-  { nome: 'Executivos', slug: 'executivos' },
-  { nome: 'Saladas', slug: 'saladas' },
-  { nome: 'Monte Seu', slug: 'monte-seu' },
-  { nome: 'Para 2', slug: 'para-2' },
-  { nome: 'Sobremesas', slug: 'sobremesas' },
-  { nome: 'Bebidas', slug: 'bebidas' },
-])
+// Categorias vêm do backend (GET /produtos/categorias) para refletir criação,
+// renomeação e reordenação feitas no painel — e atualizam ao vivo via realtime.
+const categories = ref([{ nome: 'Todos', slug: 'todos' }])
 const loading = ref(true)
 const searchQuery = ref('')
 const activeCategory = ref('todos')
@@ -719,18 +712,63 @@ async function carregarBanners() {
   } catch { /* usa fallback */ }
 }
 
+// Recarrega cardápio completo (categorias + produtos) — usado no realtime
+async function recarregarCardapio() {
+  const [cats, prods] = await Promise.allSettled([
+    api.get('/produtos/categorias'),
+    api.get('/produtos/com-extras'),
+  ])
+  if (cats.status === 'fulfilled') {
+    categories.value = [
+      { nome: 'Todos', slug: 'todos' },
+      ...cats.value.data.map(c => ({ nome: c.nome, slug: c.slug })),
+    ]
+    // Categoria ativa foi renomeada/excluída no painel → volta para "Todos"
+    if (activeCategory.value !== 'todos' &&
+        !categories.value.some(c => c.slug === activeCategory.value)) {
+      activeCategory.value = 'todos'
+    }
+  }
+  if (prods.status === 'fulfilled') {
+    products.value = prods.value.data
+  }
+}
+
+// Handler do evento realtime — cardápio mudou no painel (categorias/produtos)
+function onCardapioAtualizado() {
+  recarregarCardapio()
+}
+
 onMounted(async () => {
   // Carregar banners dinâmicos
   carregarBanners()
 
   try {
     // Endpoint otimizado: retorna produtos com extras em 2 queries
-    const { data } = await api.get('/produtos/com-extras')
-    products.value = data
+    const [cats, prods] = await Promise.allSettled([
+      api.get('/produtos/categorias'),
+      api.get('/produtos/com-extras'),
+    ])
+    if (cats.status === 'fulfilled') {
+      categories.value = [
+        { nome: 'Todos', slug: 'todos' },
+        ...cats.value.data.map(c => ({ nome: c.nome, slug: c.slug })),
+      ]
+    }
+    if (prods.status === 'fulfilled') {
+      products.value = prods.value.data
+    }
   } catch (err) {
     addToast('Erro ao carregar cardápio.', 'error')
   } finally {
     loading.value = false
   }
+
+  // Atualização ao vivo: categorias/produtos mudados no painel chegam aqui
+  onEvent('cardapio:atualizado', onCardapioAtualizado)
+})
+
+onUnmounted(() => {
+  offEvent('cardapio:atualizado', onCardapioAtualizado)
 })
 </script>
