@@ -235,13 +235,14 @@
               </div>
             </div>
           </div>
+        </div>
 
-          <div class="modal-footer">
-            <span class="price">{{ formatPrice(productTotal) }}</span>
-            <button class="btn-add-modal" @click="addToCart">
-              <i-lucide-shopping-bag style="width:16px;height:16px" /> Adicionar
-            </button>
-          </div>
+        <!-- Rodapé fixo: total sempre visível enquanto rola os adicionais -->
+        <div class="modal-footer">
+          <span class="price">{{ formatPrice(productTotal) }}</span>
+          <button class="btn-add-modal" @click="addToCart">
+            <i-lucide-shopping-bag style="width:16px;height:16px" /> Adicionar
+          </button>
         </div>
       </div>
     </div>

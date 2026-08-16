@@ -327,7 +327,7 @@
         </div>
         <div class="order-summary-total">
           <span>Total:</span>
-          <span>{{ formatPrice(subtotal + (tipoEntrega === 'retirada' ? 0 : (freteInfo?.custo || 0))) }}</span>
+          <span>{{ formatPrice((Number(subtotal) || 0) + (tipoEntrega === 'retirada' ? 0 : (Number(freteInfo?.custo) || 0))) }}</span>
         </div>
       </div>
 
@@ -877,9 +877,11 @@ async function confirmOrder() {
       cidade_cliente: tipoEntrega.value === 'retirada' ? '' : form.cidade,
       estado_cliente: tipoEntrega.value === 'retirada' ? '' : form.estado,
       ...(form.latitude != null && tipoEntrega.value !== 'retirada' ? { latitude_cliente: Number(form.latitude), longitude_cliente: Number(form.longitude) } : {}),
-      subtotal: subtotal.value,
-      valor_frete: tipoEntrega.value === 'retirada' ? 0 : (freteInfo.value?.custo || 0),
-      total: tipoEntrega.value === 'retirada' ? subtotal.value : subtotal.value + (freteInfo.value?.custo || 0),
+      subtotal: Number(subtotal.value) || 0,
+      valor_frete: tipoEntrega.value === 'retirada' ? 0 : (Number(freteInfo.value?.custo) || 0),
+      total: tipoEntrega.value === 'retirada'
+        ? (Number(subtotal.value) || 0)
+        : (Number(subtotal.value) || 0) + (Number(freteInfo.value?.custo) || 0),
       metodo_pagamento: form.metodo_pagamento,
       detalhes_pagamento: form.metodo_pagamento === 'dinheiro' && form.troco
         ? `Troco para R$ ${parseFloat(form.troco).toFixed(2)}` : '',
