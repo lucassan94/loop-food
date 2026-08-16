@@ -5,7 +5,7 @@ import { config } from '../../config/index.js';
 import { authenticate, authorize, optionalAuth } from '../../middleware/auth.js';
 import { AppError } from '../../middleware/errorHandler.js';
 import { emitToRestaurant } from '../../services/realtime.js';
-import { saveBase64AsFile, deleteUploadFile, gerarNomeArquivo } from '../../config/upload.js';
+import { saveBase64AsFile, deleteUploadFile, gerarNomeArquivo, otimizarImagemBase64 } from '../../config/upload.js';
 import { TZ_RESTAURANTE } from '../../services/horarios.js';
 import { produtoDisponivelAgora, produtoNoModulo } from '../../services/itemValidation.js';
 
@@ -341,6 +341,28 @@ async function buscarSubcategoriasDeProdutos(db, produtoIds) {
     result[pid] = ids.map(sid => subMap[sid]).filter(Boolean);
   }
   return result;
+}
+
+// ============================
+// Helpers — Otimização de imagens de itens (base64 embutido)
+// ============================
+
+// Redimensiona/recomprime o base64 de cada item do catálogo ANTES de salvar.
+// As imagens dos itens vivem na coluna imagem_base64 da própria linha (e vão
+// no JSON do cardápio), então precisam ficar pequenas para o app carregar
+// rápido. Formato é preservado (jpeg/png/webp/svg) — detecção dos frontends
+// continua válida.
+async function otimizarItensImagens(itens) {
+  const otimizados = [];
+  for (const item of itens || []) {
+    const copia = { ...item };
+    if (copia.imagem_base64 && copia.imagem_base64.length > 50) {
+      const ot = await otimizarImagemBase64(copia.imagem_base64);
+      copia.imagem_base64 = ot.base64;
+    }
+    otimizados.push(copia);
+  }
+  return otimizados;
 }
 
 // ============================
@@ -681,6 +703,8 @@ router.post('/extra-subcategorias', authenticate, authorize('admin', 'gerente'),
         );
       }
       if (tipo === 'manual') {
+        // Comprimir imagens base64 antes de inserir (cardápio carrega rápido)
+        data.itens = await otimizarItensImagens(data.itens);
         let ordem = 0;
         for (const item of data.itens) {
           try {
@@ -740,6 +764,8 @@ router.put('/extra-subcategorias/:id', authenticate, authorize('admin', 'gerente
         } catch (e) { try { await client.query('ROLLBACK TO SAVEPOINT sub_tipo_update'); } catch {} /* colunas tipo/categoria_id podem não existir */ }
       }
       if ('itens' in req.body && (data.tipo || 'manual') !== 'categoria') {
+        // Comprimir imagens base64 antes de salvar (cardápio carrega rápido)
+        data.itens = await otimizarItensImagens(data.itens);
         await client.query('DELETE FROM extra_subcategoria_itens WHERE subcategoria_id = $1', [id]);
         let ordem = 0;
         for (const item of data.itens) {

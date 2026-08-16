@@ -703,6 +703,7 @@ import { ref, onMounted, reactive, computed, markRaw } from 'vue'
 import api from '../services/api'
 import { Power, Store, Palette, MapPin, CreditCard, Table2, Users, Images, PlugZap } from 'lucide-vue-next'
 import AlertDialog from '../components/AlertDialog.vue'
+import { comprimirImagemFile } from '../utils/images'
 
 // ── Tabs ──
 const tabs = [
@@ -941,23 +942,19 @@ async function toggleLoja() {
   storeOpen.value = data.status_loja
 }
 
-function onLogoSelected(event) {
+async function onLogoSelected(event) {
   const file = event.target.files?.[0]
   if (!file) return
   if (file.size > 5 * 1024 * 1024) { uploadError.value = 'Logo muito grande! O tamanho máximo permitido é 5MB.'; return }
-  const reader = new FileReader()
-  reader.onload = async (e) => {
-    const base64 = e.target.result.split(',')[1]
-    logoBase64.value = base64
-    logoPreview.value = 'data:image/png;base64,' + base64
-    try {
-      await api.put('/restaurante', { logo_base64: base64 })
-      cepMsg.value = { tipo: 'success', texto: 'Logo atualizado com sucesso!' }
-    } catch (err) {
-      alert(err.response?.data?.error || 'Erro ao salvar logo')
-    }
+  const { base64, mime } = await comprimirImagemFile(file)
+  logoBase64.value = base64
+  logoPreview.value = `data:${mime};base64,${base64}`
+  try {
+    await api.put('/restaurante', { logo_base64: base64 })
+    cepMsg.value = { tipo: 'success', texto: 'Logo atualizado com sucesso!' }
+  } catch (err) {
+    alert(err.response?.data?.error || 'Erro ao salvar logo')
   }
-  reader.readAsDataURL(file)
 }
 
 async function removerLogo() {
@@ -1074,17 +1071,14 @@ function abrirBannerEditor(banner) {
   showBannerEditor.value = true
 }
 
-function onBannerImageSelected(event) {
+async function onBannerImageSelected(event) {
   const file = event.target.files?.[0]
   if (!file) return
   if (file.size > 5 * 1024 * 1024) { uploadError.value = 'Imagem muito grande! O tamanho máximo permitido é 5MB.'; return }
-  const reader = new FileReader()
-  reader.onload = (e) => {
-    const base64 = e.target.result.split(',')[1]
-    bannerForm.imagem_base64 = base64; bannerForm.preview = 'data:image/jpeg;base64,' + base64
-    bannerForm.imagem_url = ''
-  }
-  reader.readAsDataURL(file)
+  const { base64, mime } = await comprimirImagemFile(file)
+  bannerForm.imagem_base64 = base64
+  bannerForm.preview = `data:${mime};base64,${base64}`
+  bannerForm.imagem_url = ''
 }
 
 async function salvarBanner() {

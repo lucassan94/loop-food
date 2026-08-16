@@ -16,8 +16,108 @@
 
 import fs from 'fs';
 import path from 'path';
+import sharp from 'sharp';
 import { config } from './index.js';
 import { query } from './database.js';
+
+// ============================================================================
+// OTIMIZAÇÃO DE IMAGENS (cardápio carrega rápido)
+// ============================================================================
+// Fotos de celular chegam com 3000-4000px e vários MB, mas o cardápio exibe
+// as imagens em ~150-400px. Sem otimização, cada cliente baixa o arquivo
+// original inteiro — o motivo #1 de carregamento lento. Aqui redimensionamos
+// e re-encodamos no UPLOAD (fonte única), cobrindo produtos, banners,
+// entregadores, categorias, logos e itens de subcategorias.
+
+// Dimensão máxima (largura OU altura) das imagens otimizadas.
+// 1200px cobre banner full-width em desktop e retina em mobile; produtos são
+// exibidos bem menores. Imagens já menores que o limite não são ampliadas.
+export const IMAGEM_MAX_DIM = 1200;
+
+// Qualidade dos re-encodes JPEG/WebP (80 = boa relação tamanho/qualidade).
+export const IMAGEM_QUALIDADE = 80;
+
+const EXTENSAO_POR_MIME = {
+  'image/jpeg': 'jpg',
+  'image/png': 'png',
+  'image/gif': 'gif',
+  'image/webp': 'webp',
+  'image/svg+xml': 'svg',
+};
+
+/**
+ * Otimiza uma imagem em memória: aplica orientação EXIF, redimensiona para
+ * no máximo IMAGEM_MAX_DIM e re-encode no MESMO formato do original.
+ *
+ * - JPEG → redimensiona + re-encode q80 (mozjpeg)
+ * - PNG  → redimensiona + re-encode (mantém transparência)
+ * - WebP → redimensiona + re-encode q80
+ * - SVG/GIF → retorna original (vetor/animação não são convertidos)
+ * - Arquivo corrompido/ilegível → retorna original (não quebra o upload)
+ *
+ * @param {Buffer} buffer Bytes da imagem
+ * @param {string} mime Content-Type declarado
+ * @returns {Promise<{ buffer: Buffer, mime: string }>}
+ */
+export async function otimizarImagemBuffer(buffer, mime = 'image/jpeg') {
+  if (!buffer || buffer.length === 0) return { buffer, mime };
+
+  // Formatos não-raster: manter byte a byte
+  if (mime === 'image/svg+xml' || mime === 'image/gif') {
+    return { buffer, mime };
+  }
+
+  try {
+    const meta = await sharp(buffer).metadata();
+    if (!meta.format || meta.format === 'svg' || meta.format === 'gif') {
+      return { buffer, mime };
+    }
+
+    // .rotate() sem argumentos aplica a orientação EXIF (fotos de celular)
+    const pipeline = sharp(buffer)
+      .rotate()
+      .resize(IMAGEM_MAX_DIM, IMAGEM_MAX_DIM, {
+        fit: 'inside',
+        withoutEnlargement: true,
+      });
+
+    let saida;
+    if (meta.format === 'png') {
+      saida = await pipeline.png({ compressionLevel: 9, adaptiveFiltering: true }).toBuffer();
+      mime = 'image/png';
+    } else if (meta.format === 'webp') {
+      saida = await pipeline.webp({ quality: IMAGEM_QUALIDADE }).toBuffer();
+      mime = 'image/webp';
+    } else {
+      // JPEG e demais rasters (tiff, avif...) → JPEG
+      saida = await pipeline.jpeg({ quality: IMAGEM_QUALIDADE, mozjpeg: true }).toBuffer();
+      mime = 'image/jpeg';
+    }
+
+    return { buffer: saida, mime };
+  } catch (err) {
+    console.warn(`[Upload] Falha ao otimizar imagem (mantendo original): ${err.message}`);
+    return { buffer, mime };
+  }
+}
+
+/**
+ * Otimiza uma imagem em base64 (colunas imagem_base64 embutidas em linhas).
+ * Retorna o base64 re-encodado (menor) mantendo o formato — a detecção de
+ * prefixo usada nos frontends (jpeg/png/webp/svg) continua válida.
+ *
+ * @param {string} base64Data Conteúdo base64 (SEM prefixo data:)
+ * @returns {Promise<{ base64: string, mime: string }>}
+ */
+export async function otimizarImagemBase64(base64Data) {
+  if (!base64Data || base64Data.length < 50) {
+    return { base64: base64Data || '', mime: detectMimeFromBase64(base64Data || '') };
+  }
+  const mime = detectMimeFromBase64(base64Data);
+  const buffer = Buffer.from(base64Data, 'base64');
+  const otimizada = await otimizarImagemBuffer(buffer, mime);
+  return { base64: otimizada.buffer.toString('base64'), mime: otimizada.mime };
+}
 
 /**
  * Retorna o caminho absoluto do diretório base de uploads (fallback disco).
@@ -140,8 +240,22 @@ export async function deleteImageFromDb(tenantId, tipo, filename) {
  * @returns {Promise<{ filePath: string, publicUrl: string }>}
  */
 export async function saveBase64AsFile(tenantId, subdir, filename, base64Data) {
-  const buffer = Buffer.from(base64Data, 'base64');
-  const mime = detectMimeFromBase64(base64Data);
+  let buffer = Buffer.from(base64Data, 'base64');
+  let mime = detectMimeFromBase64(base64Data);
+
+  // Redimensiona/recomprime a imagem no upload (cardápio não precisa de fotos
+  // de 4000px). SVG/GIF são mantidos byte a byte; falha → mantém original.
+  const otimizada = await otimizarImagemBuffer(buffer, mime);
+  buffer = otimizada.buffer;
+  mime = otimizada.mime;
+
+  // Se a otimização mudou o formato (ex.: TIFF declarado como jpg → jpeg,
+  // ou PNG detectado no conteúdo), ajusta a extensão do filename para o
+  // conteúdo real — mantém URL, banco e disco consistentes.
+  const ext = EXTENSAO_POR_MIME[mime] || detectFileExtension(base64Data);
+  if (!filename.toLowerCase().endsWith('.' + ext)) {
+    filename = filename.replace(/\.[^.]+$/, '') + '.' + ext;
+  }
 
   await saveImageToDb(tenantId, subdir, filename, buffer, mime);
 
@@ -288,8 +402,10 @@ export async function serveUploadFile(tenantId, type, filename, res) {
     return res.status(400).json({ error: 'Parâmetro inválido.' });
   }
 
-  // Cache público (imagens do cardápio mudam raramente) — só em respostas 200
-  res.setHeader('Cache-Control', 'public, max-age=86400');
+  // Cache público LONGO: os filenames são únicos por upload (timestamp +
+  // sufixo aleatório), então a URL nunca muda de conteúdo — o browser pode
+  // reaproveitar a imagem por 1 ano sem revalidar. Só em respostas 200.
+  res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
 
   // ─── Fonte primária: banco ───
   try {

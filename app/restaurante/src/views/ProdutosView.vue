@@ -897,7 +897,7 @@
 import { ref, reactive, computed, onMounted, markRaw, watch } from 'vue'
 import { Info, Image, CirclePlus, ListChecks, CalendarClock } from 'lucide-vue-next'
 import api from '../services/api'
-import { PRODUCT_PLACEHOLDER } from '../utils/images'
+import { PRODUCT_PLACEHOLDER, comprimirImagemFile } from '../utils/images'
 import AlertDialog from '../components/AlertDialog.vue'
 
 const produtos = ref([])
@@ -1203,16 +1203,13 @@ function cancelarCatalogoEdit() {
 }
 
 // Imagem de item do catálogo (base64 — sem upload de arquivo)
-function onItemImageSelected(event, item) {
+async function onItemImageSelected(event, item) {
   const file = event.target.files[0]
   if (!file) return
   if (file.size > 5 * 1024 * 1024) { uploadError.value = 'Imagem muito grande! O tamanho máximo permitido é 5MB.'; return }
-  const reader = new FileReader()
-  reader.onload = (e) => {
-    item.imagem_base64 = e.target.result.split(',')[1]
-    item.imagem_url = ''
-  }
-  reader.readAsDataURL(file)
+  const { base64 } = await comprimirImagemFile(file)
+  item.imagem_base64 = base64
+  item.imagem_url = ''
   event.target.value = ''
 }
 
@@ -1348,13 +1345,14 @@ async function editar(p) {
   showForm.value = true
 }
 
-function onImageSelected(event) {
+async function onImageSelected(event) {
   const file = event.target.files[0]
   if (!file) return
   if (file.size > 5 * 1024 * 1024) { uploadError.value = 'Imagem muito grande! O tamanho máximo permitido é 5MB.'; return }
-  const reader = new FileReader()
-  reader.onload = (e) => { form.imagem_base64 = e.target.result.split(',')[1]; previewImage.value = e.target.result; form.imagem_url = '' }
-  reader.readAsDataURL(file)
+  const { base64, mime } = await comprimirImagemFile(file)
+  form.imagem_base64 = base64
+  previewImage.value = `data:${mime};base64,${base64}`
+  form.imagem_url = ''
 }
 
 function onUrlChange() { if (form.imagem_url) { previewImage.value = form.imagem_url; form.imagem_base64 = '' } }

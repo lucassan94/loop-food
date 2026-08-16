@@ -3,6 +3,7 @@ import bcrypt from 'bcrypt';
 import { z } from 'zod';
 import { query } from '../../config/database.js';
 import { config } from '../../config/index.js';
+import { otimizarImagemBase64 } from '../../config/upload.js';
 import { authenticate, authorize } from '../../middleware/auth.js';
 import { AppError } from '../../middleware/errorHandler.js';
 import { emitToRestaurant, emitNovaMensagem, emitMensagemLida } from '../../services/realtime.js';
@@ -105,7 +106,19 @@ router.put('/', authenticate, authorize('admin', 'gerente'), async (req, res, ne
       fields.push(`features = $${idx++}`);
       params.push(JSON.stringify(features));
     }
-    if (logo_base64 !== undefined) { fields.push(`logo_base64 = $${idx++}`); params.push(logo_base64); }
+    if (logo_base64 !== undefined) {
+      // Comprimir o logo no upload (vai no JSON de /restaurante e é renderizado
+      // no header do cardápio — tamanho importa para o carregamento).
+      let logo = logo_base64;
+      if (typeof logo === 'string' && logo.length > 50) {
+        try {
+          const ot = await otimizarImagemBase64(logo);
+          logo = ot.base64;
+        } catch (e) { /* mantém original */ }
+      }
+      fields.push(`logo_base64 = $${idx++}`);
+      params.push(logo);
+    }
     if (retirada_habilitada !== undefined) { fields.push(`retirada_habilitada = $${idx++}`); params.push(retirada_habilitada); }
     if (horarios_funcionamento !== undefined) {
       fields.push(`horarios_funcionamento = $${idx++}`);
