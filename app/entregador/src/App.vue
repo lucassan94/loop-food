@@ -467,8 +467,8 @@ async function salvarPerfil() {
 }
 
 onMounted(() => {
-  // Try to restore session
-  const token = document.cookie.match(/(^| )publicToken=([^;]+)/)?.[2]
+  // Try to restore session (cookie própria do app entregador)
+  const token = document.cookie.match(/(^| )entregador_publicToken=([^;]+)/)?.[2]
   if (token) {
     api.get('/auth/me').then(({ data }) => {
       // Cross-login prevention: só aceita sessão de entregador

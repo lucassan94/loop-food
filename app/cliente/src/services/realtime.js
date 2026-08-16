@@ -5,7 +5,7 @@ let socket = null
 export function connectRealtime() {
   if (socket?.connected) return socket
 
-  const token = getCookie('publicToken')
+  const token = getCookie('cliente_publicToken')
   const restaurantId = getCookie('tenantId')
 
   socket = io(window.location.origin, {

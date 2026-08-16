@@ -14,7 +14,8 @@ const api = axios.create({
 })
 
 api.interceptors.request.use((config) => {
-  const token = document.cookie.match(/(^| )publicToken=([^;]+)/)?.[2]
+  // Cookie própria do app entregador — sessões individuais por módulo
+  const token = document.cookie.match(/(^| )entregador_publicToken=([^;]+)/)?.[2]
   if (token) config.headers.Authorization = `Bearer ${token}`
   // Cross-login prevention: identificar módulo para o backend
   config.headers['X-Module'] = 'entregador'
@@ -31,12 +32,12 @@ api.interceptors.response.use(
     if (error.response?.status === 401 && !error.config._retry) {
       // Só tenta refresh se havia um token — evita loop infinito quando
       // o usuário nunca fez login (primeiro carregamento da página)
-      const hadToken = !!document.cookie.match(/(^| )publicToken=([^;]+)/)?.[2]
+      const hadToken = !!document.cookie.match(/(^| )entregador_publicToken=([^;]+)/)?.[2]
       if (!hadToken) return Promise.reject(error)
 
       error.config._retry = true
       try {
-        await axios.post('/api/auth/refresh', {}, { withCredentials: true })
+        await axios.post('/api/auth/refresh', {}, { withCredentials: true, headers: { 'X-Module': 'entregador' } })
         return api(error.config)
       } catch {
         // Refresh falhou — limpa cookies e redireciona sem reload completo

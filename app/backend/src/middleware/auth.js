@@ -91,12 +91,26 @@ export function clearJwtSecretCache(restaurantId) {
   }
 }
 
-// Extrair token do cookie ou header Authorization
+// Módulo que está chamando (X-Module enviado pelos apps: cliente/admin/entregador)
+function getRequestModule(req) {
+  return String(req.headers['x-module'] || '').toLowerCase();
+}
+
+// Extrair token do cookie do MÓDULO, cookie legado ou header Authorization.
+// Cada app tem cookies próprias ({modulo}_token/{modulo}_refreshToken/
+// {modulo}_publicToken) para sessões individuais no mesmo domínio; o cookie
+// legado (token) é aceito apenas como fallback de transição.
 function extractToken(req) {
-  // Tenta cookie first (httpOnly cookie)
+  // 1. Cookie do módulo (ex: admin_token, cliente_token, entregador_token)
+  const requestModule = getRequestModule(req);
+  if (requestModule && req.cookies?.[`${requestModule}_token`]) {
+    return req.cookies[`${requestModule}_token`];
+  }
+
+  // 2. Cookie legado (httpOnly)
   if (req.cookies?.token) return req.cookies.token;
 
-  // Fallback: Authorization header
+  // 3. Fallback: Authorization header
   const authHeader = req.headers.authorization;
   if (authHeader?.startsWith('Bearer ')) {
     return authHeader.substring(7);
@@ -135,6 +149,20 @@ export async function authenticate(req, res, next) {
     } else {
       decoded = jwt.verify(token, config.jwt.secret);
     }
+    // Isolamento de sessões por módulo: o app que chamou (X-Module) precisa
+    // ser o mesmo módulo do token. Impede que o token do cliente (mesmo
+    // domínio) acesse o painel admin — e vice-versa. Sem isso, os 3 apps no
+    // mesmo domínio compartilhariam cookies/sessões entre si.
+    const requestModule = getRequestModule(req);
+    if (requestModule && decoded.module && requestModule !== decoded.module) {
+      return res.status(403).json({
+        error: 'Sessão de outro módulo. Faça login nesta área.',
+        code: 'WRONG_MODULE',
+        expected: decoded.module,
+        received: requestModule,
+      });
+    }
+
     req.user = decoded;
 
     // Atualizar o contexto RLS do request com os dados do usuário logado

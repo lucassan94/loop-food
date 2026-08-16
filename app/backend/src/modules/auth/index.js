@@ -84,8 +84,11 @@ async function gerarTokens(usuario, restaurantId) {
   return { accessToken, refreshToken };
 }
 
-// Definir cookie httpOnly
-function setTokenCookies(req, res, tokens) {
+// Definir cookie httpOnly — POR MÓDULO. Cada app (cliente/admin/entregador)
+// tem suas próprias cookies ({modulo}_token, {modulo}_refreshToken,
+// {modulo}_publicToken) para que as sessões sejam individuais no mesmo
+// domínio: logar no cliente não dá acesso ao painel admin e vice-versa.
+function setTokenCookies(req, res, tokens, modulo) {
   // Detecta se a conexão é segura (HTTPS) de forma confiável
   const isSecure = req.secure || req.headers['x-forwarded-proto'] === 'https';
   
@@ -100,18 +103,18 @@ function setTokenCookies(req, res, tokens) {
     path: '/',
   };
 
-  res.cookie('token', tokens.accessToken, {
+  res.cookie(`${modulo}_token`, tokens.accessToken, {
     ...cookieOptions,
     maxAge: ACCESS_MAX_AGE,
   });
 
-  res.cookie('refreshToken', tokens.refreshToken, {
+  res.cookie(`${modulo}_refreshToken`, tokens.refreshToken, {
     ...cookieOptions,
     maxAge: REFRESH_MAX_AGE,
   });
 
   // Token legível para o frontend (útil para Socket.IO auth e interceptor API)
-  res.cookie('publicToken', tokens.accessToken, {
+  res.cookie(`${modulo}_publicToken`, tokens.accessToken, {
     httpOnly: false,
     secure: isSecure,
     sameSite: 'lax',
@@ -160,7 +163,7 @@ router.post('/cliente/login', loginLimiter, async (req, res, next) => {
     if (!senhaValida) throw new AppError('Usuário/telefone ou senha inválidos.', 401);
 
     const tokens = await gerarTokens({ ...user, role: 'cliente' }, restaurantId);
-    setTokenCookies(req, res, tokens);
+    setTokenCookies(req, res, tokens, 'cliente');
 
     res.json({
       message: 'Login realizado com sucesso!',
@@ -231,7 +234,7 @@ router.post('/cliente/signup', signupLimiter, async (req, res, next) => {
     });
 
     const tokens = await gerarTokens({ ...result, role: 'cliente' }, restaurantId);
-    setTokenCookies(req, res, tokens);
+    setTokenCookies(req, res, tokens, 'cliente');
 
     res.status(201).json({
       message: 'Conta criada com sucesso!',
@@ -284,7 +287,7 @@ router.post('/entregador/login', loginLimiter, async (req, res, next) => {
     if (!senhaValida) throw new AppError('Usuário/telefone ou senha inválidos.', 401);
 
     const tokens = await gerarTokens({ ...user, role: 'entregador' }, restaurantId);
-    setTokenCookies(req, res, tokens);
+    setTokenCookies(req, res, tokens, 'entregador');
 
     res.json({
       message: 'Login realizado com sucesso!',
@@ -331,7 +334,7 @@ router.post('/restaurante/login', loginLimiter, async (req, res, next) => {
     await query('UPDATE restaurante_users SET ultimo_acesso = NOW() WHERE id = $1', [user.id]);
 
     const tokens = await gerarTokens({ ...user, role: 'restaurante' }, restaurantId);
-    setTokenCookies(req, res, tokens);
+    setTokenCookies(req, res, tokens, 'admin');
 
     res.json({
       message: 'Login realizado com sucesso!',
@@ -356,7 +359,12 @@ router.post('/restaurante/login', loginLimiter, async (req, res, next) => {
 // ============================
 router.post('/refresh', refreshLimiter, async (req, res, next) => {
   try {
-    const refreshToken = req.cookies?.refreshToken || req.body?.refreshToken;
+    // Cookie do módulo que está chamando (X-Module), com fallback para o
+    // cookie legado (transição) e o body.
+    const requestModule = String(req.headers['x-module'] || '').toLowerCase();
+    const refreshToken = (requestModule && req.cookies?.[`${requestModule}_refreshToken`])
+      || req.cookies?.refreshToken
+      || req.body?.refreshToken;
     if (!refreshToken) throw new AppError('Refresh token não fornecido.', 401);
 
     // Decodificar sem verificar primeiro para extrair o restaurantId
@@ -387,8 +395,10 @@ router.post('/refresh', refreshLimiter, async (req, res, next) => {
       role: decoded.role,
     };
 
+    // Mesmo módulo do refresh token (mantém a sessão no mesmo app)
+    const modulo = decoded.module || requestModule || 'cliente';
     const tokens = await gerarTokens(user, rid);
-    setTokenCookies(req, res, tokens);
+    setTokenCookies(req, res, tokens, modulo);
 
     res.json({
       message: 'Token renovado.',
@@ -406,6 +416,14 @@ router.post('/refresh', refreshLimiter, async (req, res, next) => {
 // LOGOUT
 // ============================
 router.post('/logout', (req, res) => {
+  // Limpa as cookies do módulo que chamou + legadas (transição)
+  const requestModule = String(req.headers['x-module'] || '').toLowerCase();
+  for (const m of [requestModule, 'cliente', 'admin', 'entregador']) {
+    if (!m) continue;
+    res.clearCookie(`${m}_token`, { path: '/' });
+    res.clearCookie(`${m}_refreshToken`, { path: '/' });
+    res.clearCookie(`${m}_publicToken`, { path: '/' });
+  }
   res.clearCookie('token', { path: '/' });
   res.clearCookie('refreshToken', { path: '/' });
   res.clearCookie('publicToken', { path: '/' });

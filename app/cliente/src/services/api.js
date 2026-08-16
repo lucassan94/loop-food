@@ -21,7 +21,8 @@ api.interceptors.request.use((config) => {
   const publicEndpoints = ['/auth/cliente/login', '/auth/cliente/signup', '/auth/refresh']
   const isPublic = publicEndpoints.some(e => config.url.includes(e))
   if (!isPublic) {
-    const token = getCookie('publicToken')
+    // Cookie própria do app cliente — sessões individuais por módulo
+    const token = getCookie('cliente_publicToken')
     if (token) {
       config.headers.Authorization = `Bearer ${token}`
     }
@@ -44,7 +45,7 @@ api.interceptors.response.use(
     if (error.response?.status === 401 && error.response?.data?.code === 'TOKEN_EXPIRED' && !originalRequest._retry) {
       originalRequest._retry = true
       try {
-        await axios.post('/api/auth/refresh', {}, { withCredentials: true })
+        await axios.post('/api/auth/refresh', {}, { withCredentials: true, headers: { 'X-Module': 'cliente' } })
         return api(originalRequest)
       } catch {
         window.location.href = '/'
