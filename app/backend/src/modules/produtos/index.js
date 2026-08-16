@@ -399,6 +399,47 @@ router.get('/categorias', async (req, res, next) => {
 });
 
 // ============================
+// REORDENAR CATEGORIAS (Admin)
+// ============================
+// Recebe a lista de ids na ordem desejada e renumera a coluna `ordem` numa
+// transação. O cardápio exibe as seções de categoria por essa ordem.
+// ⚠️ Registrada ANTES de PUT /categorias/:id (senão 'reordenar' cairia no :id).
+router.put('/categorias/reordenar', authenticate, authorize('admin', 'gerente'), async (req, res, next) => {
+  try {
+    const restaurantId = req.restaurantId || config.restaurantId;
+    const { ids } = req.body;
+    if (!Array.isArray(ids) || ids.length === 0 || ids.some(id => !Number.isInteger(id))) {
+      throw new AppError('Envie a lista de ids das categorias na ordem desejada.', 400);
+    }
+
+    // Anti cross-tenant: todos os ids devem pertencer ao restaurante
+    const unicos = [...new Set(ids)];
+    const valid = await query(
+      'SELECT id FROM categorias WHERE restaurant_id = $1 AND id = ANY($2)',
+      [restaurantId, unicos]
+    );
+    if (valid.rows.length !== unicos.length) {
+      throw new AppError('Uma ou mais categorias não pertencem ao restaurante.', 400);
+    }
+
+    await transaction(async (client) => {
+      for (let i = 0; i < ids.length; i++) {
+        await client.query(
+          'UPDATE categorias SET ordem = $1 WHERE id = $2 AND restaurant_id = $3',
+          [i + 1, ids[i], restaurantId]
+        );
+      }
+    });
+
+    const result = await query(
+      'SELECT id, nome, slug, ordem FROM categorias WHERE restaurant_id = $1 ORDER BY ordem ASC',
+      [restaurantId]
+    );
+    res.json(result.rows);
+  } catch (err) { next(err); }
+});
+
+// ============================
 // CRIAR CATEGORIA (Admin)
 // ============================
 router.post('/categorias', authenticate, authorize('admin', 'gerente'), async (req, res, next) => {
@@ -523,7 +564,9 @@ router.get('/', async (req, res, next) => {
       params.push(`%${buscaSegura.toLowerCase()}%`);
     }
 
-    sql += ' ORDER BY p.destaque DESC, p.nome ASC';
+    // Ordem das seções do cardápio = ordem das categorias (ordem editável no
+    // painel); dentro de cada categoria, destaque + nome.
+    sql += ' ORDER BY c.ordem ASC NULLS LAST, p.destaque DESC, p.nome ASC';
 
     const result = await query(sql, params);
     res.json(result.rows);
@@ -569,7 +612,9 @@ router.get('/com-extras', optionalAuth, async (req, res, next) => {
       params.push(`%${buscaSegura.toLowerCase()}%`);
     }
 
-    sql += ' ORDER BY p.destaque DESC, p.nome ASC';
+    // Ordem das seções do cardápio = ordem das categorias (ordem editável no
+    // painel); dentro de cada categoria, destaque + nome.
+    sql += ' ORDER BY c.ordem ASC NULLS LAST, p.destaque DESC, p.nome ASC';
 
     const produtosResult = await query(sql, params);
     const produtos = produtosResult.rows;

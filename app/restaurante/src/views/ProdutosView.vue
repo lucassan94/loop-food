@@ -125,6 +125,8 @@
                   </div>
                 </div>
                 <div class="catalog-card-actions">
+                  <button class="btn-icon" title="Mover para cima" :disabled="categorias[0]?.id === cat.id" @click="moverCategoria(cat, -1)"><i-lucide-arrow-up style="width:15px;height:15px" /></button>
+                  <button class="btn-icon" title="Mover para baixo" :disabled="categorias[categorias.length - 1]?.id === cat.id" @click="moverCategoria(cat, 1)"><i-lucide-arrow-down style="width:15px;height:15px" /></button>
                   <button class="btn-icon" title="Editar" @click="editarCategoria(cat)"><i-lucide-pencil style="width:15px;height:15px" /></button>
                   <button class="btn-icon danger" title="Excluir" @click="excluirCategoria(cat)"><i-lucide-trash-2 style="width:15px;height:15px" /></button>
                 </div>
@@ -1417,6 +1419,25 @@ function cancelarEditCategoria() {
   categoriasEditorOpen.value = false
 }
 
+// Move a categoria uma posição (dir = -1 cima, +1 baixo) e persiste a ordem
+// nova no backend (que renumera a coluna `ordem`). Se falhar, recarrega a
+// ordem original do servidor.
+async function moverCategoria(cat, dir) {
+  const i = categorias.value.findIndex(c => c.id === cat.id)
+  const j = i + dir
+  if (i < 0 || j < 0 || j >= categorias.value.length) return
+  const novo = [...categorias.value]
+  ;[novo[i], novo[j]] = [novo[j], novo[i]]
+  categorias.value = novo // feedback imediato
+  try {
+    await api.put('/produtos/categorias/reordenar', { ids: novo.map(c => c.id) })
+  } catch (err) {
+    alert(err.response?.data?.error || 'Erro ao reordenar categorias.')
+  } finally {
+    await load() // recarrega com a ordem definitiva do backend
+  }
+}
+
 async function salvarCategoria() {
   const nome = catForm.nome.trim()
   if (!nome) return
@@ -1608,6 +1629,9 @@ onMounted(() => { load(); carregarCatalogo() })
   display: inline-flex; align-items: center; justify-content: center;
   transition: var(--transition);
 }
+
+button.btn-icon:disabled { opacity: 0.35; cursor: not-allowed; }
+
 .btn-icon:hover { background: var(--info-light); color: #1e40af; }
 .btn-icon.danger:hover { background: #fee2e2; color: var(--error); }
 
