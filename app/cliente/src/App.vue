@@ -394,9 +394,10 @@ onMounted(async () => {
   restoreCart()
   carregarNaoLidas()
 
-  // CEP Onboarding: perguntar CEP na primeira visita
+  // CEP Onboarding: perguntar CEP na primeira visita (só para visitantes
+  // anônimos — cliente logado já tem endereço no perfil)
   const cepSalvo = localStorage.getItem('kardapio_cep') || localStorage.getItem('saborexpress_cep')
-  if (!cepSalvo) {
+  if (!cepSalvo && !authStore.isAuthenticated) {
     // Mostrar modal após um breve delay para não atrapalhar renderização
     setTimeout(() => {
       showCepModal.value = true

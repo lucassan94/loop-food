@@ -32,10 +32,10 @@
       </div>
 
       <div class="cep-actions">
-        <button class="btn btn-primary btn-block" @click="$router.push('/auth')">
+        <button class="btn btn-primary btn-block" @click="irParaAuth">
           <i-lucide-log-in style="width:16px;height:16px" /> Fazer Login
         </button>
-        <button class="btn btn-outline-primary btn-block" @click="$router.push('/auth')">
+        <button class="btn btn-outline-primary btn-block" @click="irParaAuth">
           <i-lucide-user-plus style="width:16px;height:16px" /> Criar uma conta
         </button>
         <button class="btn-link-muted" @click="$emit('close')">
@@ -48,14 +48,23 @@
 
 <script setup>
 import { ref, inject } from 'vue'
+import { useRouter } from 'vue-router'
 import api from '../services/api'
 
 const emit = defineEmits(['close'])
 const addToast = inject('addToast')
+const $router = useRouter()
 
 const cep = ref('')
 const buscando = ref(false)
 const resultado = ref(null)
+
+// Fechar o popup ao ir para login/cadastro — senão ele continua sobreposto
+// à tela de autenticação (o $router.push sozinho não dispara o close)
+function irParaAuth() {
+  emit('close')
+  $router.push('/auth')
+}
 
 function formatCEP() {
   cep.value = cep.value.replace(/\D/g, '').replace(/^(\d{5})(\d)/, '$1-$2').substring(0, 9)
