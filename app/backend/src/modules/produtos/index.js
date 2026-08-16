@@ -5,7 +5,7 @@ import { config } from '../../config/index.js';
 import { authenticate, authorize, optionalAuth } from '../../middleware/auth.js';
 import { AppError } from '../../middleware/errorHandler.js';
 import { emitToRestaurant } from '../../services/realtime.js';
-import { saveBase64AsFile, deleteUploadFile, gerarNomeArquivo, otimizarImagemBase64 } from '../../config/upload.js';
+import { saveBase64AsFile, deleteUploadFile, gerarNomeArquivo } from '../../config/upload.js';
 import { TZ_RESTAURANTE } from '../../services/horarios.js';
 import { produtoDisponivelAgora, produtoNoModulo } from '../../services/itemValidation.js';
 
@@ -344,25 +344,37 @@ async function buscarSubcategoriasDeProdutos(db, produtoIds) {
 }
 
 // ============================
-// Helpers — Otimização de imagens de itens (base64 embutido)
+// Helpers — Imagens de itens do catálogo (base64 → tabela imagens)
 // ============================
 
-// Redimensiona/recomprime o base64 de cada item do catálogo ANTES de salvar.
-// As imagens dos itens vivem na coluna imagem_base64 da própria linha (e vão
-// no JSON do cardápio), então precisam ficar pequenas para o app carregar
-// rápido. Formato é preservado (jpeg/png/webp/svg) — detecção dos frontends
-// continua válida.
-async function otimizarItensImagens(itens) {
-  const otimizados = [];
+// Converte o base64 de cada item para a tabela `imagens` (URL pública
+// /uploads/...). O JSON do cardápio fica leve (sem base64 embutido) e o
+// saveBase64AsFile já otimiza a imagem (sharp, ≤1200px). Itens sem base64
+// (URL externa ou sem imagem) são mantidos como estão.
+async function moverItensImagensParaUrl(restaurantId, itens) {
   for (const item of itens || []) {
-    const copia = { ...item };
-    if (copia.imagem_base64 && copia.imagem_base64.length > 50) {
-      const ot = await otimizarImagemBase64(copia.imagem_base64);
-      copia.imagem_base64 = ot.base64;
+    if (item.imagem_base64 && item.imagem_base64.length > 50) {
+      const filename = gerarNomeArquivo(item.nome || 'item', item.imagem_base64);
+      const saved = await saveBase64AsFile(restaurantId, 'cardapio', filename, item.imagem_base64);
+      item.imagem_url = saved.publicUrl;
+      item.imagem_base64 = '';
     }
-    otimizados.push(copia);
   }
-  return otimizados;
+  return itens;
+}
+
+// Remove as imagens (banco + disco) dos itens de uma subcategoria.
+// Usado ao substituir itens (PUT) ou excluir a subcategoria.
+async function removerImagensDosItens(subcategoriaId) {
+  const itens = await query(
+    'SELECT imagem_url FROM extra_subcategoria_itens WHERE subcategoria_id = $1',
+    [subcategoriaId]
+  );
+  for (const it of itens.rows) {
+    if (it.imagem_url?.startsWith('/uploads/')) {
+      try { await deleteUploadFile(it.imagem_url); } catch { /* imagem já inexistente */ }
+    }
+  }
 }
 
 // ============================
@@ -673,11 +685,15 @@ router.post('/extra-subcategorias', authenticate, authorize('admin', 'gerente'),
   try {
     const restaurantId = req.restaurantId || config.restaurantId;
     const data = subcategoriaSchema.parse(req.body);
-    const tipo = data.tipo || 'manual';
-    if (tipo === 'categoria') {
-      if (!data.categoria_id) throw new AppError('Selecione a categoria do cardápio para a subcategoria.', 400);
-      const cat = await query('SELECT id FROM categorias WHERE id = $1 AND restaurant_id = $2', [data.categoria_id, restaurantId]);
-      if (cat.rows.length === 0) throw new AppError('Categoria não pertence ao restaurante.', 400);
+    const tipo = data.tipo || 'manual';      if (tipo === 'categoria') {
+        if (!data.categoria_id) throw new AppError('Selecione a categoria do cardápio para a subcategoria.', 400);
+        const cat = await query('SELECT id FROM categorias WHERE id = $1 AND restaurant_id = $2', [data.categoria_id, restaurantId]);
+        if (cat.rows.length === 0) throw new AppError('Categoria não pertence ao restaurante.', 400);
+      }
+    // Itens com imagem base64 → salvar na tabela imagens (URL no JSON do
+    // cardápio, sem base64 embutido). O saveBase64AsFile já otimiza (sharp).
+    if (tipo === 'manual') {
+      await moverItensImagensParaUrl(restaurantId, data.itens);
     }
     const result = await transaction(async (client) => {
       const ordemRes = await client.query(
@@ -703,8 +719,6 @@ router.post('/extra-subcategorias', authenticate, authorize('admin', 'gerente'),
         );
       }
       if (tipo === 'manual') {
-        // Comprimir imagens base64 antes de inserir (cardápio carrega rápido)
-        data.itens = await otimizarItensImagens(data.itens);
         let ordem = 0;
         for (const item of data.itens) {
           try {
@@ -736,6 +750,14 @@ router.put('/extra-subcategorias/:id', authenticate, authorize('admin', 'gerente
     const restaurantId = req.restaurantId || config.restaurantId;
     const { id } = req.params;
     const data = subcategoriaSchema.partial().parse(req.body);
+
+    // Antes da transação: remover imagens antigas dos itens e converter o
+    // base64 dos novos itens para a tabela imagens (URLs).
+    if ('itens' in req.body && (data.tipo || 'manual') !== 'categoria') {
+      await removerImagensDosItens(id);
+      await moverItensImagensParaUrl(restaurantId, data.itens);
+    }
+
     await transaction(async (client) => {
       const existing = await client.query(
         'SELECT id FROM extra_subcategorias WHERE id = $1 AND restaurant_id = $2',
@@ -758,14 +780,14 @@ router.put('/extra-subcategorias/:id', authenticate, authorize('admin', 'gerente
           await client.query('SAVEPOINT sub_tipo_update');
           await client.query('UPDATE extra_subcategorias SET tipo = $1, categoria_id = $2 WHERE id = $3', [tipo, tipo === 'categoria' ? catId : null, id]);
           if (tipo === 'categoria') {
+            // Itens manuais deixam de existir — limpar as imagens (banco + disco)
+            await removerImagensDosItens(id);
             await client.query('DELETE FROM extra_subcategoria_itens WHERE subcategoria_id = $1', [id]);
           }
           await client.query('RELEASE SAVEPOINT sub_tipo_update');
         } catch (e) { try { await client.query('ROLLBACK TO SAVEPOINT sub_tipo_update'); } catch {} /* colunas tipo/categoria_id podem não existir */ }
       }
       if ('itens' in req.body && (data.tipo || 'manual') !== 'categoria') {
-        // Comprimir imagens base64 antes de salvar (cardápio carrega rápido)
-        data.itens = await otimizarItensImagens(data.itens);
         await client.query('DELETE FROM extra_subcategoria_itens WHERE subcategoria_id = $1', [id]);
         let ordem = 0;
         for (const item of data.itens) {
@@ -890,6 +912,8 @@ router.delete('/extra-subcategorias/:id', authenticate, authorize('admin', 'gere
   try {
     const restaurantId = req.restaurantId || config.restaurantId;
     const { id } = req.params;
+    // Remover as imagens dos itens (banco + disco) antes de excluir
+    await removerImagensDosItens(id);
     const result = await query(
       'DELETE FROM extra_subcategorias WHERE id = $1 AND restaurant_id = $2 RETURNING id',
       [id, restaurantId]

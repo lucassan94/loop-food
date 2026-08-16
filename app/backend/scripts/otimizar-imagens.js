@@ -25,7 +25,7 @@
 
 import 'dotenv/config';
 import pg from 'pg';
-import { otimizarImagemBuffer, otimizarImagemBase64, detectMimeFromBase64 } from '../src/config/upload.js';
+import { otimizarImagemBuffer, otimizarImagemBase64, detectMimeFromBase64, gerarNomeArquivo } from '../src/config/upload.js';
 
 const DRY_RUN = process.argv.includes('--dry-run');
 
@@ -127,6 +127,50 @@ async function otimizarImagens(tenantId) {
   if (otimizadas > 0) log(`  ✔ ${otimizadas} imagem(ns) otimizada(s) em imagens (tenant ${tenantId})`);
 }
 
+// ── Itens de subcategoria: base64 → tabela imagens (URL no JSON) ──
+// Move a imagem embutida do item para a tabela `imagens` (como produtos e
+// banners) — o JSON do cardápio deixa de carregar MBs de base64.
+async function migrarItensParaUrl(tenantId) {
+  const rows = (
+    await queryTenant(
+      tenantId,
+      `SELECT i.id, i.nome, i.imagem_base64
+       FROM extra_subcategoria_itens i
+       JOIN extra_subcategorias s ON s.id = i.subcategoria_id
+       WHERE s.restaurant_id = ${tenantId} AND length(i.imagem_base64) > 50`
+    )
+  ).rows;
+
+  let movidos = 0;
+  const chave = 'itens.migrados_para_url';
+  for (const row of rows) {
+    const ot = await otimizarImagemBase64(row.imagem_base64);
+    const filename = gerarNomeArquivo(row.nome || 'item', row.imagem_base64);
+    const url = `/uploads/${tenantId}/cardapio/${filename}`;
+    const antes = row.imagem_base64.length;
+    movidos++;
+    addStat(chave, antes, 0);
+    if (!DRY_RUN) {
+      await queryTenant(
+        tenantId,
+        `INSERT INTO imagens (restaurant_id, tipo, filename, mime, dados, atualizado_em)
+         VALUES ($1, 'cardapio', $2, $3, $4, now())
+         ON CONFLICT (restaurant_id, tipo, filename)
+         DO UPDATE SET dados = EXCLUDED.dados, mime = EXCLUDED.mime, atualizado_em = now()`,
+        [tenantId, filename, ot.mime, Buffer.from(ot.base64, 'base64')]
+      );
+      await queryTenant(
+        tenantId,
+        `UPDATE extra_subcategoria_itens SET imagem_url = $1, imagem_base64 = '' WHERE id = $2`,
+        [url, row.id]
+      );
+    } else {
+      log(`  item #${row.id} (${row.nome}): ${fmtBytes(antes)} base64 → ${url}`);
+    }
+  }
+  if (movidos > 0) log(`  ✔ ${movidos} item(ns) movido(s) para URL (tenant ${tenantId})`);
+}
+
 // ── Colunas base64 embutidas em linhas (mantém o formato) ──
 async function otimizarColunaBase64(tenantId, tabela, idCol, coluna, sqlFiltro = '') {
   const rows = (
@@ -166,7 +210,7 @@ async function main() {
   console.log(`\n🖼️  Otimização de imagens existentes ${DRY_RUN ? '(DRY-RUN — nada será alterado)' : ''}\n`);
 
   // Inicializa estatísticas
-  for (const chave of ['imagens', 'extra_subcategoria_itens.imagem_base64', 'produtos.imagem_base64', 'banners.imagem_base64', 'restaurantes.logo_base64']) {
+  for (const chave of ['imagens', 'extra_subcategoria_itens.imagem_base64', 'itens.migrados_para_url', 'produtos.imagem_base64', 'banners.imagem_base64', 'restaurantes.logo_base64']) {
     stats[chave] = { n: 0, bytesAntes: 0, bytesDepois: 0, mantidas: 0 };
   }
 
@@ -182,12 +226,9 @@ async function main() {
   for (const tenantId of tenants) {
     console.log(`── Tenant ${tenantId} ──`);
     await otimizarImagens(tenantId);
-    // SELECT de extra_subcategoria_itens é público — filtra pela subcategoria
-    // do tenant (mesma regra da policy de escrita, evita otimizar 2×)
-    await otimizarColunaBase64(
-      tenantId, 'extra_subcategoria_itens', 'id', 'imagem_base64',
-      `AND subcategoria_id IN (SELECT id FROM extra_subcategorias WHERE restaurant_id = ${tenantId})`
-    );
+    // Itens: move o base64 embutido para a tabela imagens (JSON do cardápio leve)
+    await migrarItensParaUrl(tenantId);
+    // Base64 legado em outras colunas (só otimiza em lugar, mantém o formato)
     await otimizarColunaBase64(tenantId, 'produtos', 'id', 'imagem_base64', `AND restaurant_id = ${tenantId}`);
     await otimizarColunaBase64(tenantId, 'banners', 'id', 'imagem_base64', `AND restaurant_id = ${tenantId}`);
     await otimizarColunaBase64(tenantId, 'restaurantes', 'id', 'logo_base64', 'AND id = ' + tenantId);
