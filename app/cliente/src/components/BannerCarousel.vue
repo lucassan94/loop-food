@@ -65,10 +65,15 @@ const currentIndex = ref(0)
 let autoplayInterval = null
 
 function navigate(url) {
-  if (url.startsWith('http://') || url.startsWith('https://')) {
-    window.open(url, '_blank')
+  const clean = (url || '').trim()
+  if (!clean) return
+  // CWE-79: só aceita http(s) externo ou caminho/rota interna — bloqueia
+  // javascript:, data:, vbscript: e afins
+  if (/^(javascript|data|vbscript):/i.test(clean)) return
+  if (clean.startsWith('http://') || clean.startsWith('https://')) {
+    window.open(clean, '_blank')
   } else {
-    router.push(url)
+    router.push(clean)
   }
 }
 

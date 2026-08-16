@@ -1084,7 +1084,9 @@ async function onBannerImageSelected(event) {
 async function salvarBanner() {
   salvandoBanner.value = true
   try {
-    const payload = { titulo: bannerForm.titulo, subtitulo: bannerForm.subtitulo, link_url: bannerForm.link_url || null, ativo: bannerForm.ativo }
+    // link_url em string crua: '' limpa o link, ausente mantém (COALESCE no backend)
+    const payload = { titulo: bannerForm.titulo, subtitulo: bannerForm.subtitulo, link_url: bannerForm.link_url, ativo: bannerForm.ativo }
+
     if (bannerForm.imagem_base64) payload.imagem_base64 = bannerForm.imagem_base64
     else if (bannerForm.imagem_url) payload.imagem_url = bannerForm.imagem_url
     if (editandoBanner.value) { await api.put(`/restaurante/banners/${editandoBanner.value.id}`, payload) }

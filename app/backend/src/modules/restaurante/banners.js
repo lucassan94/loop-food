@@ -127,9 +127,9 @@ router.put('/:id', authenticate, authorize('admin', 'gerente'), async (req, res,
       `UPDATE banners SET
         titulo = COALESCE($1, titulo),
         subtitulo = COALESCE($2, subtitulo),
-        link_url = $3,
-        imagem_url = $4,
-        imagem_base64 = $5,
+        link_url = COALESCE($3, link_url),
+        imagem_url = COALESCE($4, imagem_url),
+        imagem_base64 = COALESCE($5, imagem_base64),
         ativo = COALESCE($6, ativo)
        WHERE id = $7 AND restaurant_id = $8
        RETURNING *`,
