@@ -248,15 +248,17 @@ onMounted(async () => {
   
   onEvent('restaurante:status_loja', (data) => { storeOpen.value = data.status_loja })
   onEvent('restaurante:atualizado', async (data) => {
-    // Recarregar features e logo quando ConfigView salvar
+    // Recarregar features, nome e logo quando ConfigView salvar
     if (data.features) {
       features.value = data.features
     }
-    if (data.nome) {
-      nomeRestaurante.value = data.nome
+    if (data.nome !== undefined) {
+      nomeRestaurante.value = data.nome || ''
     }
-    if (data.logo_base64) {
-      logoUrl.value = data.logo_base64.startsWith('data:') ? data.logo_base64 : 'data:image/png;base64,' + data.logo_base64
+    if ('logo_base64' in data) {
+      logoUrl.value = data.logo_base64
+        ? (data.logo_base64.startsWith('data:') ? data.logo_base64 : 'data:image/png;base64,' + data.logo_base64)
+        : ''
     }
   })
 
@@ -272,6 +274,20 @@ onMounted(async () => {
   } catch { /* ignore */ }
 
 })
+
+// Título e ícone da aba do navegador seguem o Nome Fantasia e o logo do restaurante
+function atualizarAbaNavegador() {
+  document.title = nomeRestaurante.value ? `${nomeRestaurante.value} | Administrativo` : 'Administrativo'
+  let link = document.querySelector("link[rel='icon']")
+  if (!link) {
+    link = document.createElement('link')
+    link.rel = 'icon'
+    document.head.appendChild(link)
+  }
+  link.href = logoUrl.value || (import.meta.env.BASE_URL + 'favicon.svg')
+}
+
+watch([nomeRestaurante, logoUrl], atualizarAbaNavegador)
 
 // Handler de navegação vindo de MesasView (irParaPedido)
 function validarBase64Imagem(b64) {

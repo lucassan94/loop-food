@@ -140,7 +140,7 @@ const showCepModal = ref(false)
 const unreadMessages = ref(0)
 
 // Restaurant data for pickup (retirada)
-const restaurantData = ref({ endereco: '', cidade: '', estado: '', retirada_habilitada: false, horarios_funcionamento: [], timezone: 'America/Sao_Paulo' })
+const restaurantData = ref({ nome: '', logo: '', endereco: '', cidade: '', estado: '', retirada_habilitada: false, horarios_funcionamento: [], timezone: 'America/Sao_Paulo' })
 
 // ── Hora local do restaurante (os horários cadastrados são no fuso dele) ──
 // Usa Intl.DateTimeFormat com timeZone explícita — não depende do relógio do
@@ -411,6 +411,14 @@ onMounted(async () => {
     statusLojaManual.value = data.status_loja
   })
 
+  onEvent('restaurante:atualizado', (data) => {
+    if (data.nome !== undefined) restaurantData.value.nome = data.nome || ''
+    if ('logo_base64' in data) {
+      restaurantData.value.logo = data.logo_base64 ? detectImgSrc(data.logo_base64) : ''
+    }
+    atualizarAbaNavegador()
+  })
+
   onEvent('pedido:atualizado', (data) => {
     if (data.cliente_id === authStore.user?.id) {
       addToast(`Pedido ${data.pedido_id}: ${statusLabel(data.status)}`, 'info')
@@ -427,6 +435,8 @@ onMounted(async () => {
     try {
       const { data } = await api.get('/restaurante')
       restaurantData.value = {
+        nome: data.nome || '',
+        logo: data.logo_base64 ? detectImgSrc(data.logo_base64) : '',
         endereco: data.endereco || '',
         cidade: data.cidade || '',
         estado: data.estado || '',
@@ -434,6 +444,7 @@ onMounted(async () => {
         horarios_funcionamento: data.horarios_funcionamento || [],
         timezone: data.timezone || 'America/Sao_Paulo',
       }
+      atualizarAbaNavegador()
       // Toggle manual (status_loja) é a fonte primária; os horários de
       // funcionamento (quando configurados) só podem fechar a loja.
       statusLojaManual.value = data.status_loja
@@ -549,5 +560,79 @@ function hexToRgba(hex, alpha) {
   const g = (num >> 8) & 0xFF
   const b = num & 0xFF
   return `rgba(${r}, ${g}, ${b}, ${alpha})`
+}
+
+// ── Título e favicon da aba do navegador (nome e logo do restaurante) ──
+function validarBase64Imagem(b64) {
+  if (!b64 || typeof b64 !== 'string') return ''
+  const trimmed = b64.trim()
+  const isValidBase64 = /^[A-Za-z0-9+/]+={0,2}$/.test(trimmed)
+  const isValidBase64Url = /^[A-Za-z0-9_-]+$/.test(trimmed)
+  if (!isValidBase64 && !isValidBase64Url) {
+    console.warn('[Logo] base64 inválido ignorado')
+    return ''
+  }
+  return trimmed
+}
+
+function detectImgSrc(b64) {
+  const limpo = validarBase64Imagem(b64)
+  if (!limpo) return ''
+  if (limpo.startsWith('/9j/')) return 'data:image/jpeg;base64,' + limpo
+  if (limpo.startsWith('iVBORw0KGgo')) return 'data:image/png;base64,' + limpo
+  if (limpo.startsWith('UklGR')) return 'data:image/webp;base64,' + limpo
+  return 'data:image/png;base64,' + limpo
+}
+
+function atualizarAbaNavegador() {
+  document.title = restaurantData.value.nome ? `${restaurantData.value.nome} | Cardápio Digital` : 'Cardápio Digital'
+  const link = document.querySelector("link[rel='icon']")
+  if (link) {
+    link.href = restaurantData.value.logo || '/icons/icon.svg'
+  }
+  atualizarManifestPwa()
+}
+
+// Manifest PWA dinâmico: nome/short_name seguem o Nome Fantasia do restaurante
+// e o ícone de instalação usa o logo quando cadastrado. Gerado em runtime via
+// Blob URL (o browser não envia o header X-Tenant-Slug em /manifest.json, então
+// um endpoint estático não resolveria o tenant corretamente em multi-tenant).
+let manifestUrl = null // blob URL atual (revogado ao trocar)
+
+function dataUrlMime(src) {
+  const m = /^data:([^;,]+)/.exec(src || '')
+  return m ? m[1] : 'image/png'
+}
+
+function atualizarManifestPwa() {
+  const nome = restaurantData.value.nome || 'Kardapio Digital'
+  const shortName = nome.length > 12 ? nome.slice(0, 12) : nome
+  const logo = restaurantData.value.logo || ''
+  const manifest = {
+    name: nome,
+    short_name: shortName,
+    description: `Peça seu delivery online no ${nome}`,
+    start_url: '/',
+    display: 'standalone',
+    background_color: '#f8fafc',
+    theme_color: '#dc2626',
+    orientation: 'portrait-primary',
+    icons: [
+      ...(logo ? [{ src: logo, sizes: 'any', type: dataUrlMime(logo), purpose: 'any' }] : []),
+      { src: '/icons/icon.svg', sizes: '96x96 192x192 512x512', type: 'image/svg+xml', purpose: 'any maskable' },
+    ],
+    categories: ['food', 'restaurants'],
+    lang: 'pt-BR',
+    scope: '/',
+  }
+  const url = URL.createObjectURL(new Blob([JSON.stringify(manifest)], { type: 'application/manifest+json' }))
+  const link = document.querySelector("link[rel='manifest']")
+  if (link) link.href = url
+  if (manifestUrl) URL.revokeObjectURL(manifestUrl)
+  manifestUrl = url
+
+  // Rótulo de instalação no iOS (apple-mobile-web-app-title)
+  const meta = document.querySelector("meta[name='apple-mobile-web-app-title']")
+  if (meta) meta.setAttribute('content', shortName)
 }
 </script>

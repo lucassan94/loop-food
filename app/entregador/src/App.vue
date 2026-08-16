@@ -303,6 +303,8 @@ const financeiro = ref({ hoje: 0, semana: 0, mes: 0, dias: [] })
 const diaDetalhes = ref(null)
 const profile = reactive({ nome: '', telefone: '', endereco: '' })
 const msgPerfil = ref('')
+const nomeRestaurante = ref('')
+const logoUrl = ref('')
 
 let toleranceTimer = null
 
@@ -386,6 +388,13 @@ function connectSocket() {
   const socket = connectRealtime()
   onEvent('pedido:atualizado', () => loadData())
   onEvent('entrega:disponivel', () => loadData())
+  onEvent('restaurante:atualizado', (data) => {
+    if (data.nome !== undefined) nomeRestaurante.value = data.nome || ''
+    if ('logo_base64' in data) {
+      logoUrl.value = data.logo_base64 ? detectImgSrc(data.logo_base64) : ''
+    }
+    atualizarAbaNavegador()
+  })
 }
 
 async function assumirEntrega(entrega) {
@@ -466,7 +475,90 @@ async function salvarPerfil() {
   } catch { msgPerfil.value = 'Erro ao salvar.' }
 }
 
+// ── Título e favicon da aba do navegador (nome e logo do restaurante) ──
+function validarBase64Imagem(b64) {
+  if (!b64 || typeof b64 !== 'string') return ''
+  const trimmed = b64.trim()
+  const isValidBase64 = /^[A-Za-z0-9+/]+={0,2}$/.test(trimmed)
+  const isValidBase64Url = /^[A-Za-z0-9_-]+$/.test(trimmed)
+  if (!isValidBase64 && !isValidBase64Url) {
+    console.warn('[Logo] base64 inválido ignorado')
+    return ''
+  }
+  return trimmed
+}
+
+function detectImgSrc(b64) {
+  const limpo = validarBase64Imagem(b64)
+  if (!limpo) return ''
+  if (limpo.startsWith('/9j/')) return 'data:image/jpeg;base64,' + limpo
+  if (limpo.startsWith('iVBORw0KGgo')) return 'data:image/png;base64,' + limpo
+  if (limpo.startsWith('UklGR')) return 'data:image/webp;base64,' + limpo
+  return 'data:image/png;base64,' + limpo
+}
+
+function atualizarAbaNavegador() {
+  document.title = nomeRestaurante.value ? `${nomeRestaurante.value} | Entregador` : 'Entregador'
+  let link = document.querySelector("link[rel='icon']")
+  if (!link) {
+    link = document.createElement('link')
+    link.rel = 'icon'
+    document.head.appendChild(link)
+  }
+  link.href = logoUrl.value || (import.meta.env.BASE_URL + 'favicon.svg')
+  atualizarManifestPwa()
+}
+
+// Manifest PWA dinâmico: nome do restaurante ao instalar o app (gerado em
+// runtime via Blob URL — o browser não envia X-Tenant-Slug em /manifest.json,
+// então um endpoint estático não resolveria o tenant em multi-tenant).
+let manifestUrl = null // blob URL atual (revogado ao trocar)
+
+function dataUrlMime(src) {
+  const m = /^data:([^;,]+)/.exec(src || '')
+  return m ? m[1] : 'image/png'
+}
+
+function atualizarManifestPwa() {
+  const nome = nomeRestaurante.value || 'Entregador'
+  const shortName = nome.length > 12 ? nome.slice(0, 12) : nome
+  const logo = logoUrl.value || ''
+  const base = import.meta.env.BASE_URL
+  const manifest = {
+    name: nome,
+    short_name: shortName,
+    description: `Entregas do ${nome}`,
+    start_url: base,
+    display: 'standalone',
+    background_color: '#f8fafc',
+    theme_color: '#059669',
+    orientation: 'portrait-primary',
+    icons: [
+      ...(logo ? [{ src: logo, sizes: 'any', type: dataUrlMime(logo), purpose: 'any' }] : []),
+      { src: base + 'favicon.svg', sizes: '96x96 192x192 512x512', type: 'image/svg+xml', purpose: 'any maskable' },
+    ],
+    lang: 'pt-BR',
+    scope: base,
+  }
+  const url = URL.createObjectURL(new Blob([JSON.stringify(manifest)], { type: 'application/manifest+json' }))
+  const link = document.querySelector("link[rel='manifest']")
+  if (link) link.href = url
+  if (manifestUrl) URL.revokeObjectURL(manifestUrl)
+  manifestUrl = url
+
+  // Rótulo de instalação no iOS (apple-mobile-web-app-title)
+  const meta = document.querySelector("meta[name='apple-mobile-web-app-title']")
+  if (meta) meta.setAttribute('content', shortName)
+}
+
 onMounted(() => {
+  // Nome e logo do restaurante na aba do navegador (endpoint público)
+  api.get('/restaurante').then(({ data }) => {
+    nomeRestaurante.value = data.nome || ''
+    logoUrl.value = data.logo_base64 ? detectImgSrc(data.logo_base64) : ''
+    atualizarAbaNavegador()
+  }).catch(() => {})
+
   // Try to restore session (cookie própria do app entregador)
   const token = document.cookie.match(/(^| )entregador_publicToken=([^;]+)/)?.[2]
   if (token) {
@@ -484,6 +576,7 @@ onUnmounted(() => {
   clearInterval(toleranceTimer)
   offEvent('pedido:atualizado')
   offEvent('entrega:disponivel')
+  offEvent('restaurante:atualizado')
 })
 </script>
 <style scoped>
