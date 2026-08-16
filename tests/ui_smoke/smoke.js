@@ -118,6 +118,12 @@ try {
 try {
   const page = await browser.newPage()
   await page.setViewport({ width: 420, height: 900 })
+  // Pré-setar o CEP: o onboarding de CEP (modal após 800ms) interceptaria o
+  // clique no botão Entrar do login (CL-05 flaky) — setar antes do load.
+  await page.evaluateOnNewDocument(() => {
+    localStorage.setItem('kardapio_cep', '01310100')
+    localStorage.setItem('saborexpress_cep', '01310100')
+  })
   await page.goto(`http://localhost:5173/?slug=${SLUG}`, { waitUntil: 'domcontentloaded', timeout: 60000 })
 
   const cardapio = await waitText(page, 'X-Burguer')

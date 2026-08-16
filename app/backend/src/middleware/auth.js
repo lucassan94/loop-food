@@ -1,7 +1,7 @@
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import { config } from '../config/index.js';
-import { mergeRequestContext } from '../config/database.js';
+import { mergeRequestContext, query } from '../config/database.js';
 
 // ============================================================================
 // CACHE DE JWT SECRET POR TENANT
@@ -164,6 +164,23 @@ export async function authenticate(req, res, next) {
     }
 
     req.user = decoded;
+
+    // Tokens antigos (sessões criadas antes da feature de cargos — duram 365
+    // dias) não carregam `cargo` no payload. Sem isso, authorize('admin')
+    // devolve 403 mesmo para o admin logado (ex.: reordenar categorias).
+    // Busca o cargo no banco apenas quando ausente (tokens novos não pagam
+    // essa query).
+    if (!decoded.cargo && decoded.role === 'restaurante' && decoded.id) {
+      try {
+        const { rows } = await query('SELECT cargo FROM restaurante_users WHERE id = $1', [decoded.id]);
+        if (rows[0]?.cargo) {
+          decoded.cargo = rows[0].cargo;
+          req.user = decoded;
+        }
+      } catch {
+        // Sem cargo no token e falha ao buscar: authorize() barra conforme o caso
+      }
+    }
 
     // Atualizar o contexto RLS do request com os dados do usuário logado
     mergeRequestContext({
