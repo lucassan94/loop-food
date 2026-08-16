@@ -41,6 +41,16 @@ async function waitText(page, text, timeout = 40000) {
   return false
 }
 
+// Espera uma condição no DOM ser verdadeira (polling)
+async function waitFor(page, fn, timeout = 40000) {
+  const t0 = Date.now()
+  while (Date.now() - t0 < timeout) {
+    try { if (await fn()) return true } catch { /* página ainda carregando */ }
+    await sleep(1000)
+  }
+  return false
+}
+
 async function typeByPlaceholder(page, placeholder, value) {
   const sel = `input[placeholder="${placeholder}"]`
   await page.waitForSelector(sel, { timeout: 30000 })
@@ -80,10 +90,19 @@ try {
     const painel = await waitText(page, 'Fila de Pedidos')
     check('RS-02', 'painel carrega após login (sidebar)', painel)
 
-    // Pedidos do Loop devem aparecer na fila (1199 = pendente delivery do seed;
-    // o painel renderiza o pedido_id SEM o prefixo '#')
-    const pedidoLoop = await waitText(page, '1199')
-    check('RS-03', 'fila mostra pedido do Loop (1199)', pedidoLoop)
+    // A fila renderiza com os dados do Loop: o cartão "Ativos na Fila" vem do
+    // /dashboard/resumo-dia do tenant (sempre retorna um número, mesmo 0). Não
+    // checamos pedido fixo — dados de produção mudam (ex.: #1199 virou recusado
+    // e hoje o tenant pode não ter pedidos ativos).
+    const filaCarregou = await waitFor(page, async () => {
+      return await page.evaluate(() => {
+        // innerText reflete text-transform:uppercase do CSS — compara em maiúsculas
+        const cards = [...document.querySelectorAll('.stat-card')]
+        const ativos = cards.find((c) => c.innerText.toUpperCase().includes('ATIVOS NA FILA'))
+        return !!ativos && /^\d+$/.test((ativos.querySelector('.value')?.textContent || '').trim())
+      })
+    })
+    check('RS-03', 'fila renderiza com dados do Loop ("Ativos na Fila")', filaCarregou)
     const temConfig = await waitText(page, 'Configurações')
     check('RS-04', 'menu de Configurações visível', temConfig)
   }
