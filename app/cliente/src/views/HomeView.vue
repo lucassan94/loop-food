@@ -364,14 +364,17 @@ const sectionTitle = computed(() => {
 
 const productTotal = computed(() => {
   if (!selectedProduct.value) return 0
+  // Preço do produto vem do backend como string (NUMERIC → "32.90"):
+  // converter para número ANTES de somar, senão "32.90" + 4.5 vira "32.904.5" → NaN
+  const basePreco = Number(selectedProduct.value.preco) || 0
   // Extras com quantidade (max > 1)
-  const qtyExtrasTotal = chosenExtras.value.reduce((acc, e) => acc + (e.extra.preco * e.qty), 0)
+  const qtyExtrasTotal = chosenExtras.value.reduce((acc, e) => acc + ((Number(e.extra.preco) || 0) * e.qty), 0)
   // Extras checkbox (max = 1)
   // ATENÇÃO: chosenExtraSet guarda extra.key (ex: 's123'), não o id — comparar com .key
   const setExtrasTotal = selectedExtras.value
     .filter(e => chosenExtraSet.value.has(e.key))
-    .reduce((acc, e) => acc + e.preco, 0)
-  return selectedProduct.value.preco + qtyExtrasTotal + setExtrasTotal
+    .reduce((acc, e) => acc + (Number(e.preco) || 0), 0)
+  return basePreco + qtyExtrasTotal + setExtrasTotal
 })
 
 function playPopSound() {
@@ -393,9 +396,11 @@ function playPopSound() {
 }
 
 function formatPrice(value) {
+  // Guarda contra NaN/undefined: qualquer valor não numérico vira 0
+  const num = parseFloat(value) || 0
   return new Intl.NumberFormat('pt-BR', {
     style: 'currency', currency: 'BRL',
-  }).format(value)
+  }).format(num)
 }
 
 function productImgSrc(product) {
@@ -438,7 +443,7 @@ function buildExtrasList(product) {
     for (const item of sub.itens || []) {
       list.push({
         key: 's' + item.id, subcategoria: sub.nome, id: item.id, nome: item.nome,
-        preco: Number(item.preco), maximo: item.maximo,
+        preco: Number(item.preco) || 0, maximo: item.maximo,
         descricao: item.descricao || '',
         imagem_base64: item.imagem_base64 || '',
         imagem_url: item.imagem_url || '',
@@ -447,7 +452,7 @@ function buildExtrasList(product) {
   }
   // Adicionais avulsos (legado) — grupo 'Geral'
   for (const extra of product.extras || []) {
-    list.push({ key: 'e' + extra.id, subcategoria: 'Geral', id: extra.id, nome: extra.nome, preco: Number(extra.preco), maximo: extra.maximo })
+    list.push({ key: 'e' + extra.id, subcategoria: 'Geral', id: extra.id, nome: extra.nome, preco: Number(extra.preco) || 0, maximo: extra.maximo })
   }
   return list
 }
@@ -589,10 +594,11 @@ function addToCart() {
   const chosenExtrasArray = buildChosenExtrasArray()
   let extrasTotal = 0
   for (const e of chosenExtrasArray) {
-    extrasTotal += e.preco * e.qty
+    extrasTotal += (Number(e.preco) || 0) * e.qty
   }
 
-  const itemTotal = selectedProduct.value.preco + extrasTotal
+  // preco do produto é string da API — Number() antes de somar (evita concat/NaN)
+  const itemTotal = (Number(selectedProduct.value.preco) || 0) + extrasTotal
 
   // Normalizar extras para o formato antigo (compatibilidade)
   const extrasLegacy = chosenExtrasArray.map(e => ({
@@ -629,7 +635,7 @@ function addToCart() {
       produto_id: selectedProduct.value.id,
       nome_produto: selectedProduct.value.nome,
       quantidade: 1,
-      preco_unitario: selectedProduct.value.preco,
+      preco_unitario: Number(selectedProduct.value.preco) || 0,
       extras: extrasLegacy,
       opcoes: opcoesArray,
       talheres: chosenTalheres.value,
@@ -657,22 +663,23 @@ function quickAdd(product) {
     item => item.produto_id === product.id && item.extras.length === 0
   )
 
+  const preco = Number(product.preco) || 0
   if (existingIndex >= 0) {
     const items = [...cartItems.value]
     items[existingIndex].quantidade++
-    items[existingIndex].subtotal += product.preco
+    items[existingIndex].subtotal += preco
     updateCart(items)
   } else {
     const newItem = {
       produto_id: product.id,
       nome_produto: product.nome,
       quantidade: 1,
-      preco_unitario: product.preco,
+      preco_unitario: preco,
       extras: [],
       opcoes: [],
       talheres: null,
       observacao: '',
-      subtotal: product.preco,
+      subtotal: preco,
     }
     updateCart([...cartItems.value, newItem])
   }
