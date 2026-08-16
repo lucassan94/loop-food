@@ -18,7 +18,7 @@
       <!-- Store Status -->
       <div class="card">
         <div class="card-header">
-          <i-lucide-power style="width:16px;height:16px" /> Status da Loja
+          <span class="card-header-title"><i-lucide-power style="width:16px;height:16px" /> Status da Loja</span>
         </div>
         <div class="card-body" style="display:flex;align-items:center;justify-content:space-between;">
           <div>
@@ -61,7 +61,7 @@
       <!-- Retirada no Local + Horários de Funcionamento -->
       <div class="card">
         <div class="card-header">
-          <i-lucide-store style="width:16px;height:16px" /> Retirada no Local
+          <span class="card-header-title"><i-lucide-store style="width:16px;height:16px" /> Retirada no Local</span>
         </div>
         <div class="card-body">
           <p style="font-size:0.85rem;color:var(--text-muted);margin-bottom:0.85rem;">
@@ -91,7 +91,7 @@
       <!-- Horários de Funcionamento por dia da semana -->
       <div class="card">
         <div class="card-header">
-          <i-lucide-clock style="width:16px;height:16px" /> Horários de Funcionamento
+          <span class="card-header-title"><i-lucide-clock style="width:16px;height:16px" /> Horários de Funcionamento</span>
         </div>
         <div class="card-body">
           <p style="font-size:0.85rem;color:var(--text-muted);margin-bottom:1rem;">
@@ -130,7 +130,7 @@
       <!-- Logo Upload -->
       <div class="card">
         <div class="card-header">
-          <i-lucide-image style="width:16px;height:16px" /> Logotipo
+          <span class="card-header-title"><i-lucide-image style="width:16px;height:16px" /> Logotipo</span>
         </div>
         <div class="card-body" style="display:flex;align-items:center;gap:1.25rem;">
           <div style="width:72px;height:72px;border-radius:12px;background:var(--border-light);display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0;">
@@ -151,7 +151,7 @@
       <!-- Equipe (simplificado: link para aba) -->
       <div class="card">
         <div class="card-header">
-          <i-lucide-users style="width:16px;height:16px" /> Equipe
+          <span class="card-header-title"><i-lucide-users style="width:16px;height:16px" /> Equipe</span>
           <span style="font-size:0.75rem;color:var(--text-muted);font-weight:400;">{{ equipe.length }} membro(s)</span>
         </div>
         <div class="card-body">
@@ -178,7 +178,7 @@
     <div v-if="activeTab === 'dados'" style="display:grid;gap:1.5rem;max-width:800px;">
       <div class="card">
         <div class="card-header">
-          <i-lucide-store style="width:16px;height:16px" /> Dados do Restaurante
+          <span class="card-header-title"><i-lucide-store style="width:16px;height:16px" /> Dados do Restaurante</span>
         </div>
         <div class="card-body">
           <div class="form-group"><label>Nome Fantasia</label><input v-model="restaurante.nome" placeholder="Nome do restaurante" /></div>
@@ -219,7 +219,7 @@
     <div v-if="activeTab === 'aparencia'" style="display:grid;gap:1.5rem;max-width:900px;">
       <div class="card">
         <div class="card-header">
-          <i-lucide-palette style="width:16px;height:16px" /> Cores do Tema
+          <span class="card-header-title"><i-lucide-palette style="width:16px;height:16px" /> Cores do Tema</span>
         </div>
         <div class="card-body" style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;">
           <!-- Color Pickers -->
@@ -301,7 +301,7 @@
     <div v-if="activeTab === 'cardapio'" style="display:grid;gap:1.5rem;max-width:800px;">
       <div class="card">
         <div class="card-header">
-          <i-lucide-map-pin style="width:16px;height:16px" /> Matriz de Logística (Raios de Entrega)
+          <span class="card-header-title"><i-lucide-map-pin style="width:16px;height:16px" /> Matriz de Logística (Raios de Entrega)</span>
         </div>
         <div class="card-body">
           <table class="data-table" v-if="raios.length">
@@ -331,7 +331,7 @@
     <div v-if="activeTab === 'pagamentos'" style="display:grid;gap:1.5rem;max-width:800px;">
       <div class="card">
         <div class="card-header">
-          <i-lucide-credit-card style="width:16px;height:16px" /> Formas de Pagamento Aceitas
+          <span class="card-header-title"><i-lucide-credit-card style="width:16px;height:16px" /> Formas de Pagamento Aceitas</span>
         </div>
         <div class="card-body">
           <p style="font-size:0.85rem;color:var(--text-muted);margin-bottom:1rem;">
@@ -374,7 +374,7 @@
     <div v-if="activeTab === 'salao'" style="display:grid;gap:1.5rem;max-width:800px;">
       <div class="card">
         <div class="card-header">
-          <i-lucide-table-2 style="width:16px;height:16px" /> Gerenciar Mesas
+          <span class="card-header-title"><i-lucide-table-2 style="width:16px;height:16px" /> Gerenciar Mesas</span>
         </div>
         <div class="card-body">
           <table class="data-table" v-if="mesas.length">
@@ -436,7 +436,7 @@
     <div v-if="activeTab === 'equipe'" style="display:grid;gap:1.5rem;max-width:800px;">
       <div class="card">
         <div class="card-header">
-          <i-lucide-users style="width:16px;height:16px" /> Gestão de Equipe
+          <span class="card-header-title"><i-lucide-users style="width:16px;height:16px" /> Gestão de Equipe</span>
         </div>
         <div class="card-body">
           <table class="data-table" v-if="equipe.length">
@@ -616,7 +616,7 @@
     <div v-if="activeTab === 'integracoes'" style="display:grid;gap:1.5rem;max-width:800px;">
       <div class="card">
         <div class="card-header">
-          <i-lucide-plug-zap style="width:16px;height:16px" /> iFood
+          <span class="card-header-title"><i-lucide-plug-zap style="width:16px;height:16px" /> iFood</span>
         </div>
         <div class="card-body">
           <p style="font-size:0.85rem;color:var(--text-muted);margin-bottom:1rem;">
@@ -1289,6 +1289,7 @@ onMounted(() => { load(); carregarBanners(); loadMesas(); carregarIfood() })
 .card { background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow); border: 1px solid var(--border); transition: var(--transition); }
 .card:hover { box-shadow: var(--shadow-md); }
 .card-header { padding: 1rem 1.25rem; border-bottom: 1px solid var(--border); font-weight: 600; font-size: 0.95rem; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.card-header-title { display: inline-flex; align-items: center; gap: 8px; }
 .card-body { padding: 1.25rem; }
 
 /* ── Tables ── */
